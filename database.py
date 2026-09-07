@@ -356,6 +356,18 @@ class DatabaseManager:
             );
             """)
 
+            # 18. Enterprise Performance Indexes (Scale to 100k+ Clinics)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_website ON leads(website);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_stage ON leads(stage);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_buying_prob ON leads(buying_probability);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_urgency ON leads(urgency_score);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_ev ON leads(expected_value);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_doctor ON leads(doctor_name);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_timeline_lead_ts ON opportunity_timeline(lead_id, timestamp);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_triggers_lead_ts ON trigger_events(lead_id, detected_at);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_audits_lead_ts ON audits(lead_id, timestamp);")
+
             conn.commit()
 
     @staticmethod
@@ -783,6 +795,14 @@ class DatabaseManager:
             d["urgency_score"] = TriggerEngine.calculate_urgency_score(d)
         else:
             d["urgency_score"] = int(d["urgency_score"])
+
+        # Calculate Data Completeness & Quality Score (0 - 100%)
+        from data_quality import DataQualityEngine
+        dq = DataQualityEngine.evaluate(d)
+        d["data_quality_score"] = dq["data_quality_score"]
+        d["data_quality_tier"] = dq["quality_tier"]
+        d["data_quality_missing"] = dq["missing_fields"]
+        d["data_quality_badge"] = dq["badge_color"]
 
         return d
 

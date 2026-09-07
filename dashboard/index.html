@@ -99,6 +99,12 @@
           Start
         </button>
       </div>
+      <div id="nav-health-widget" onclick="switchTab('settings')" class="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center space-x-2 cursor-pointer hover:border-teal-500/50 transition" title="Click to view System Health & Diagnostics">
+        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" id="nav-health-dot"></span>
+        <span class="text-slate-400">System:</span>
+        <span id="nav-health-text" class="font-bold text-emerald-300 text-xs">Healthy</span>
+        <span id="nav-cost-lead" class="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded font-mono ml-1">~$0.003/lead</span>
+      </div>
       <button onclick="exportLeads('xlsx')" title="Download all leads in formatted Excel file" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg border border-emerald-400/30 flex items-center gap-1.5 transition shadow-sm cursor-pointer">
         <i class="fa-solid fa-file-excel text-emerald-200"></i>
         <span>Export Excel</span>
@@ -169,6 +175,14 @@
         <button onclick="switchTab('proposals')" id="tab-btn-proposals" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
           <i class="fa-solid fa-file-invoice-dollar text-base w-5 text-center text-indigo-400"></i>
           <span>Proposal Generator</span>
+        </button>
+
+        <button onclick="switchTab('settings')" id="tab-btn-settings" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-server text-base w-5 text-center text-teal-400"></i>
+            <span>Settings & Health</span>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">v1.0</span>
         </button>
       </div>
 
@@ -808,6 +822,126 @@
         </div>
       </section>
 
+      <!-- TAB 10: SETTINGS & SYSTEM HEALTH (v1.0 RC HARDENING) -->
+      <section id="view-settings" class="space-y-6 max-w-6xl mx-auto hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-teal-950/50 via-slate-900 to-slate-900 border border-teal-500/30 rounded-2xl p-6 shadow-xl flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <h2 class="text-xl font-bold text-white tracking-tight">System Health, Disaster Recovery & Agency Settings</h2>
+              <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">v1.0 Production Hardened</span>
+            </div>
+            <p class="text-xs text-slate-400">Zero-lock SQLite backups, real-time diagnostic latency, token telemetry, and dynamic prospect configuration.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="loadHealthData(); loadTelemetryData(); loadBackupsList();" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
+              <i class="fa-solid fa-rotate-right"></i> Refresh Diagnostics
+            </button>
+            <button onclick="createBackupNow()" id="btn-create-backup" class="px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white text-xs font-bold flex items-center gap-2 transition shadow-lg cursor-pointer">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Backup SQLite Now
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Grid Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+          <!-- Card 1: System Health Diagnostic Matrix -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-heart-pulse text-emerald-400"></i> Operational Health Matrix
+              </h3>
+              <span id="health-overall-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">ALL SYSTEMS HEALTHY</span>
+            </div>
+            <div class="space-y-3 text-xs" id="health-components-list">
+              <!-- Populated by loadHealthData() -->
+            </div>
+          </div>
+
+          <!-- Card 2: Cost & Telemetry Intelligence -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-chart-pie text-cyan-400"></i> Unit Economics & Telemetry
+              </h3>
+              <span id="telemetry-cost-pill" class="font-mono text-xs font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded">~$0.0029 / lead</span>
+            </div>
+            <div class="grid grid-cols-2 gap-3" id="telemetry-grid">
+              <!-- Populated by loadTelemetryData() -->
+            </div>
+            <div class="pt-2 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
+              <span>Avg Discovery Pipeline:</span>
+              <span class="font-mono text-slate-200 font-semibold" id="telemetry-pipeline-speed">~11.7s / clinic</span>
+            </div>
+          </div>
+
+          <!-- Card 3: SQLite Disaster Recovery & Backups -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-database text-amber-400"></i> Point-in-Time SQLite Backups
+              </h3>
+              <span class="text-[10px] text-slate-400">30-Day Gzip Retention</span>
+            </div>
+            <div class="overflow-x-auto max-h-56 overflow-y-auto">
+              <table class="w-full text-left text-xs text-slate-300">
+                <thead class="bg-slate-950 text-[10px] text-slate-400 uppercase font-semibold">
+                  <tr>
+                    <th class="py-2 px-3">Archive</th>
+                    <th class="py-2 px-3">Size</th>
+                    <th class="py-2 px-3">Created</th>
+                    <th class="py-2 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="backups-table-body" class="divide-y divide-slate-800">
+                  <!-- Populated by loadBackupsList() -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Card 4: Agency Runtime Configuration -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-sliders text-purple-400"></i> Agency Runtime Configuration
+              </h3>
+              <button onclick="saveAgencySettings()" id="btn-save-settings" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer">
+                <i class="fa-solid fa-floppy-disk"></i> Save Changes
+              </button>
+            </div>
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="text-[11px] text-slate-400 font-semibold block mb-1">Target Territories (Comma-separated)</label>
+                <input type="text" id="settings-target-cities" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500 text-xs">
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-[11px] text-slate-400 font-semibold block mb-1">Min Review Count</label>
+                  <input type="number" id="settings-min-reviews" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500 text-xs" min="0" max="100">
+                </div>
+                <div>
+                  <label class="text-[11px] text-slate-400 font-semibold block mb-1">Min Buying Probability (%)</label>
+                  <input type="number" id="settings-min-buying-prob" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500 text-xs" min="0" max="100">
+                </div>
+              </div>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <label class="text-[11px] text-slate-400 font-semibold block mb-1">Avg Patient Case Value ($)</label>
+                  <input type="number" id="settings-case-value" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500 text-xs" step="50">
+                </div>
+                <div>
+                  <label class="text-[11px] text-slate-400 font-semibold block mb-1">Monthly Agency Retainer ($)</label>
+                  <input type="number" id="settings-monthly-fee" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-teal-500 text-xs" step="50">
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -1431,7 +1565,7 @@
     // Switch Tabs
     function switchTab(tab) {
       currentTab = tab;
-      ['finder', 'todays-calls', 'briefing', 'territories', 'learning', 'queue', 'kanban', 'leads', 'proposals'].forEach(t => {
+      ['finder', 'todays-calls', 'briefing', 'territories', 'learning', 'queue', 'kanban', 'leads', 'proposals', 'settings'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         const btn = document.getElementById(`tab-btn-${t}`);
         if (view && btn) {
@@ -1455,6 +1589,12 @@
       if (tab === 'queue') loadQueueData();
       if (tab === 'kanban') loadKanbanData();
       if (tab === 'leads') loadAllLeadsTable();
+      if (tab === 'settings') {
+        loadHealthData();
+        loadTelemetryData();
+        loadBackupsList();
+        loadAgencySettings();
+      }
       updateGlobalStats();
     }
 
@@ -1641,9 +1781,14 @@
                   <i class="fa-solid fa-user-doctor text-[9px]"></i> ${lead.doctor_name}
                 </div>
               ` : ''}
-              <div class="flex items-center space-x-2 text-[11px]">
+              <div class="flex items-center space-x-2 text-[11px] flex-wrap gap-y-1">
                 <span class="text-amber-400 font-semibold">★ ${lead.rating || 4.9}</span>
                 <span class="text-slate-500">(${lead.review_count || 50}+ reviews)</span>
+                ${lead.data_quality_score !== undefined && lead.data_quality_score !== null ? `
+                  <span class="px-1.5 py-0.5 rounded text-[9px] font-bold border ${lead.data_quality_badge || 'bg-teal-500/10 text-teal-400 border-teal-500/30'}">
+                    ${lead.data_quality_score}% Data
+                  </span>
+                ` : ''}
                 ${lead.phone ? `<span class="text-slate-500 truncate">• ${lead.phone}</span>` : ''}
               </div>
             </div>
@@ -3132,16 +3277,238 @@
       });
     }
 
-    function copyOutreachText(elemId) {
-      const text = document.getElementById(elemId).innerText;
-      navigator.clipboard.writeText(text);
-      showToast("Outreach copy copied to clipboard!");
+    // --- Production Hardening & System Functions (v1.0) ---
+
+    function loadHealthData() {
+      fetch('/api/system/health')
+        .then(r => r.json())
+        .then(data => {
+          const badge = document.getElementById('health-overall-badge');
+          const navText = document.getElementById('nav-health-text');
+          const navDot = document.getElementById('nav-health-dot');
+          const list = document.getElementById('health-components-list');
+
+          if (badge && navText && navDot) {
+            const isOk = data.overall_status === 'HEALTHY';
+            badge.innerText = isOk ? 'ALL SYSTEMS HEALTHY' : 'SYSTEM DEGRADED';
+            badge.className = isOk 
+              ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              : 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30';
+            navText.innerText = isOk ? 'Healthy' : 'Degraded';
+            navText.className = isOk ? 'font-bold text-emerald-300 text-xs' : 'font-bold text-amber-300 text-xs';
+            navDot.className = isOk ? 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse' : 'w-2 h-2 rounded-full bg-amber-400 animate-pulse';
+          }
+
+          if (list && data.components) {
+            let html = '';
+            for (const [key, comp] of Object.entries(data.components)) {
+              const statusColor = comp.status === 'HEALTHY' ? 'text-emerald-400' : (comp.status === 'WARNING' || comp.status === 'DEGRADED' ? 'text-amber-400' : 'text-rose-400');
+              const icon = key === 'database' ? 'fa-database' : (key === 'gemini_ai' ? 'fa-brain' : (key === 'playwright' ? 'fa-globe' : (key === 'scheduler' ? 'fa-clock' : 'fa-hard-drive')));
+              let details = '';
+              if (key === 'database') details = `Integrity: ${comp.integrity || 'OK'} • ${comp.total_records || 0} leads • ${comp.latency_ms || 0}ms latency • ${comp.file_size_mb || 0} MB`;
+              else if (key === 'gemini_ai') details = `Model: ${comp.model || 'gemini-2.5-flash'} • Key: ${comp.key_preview || (comp.api_key_configured ? 'Active' : 'Fallback Heuristics')}`;
+              else if (key === 'playwright') details = comp.installed ? 'Headless Chromium Ready • Full Page Capture' : (comp.message || 'Disabled');
+              else if (key === 'scheduler') details = comp.daemon_running ? `24/7 Running • ${comp.cycles_completed || 0} cycles • Every ${comp.interval_hours}h` : 'Daemon Idle (Ready to start)';
+              else if (key === 'storage') details = `Total: ${comp.total_mb || 0} MB (DB: ${comp.database_mb || 0}MB, Screens: ${comp.screenshots_mb || 0}MB, Backups: ${comp.backups_mb || 0}MB)`;
+
+              html += `
+                <div class="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
+                  <div class="flex items-center gap-3">
+                    <i class="fa-solid ${icon} text-slate-400 text-sm w-5 text-center"></i>
+                    <div>
+                      <div class="font-bold text-white capitalize">${key.replace('_', ' ')}</div>
+                      <div class="text-[11px] text-slate-400">${details}</div>
+                    </div>
+                  </div>
+                  <span class="font-bold text-[10px] ${statusColor} uppercase tracking-wider">${comp.status}</span>
+                </div>
+              `;
+            }
+            list.innerHTML = html;
+          }
+        })
+        .catch(() => {});
+    }
+
+    function loadTelemetryData() {
+      fetch('/api/system/telemetry')
+        .then(r => r.json())
+        .then(data => {
+          const costPill = document.getElementById('telemetry-cost-pill');
+          const navCost = document.getElementById('nav-cost-lead');
+          const grid = document.getElementById('telemetry-grid');
+          const speedElem = document.getElementById('telemetry-pipeline-speed');
+
+          if (data.all_time) {
+            const costStr = data.all_time.cost_per_lead_formatted || `$${data.all_time.cost_per_qualified_lead_usd} / lead`;
+            if (costPill) costPill.innerText = costStr;
+            if (navCost) navCost.innerText = costStr.replace(' / lead', '/lead');
+
+            if (grid) {
+              grid.innerHTML = `
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span class="text-[10px] text-slate-400 uppercase font-semibold block">Gemini AI Invocations</span>
+                  <span class="text-base font-extrabold text-purple-400 font-mono">${data.all_time.gemini_calls}</span>
+                  <span class="text-[9px] text-slate-500 block">Today: ${data.today ? data.today.gemini_calls : 0} calls</span>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span class="text-[10px] text-slate-400 uppercase font-semibold block">Browser Renders</span>
+                  <span class="text-base font-extrabold text-blue-400 font-mono">${data.all_time.playwright_runs}</span>
+                  <span class="text-[9px] text-slate-500 block">Screenshots saved</span>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span class="text-[10px] text-slate-400 uppercase font-semibold block">Total AI Spend</span>
+                  <span class="text-base font-extrabold text-emerald-400 font-mono">$${data.all_time.total_estimated_spend_usd}</span>
+                  <span class="text-[9px] text-slate-500 block">Today: $${data.today ? data.today.today_estimated_spend_usd : 0}</span>
+                </div>
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                  <span class="text-[10px] text-slate-400 uppercase font-semibold block">Cost Per Qualified Lead</span>
+                  <span class="text-base font-extrabold text-amber-400 font-mono">${data.all_time.cost_per_lead_formatted}</span>
+                  <span class="text-[9px] text-slate-500 block">Ultra-efficient unit cost</span>
+                </div>
+              `;
+            }
+          }
+
+          if (speedElem && data.benchmarks) {
+            speedElem.innerText = `~${data.benchmarks.full_lead_pipeline_sec}s / clinic (Scrape ${data.benchmarks.average_scrape_sec}s • Audit ${data.benchmarks.average_audit_sec}s • AI ${data.benchmarks.average_gemini_sec}s)`;
+          }
+        })
+        .catch(() => {});
+    }
+
+    function loadBackupsList() {
+      fetch('/api/system/backups')
+        .then(r => r.json())
+        .then(data => {
+          const tbody = document.getElementById('backups-table-body');
+          if (!tbody) return;
+          const backups = data.backups || [];
+          if (backups.length === 0) {
+            tbody.innerHTML = `
+              <tr>
+                <td colspan="4" class="py-6 text-center text-slate-500 italic">No backups found yet. Click "Backup SQLite Now" above.</td>
+              </tr>
+            `;
+            return;
+          }
+          tbody.innerHTML = backups.map(b => `
+            <tr class="hover:bg-slate-850 transition">
+              <td class="py-2.5 px-3 font-mono text-[11px] text-teal-300 font-semibold truncate max-w-[140px]">${b.filename}</td>
+              <td class="py-2.5 px-3 font-mono text-[11px] text-slate-400">${b.size_formatted}</td>
+              <td class="py-2.5 px-3 text-[11px] text-slate-400">${b.created_at_formatted || b.created_at.split('T')[0]}</td>
+              <td class="py-2.5 px-3 text-right">
+                <button onclick="restoreBackup('${b.filename}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-amber-600/30 text-amber-300 hover:text-amber-200 border border-amber-500/20 text-[10px] font-bold transition cursor-pointer">
+                  <i class="fa-solid fa-clock-rotate-left"></i> Restore
+                </button>
+              </td>
+            </tr>
+          `).join('');
+        })
+        .catch(() => {});
+    }
+
+    function createBackupNow() {
+      const btn = document.getElementById('btn-create-backup');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Backing up...';
+      btn.disabled = true;
+
+      fetch('/api/system/backups/create', { method: 'POST' })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            showToast(`SQLite snapshot saved: ${res.archive_name} (${Math.round(res.compressed_size_bytes / 1024)} KB)`);
+            loadBackupsList();
+            loadHealthData();
+          } else {
+            showToast(`Backup error: ${res.error || 'Failed'}`);
+          }
+        })
+        .catch(err => showToast(`Network error: ${err.message}`))
+        .finally(() => {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        });
+    }
+
+    function restoreBackup(filename) {
+      if (!confirm(`Are you sure you want to restore database from backup "${filename}"?\nA pre-restore safety snapshot will automatically be created before any changes.`)) {
+        return;
+      }
+      showToast("Restoring SQLite snapshot...");
+      fetch('/api/system/backups/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ backup_filename: filename })
+      })
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            showToast(`Database restored from ${res.restored_from}! Safety copy: ${res.safety_backup}`);
+            loadBackupsList();
+            loadHealthData();
+            updateGlobalStats();
+          } else {
+            showToast(`Restore failed: ${res.error || 'Unknown error'}`);
+          }
+        })
+        .catch(err => showToast(`Restore error: ${err.message}`));
+    }
+
+    function loadAgencySettings() {
+      fetch('/api/settings')
+        .then(r => r.json())
+        .then(cfg => {
+          if (document.getElementById('settings-target-cities')) {
+            document.getElementById('settings-target-cities').value = (cfg.target_cities || []).join(', ');
+            document.getElementById('settings-min-reviews').value = cfg.min_reviews_threshold || 15;
+            document.getElementById('settings-min-buying-prob').value = cfg.min_buying_probability || 65;
+            document.getElementById('settings-case-value').value = cfg.default_case_value || 900;
+            document.getElementById('settings-monthly-fee').value = cfg.default_monthly_retainer || 299;
+          }
+        })
+        .catch(() => {});
+    }
+
+    function saveAgencySettings() {
+      const btn = document.getElementById('btn-save-settings');
+      const originalText = btn.innerHTML;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+
+      const cities = document.getElementById('settings-target-cities').value.split(',').map(s => s.trim()).filter(Boolean);
+      const minReviews = parseInt(document.getElementById('settings-min-reviews').value) || 15;
+      const minProb = parseInt(document.getElementById('settings-min-buying-prob').value) || 65;
+      const caseVal = parseInt(document.getElementById('settings-case-value').value) || 900;
+      const fee = parseInt(document.getElementById('settings-monthly-fee').value) || 299;
+
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_cities: cities,
+          min_reviews_threshold: minReviews,
+          min_buying_probability: minProb,
+          default_case_value: caseVal,
+          default_monthly_retainer: fee
+        })
+      })
+        .then(r => r.json())
+        .then(res => {
+          showToast("Agency configuration saved successfully!");
+        })
+        .catch(err => showToast(`Failed to save: ${err.message}`))
+        .finally(() => {
+          btn.innerHTML = originalText;
+        });
     }
 
     window.addEventListener('DOMContentLoaded', () => {
       updateGlobalStats();
       initMap();
       checkDaemonStatus();
+      loadHealthData();
+      loadTelemetryData();
       // Load recent leads on initial view
       fetch('/api/leads?limit=12')
         .then(r => r.json())

@@ -33,6 +33,11 @@ from timeline import OpportunityTimelineManager
 from simulator import AICallSimulator
 from triggers import TriggerEngine, compute_html_hash, compute_tech_hash
 from loom_script import generate_loom_pitch
+from backup_manager import BackupManager
+from health_monitor import SystemHealthMonitor
+from cost_tracker import CostTelemetryTracker
+from settings_manager import SettingsManager
+from security import SecurityHeadersMiddleware, validate_startup_security, human_jitter_delay, compress_image_if_possible
 
 # Setup directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -81,6 +86,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(SecurityHeadersMiddleware)
 
 # Mount static directories
 app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
@@ -88,6 +94,12 @@ app.mount("/static", StaticFiles(directory=str(DASHBOARD_DIR)), name="static")
 
 # Shared Database Instance
 db = DatabaseManager()
+
+# Hardening & Reliability Managers
+backup_mgr = BackupManager(db_path=db.db_path, backup_dir=OUTPUT_DIR / "backups")
+health_monitor = SystemHealthMonitor(db=db, output_dir=OUTPUT_DIR)
+cost_tracker = CostTelemetryTracker(telemetry_file=OUTPUT_DIR / "telemetry.json")
+settings_mgr = SettingsManager(settings_file=OUTPUT_DIR / "settings.json")
 
 # Background job tracking
 active_jobs: Dict[str, Dict[str, Any]] = {}
@@ -155,6 +167,25 @@ class CheckChangesRequest(BaseModel):
     technologies: Optional[List[str]] = None
     new_reviews: Optional[int] = None
     new_rating: Optional[float] = None
+
+class BackupRestoreRequest(BaseModel):
+    backup_filename: str
+
+class SettingsUpdateRequest(BaseModel):
+    target_cities: Optional[List[str]] = None
+    min_reviews_threshold: Optional[int] = None
+    min_reviews: Optional[int] = None
+    min_buying_probability: Optional[int] = None
+    default_case_value: Optional[int] = None
+    avg_case_value: Optional[int] = None
+    default_monthly_retainer: Optional[int] = None
+    monthly_fee: Optional[int] = None
+    daemon_interval_hours: Optional[float] = None
+    daemon_limit_per_city: Optional[int] = None
+    rate_limit_min_delay_sec: Optional[float] = None
+    rate_limit_max_delay_sec: Optional[float] = None
+    auto_backup_enabled: Optional[bool] = None
+    agency_name: Optional[str] = None
 
 # --- Helper Functions ---
 
@@ -1184,6 +1215,68 @@ async def get_search_status(job_id: str):
     if job_id not in active_jobs:
         raise HTTPException(status_code=404, detail="Job ID not found")
     return active_jobs[job_id]
+
+# --- v1.0 Hardening & System Endpoints ---
+
+@app.get("/api/health")
+async def get_basic_health():
+    """Lightweight health probe for container orchestrators and monitoring checks."""
+    return {"status": "ok", "service": "Dental WhatsApp Intelligence Platform", "version": "1.0.0"}
+
+@app.get("/api/system/health")
+async def get_system_health():
+    """Runs a complete live diagnostic across Database, Gemini, Playwright, Storage, and Scheduler."""
+    return health_monitor.run_full_diagnostic()
+
+@app.get("/api/system/telemetry")
+async def get_system_telemetry():
+    """Retrieves real-time token spend, storage footprint, and Cost Per Qualified Lead economics."""
+    return cost_tracker.get_summary()
+
+@app.get("/api/system/backups")
+async def list_system_backups():
+    """Returns the inventory of compressed SQLite disaster recovery snapshots."""
+    return {"backups": backup_mgr.list_backups()}
+
+@app.post("/api/system/backups/create")
+async def create_system_backup():
+    """Triggers an instantaneous zero-lock online SQLite backup and gzip compression."""
+    result = backup_mgr.create_backup(label="manual")
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Backup failed"))
+    return result
+
+@app.post("/api/system/backups/restore")
+async def restore_system_backup(req: BackupRestoreRequest):
+    """Safely restores SQLite database from a selected backup snapshot with pre-restore safety state."""
+    result = backup_mgr.restore_backup(req.backup_filename)
+    if not result.get("success"):
+        raise HTTPException(status_code=500, detail=result.get("error", "Restore failed"))
+    return result
+
+@app.get("/api/settings")
+async def get_agency_settings():
+    """Returns persistent runtime configuration for prospecting, thresholds, and financial models."""
+    return settings_mgr.get_settings()
+
+@app.post("/api/settings")
+async def update_agency_settings(req: SettingsUpdateRequest):
+    """Updates and persists runtime configurations instantly across the platform."""
+    updates = req.model_dump(exclude_unset=True)
+    if "min_reviews" in updates and "min_reviews_threshold" not in updates:
+        updates["min_reviews_threshold"] = updates["min_reviews"]
+    if "avg_case_value" in updates and "default_case_value" not in updates:
+        updates["default_case_value"] = updates["avg_case_value"]
+    if "monthly_fee" in updates and "default_monthly_retainer" not in updates:
+        updates["default_monthly_retainer"] = updates["monthly_fee"]
+
+    updated = settings_mgr.update_settings(updates)
+    return {"status": "success", "settings": updated}
+
+@app.get("/api/system/security")
+async def get_system_security_status():
+    """Returns security auditing, headers verification, and masked credential status."""
+    return validate_startup_security()
 
 if __name__ == "__main__":
     import webbrowser
