@@ -1,7 +1,7 @@
 import asyncio
 import re
 import urllib.parse
-from typing import List, Optional
+from typing import List, Optional, Any
 from playwright.async_api import async_playwright, Page, BrowserContext
 
 from config import MAPS_BASE_URL, USER_AGENT, HEADLESS_BROWSER
