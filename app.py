@@ -29,6 +29,8 @@ from scheduler import AutonomousScheduler
 from territory_manager import TerritoryManager
 from ai_qualifier import AIQualifier
 from outreach_generator import OutreachGenerator
+from timeline import OpportunityTimelineManager
+from simulator import AICallSimulator
 
 # Setup directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -43,29 +45,28 @@ OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 (OUTPUT_DIR / "proposals").mkdir(exist_ok=True, parents=True)
 (OUTPUT_DIR / "screenshots").mkdir(exist_ok=True, parents=True)
 
-async def capture_website_screenshot(url: str, save_path: Path) -> bool:
-    """Capture 1280x800 desktop homepage screenshot using Playwright."""
-    if not url:
-        return False
+def capture_screenshot_sync(url: str, save_path: Path) -> bool:
     target_url = url if (url.startswith("http://") or url.startswith("https://")) else f"https://{url}"
     try:
         from playwright.async_api import async_playwright
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            context = await browser.new_context(
-                viewport={"width": 1280, "height": 800},
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-            )
-            page = await context.new_page()
-            try:
-                await page.goto(target_url, timeout=12000, wait_until="domcontentloaded")
-                await asyncio.sleep(1.0)
-                await page.screenshot(path=str(save_path), full_page=False, quality=80, type="jpeg")
-                return True
-            except Exception:
-                return False
-            finally:
-                await browser.close()
+        async def _capture():
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(headless=True)
+                context = await browser.new_context(
+                    viewport={"width": 1280, "height": 800},
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                )
+                page = await context.new_page()
+                try:
+                    await page.goto(target_url, timeout=12000, wait_until="domcontentloaded")
+                    await asyncio.sleep(1.0)
+                    await page.screenshot(path=str(save_path), full_page=False, quality=80, type="jpeg")
+                    return True
+                except Exception:
+                    return False
+                finally:
+                    await browser.close()
+        return asyncio.run(_capture())
     except Exception:
         return False
 
@@ -121,6 +122,26 @@ class CallOutcomeRequest(BaseModel):
 class NextTerritoryRequest(BaseModel):
     territory_id: Optional[str] = None
     limit: int = 8
+
+class CallSimulationStartRequest(BaseModel):
+    persona: Optional[str] = "GATEKEEPER_RECEPTIONIST"
+
+class CallSimulationTurnRequest(BaseModel):
+    persona: str = "GATEKEEPER_RECEPTIONIST"
+    user_pitch: str
+    history: List[Dict[str, str]] = []
+
+class TimelineEventCreateRequest(BaseModel):
+    event_type: str
+    title: str
+    description: Optional[str] = None
+    actor: str = "SALES_REP"
+    metadata: Optional[Dict[str, Any]] = None
+
+class DaemonToggleRequest(BaseModel):
+    enable: bool = True
+    interval_hours: float = 6.0
+    limit_per_cycle: int = 8
 
 # --- Helper Functions ---
 
@@ -611,6 +632,114 @@ async def get_lead_outreach(lead_id: str):
 async def get_learning_insights():
     return db.get_conversion_intelligence()
 
+# --- Opportunity Timeline Endpoints ---
+
+@app.get("/api/leads/{lead_id}/timeline")
+async def get_lead_timeline(lead_id: str):
+    events = db.get_lead_timeline(lead_id)
+    return {"lead_id": lead_id, "events": events, "count": len(events)}
+
+@app.post("/api/leads/{lead_id}/timeline")
+async def add_lead_timeline_event(lead_id: str, req: TimelineEventCreateRequest):
+    event_id = db.log_timeline_event(
+        lead_id=lead_id,
+        event_type=req.event_type,
+        title=req.title,
+        description=req.description,
+        actor=req.actor,
+        metadata=req.metadata
+    )
+    return {"status": "success", "event_id": event_id, "lead_id": lead_id}
+
+# --- AI Call Roleplay Simulator Endpoints ---
+
+@app.post("/api/leads/{lead_id}/simulate-call/start")
+async def start_call_simulation(lead_id: str, req: Optional[CallSimulationStartRequest] = None):
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    persona = req.persona if req else "GATEKEEPER_RECEPTIONIST"
+    session_data = AICallSimulator.start_session(dict(lead), persona=persona)
+    return session_data
+
+@app.post("/api/leads/{lead_id}/simulate-call/turn")
+async def simulate_call_turn(lead_id: str, req: CallSimulationTurnRequest):
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    turn_res = AICallSimulator.simulate_turn(
+        lead_dict=dict(lead),
+        persona=req.persona,
+        conversation_history=req.history,
+        user_pitch=req.user_pitch
+    )
+    # Log practiced simulation event to lead timeline
+    try:
+        db.log_timeline_event(
+            lead_id=lead_id,
+            event_type="SIMULATION_PRACTICED",
+            title=f"Call Sparring: {req.persona} (Score: {turn_res.evaluation.overall_score}/10)",
+            description=f"Turn evaluated. Status: {turn_res.status}. Feedback: {turn_res.evaluation.tactical_feedback}",
+            actor="SALES_REP",
+            metadata={
+                "persona": req.persona,
+                "overall_score": turn_res.evaluation.overall_score,
+                "hook_score": turn_res.evaluation.hook_score,
+                "value_score": turn_res.evaluation.value_score,
+                "control_score": turn_res.evaluation.control_score,
+                "status": turn_res.status
+            }
+        )
+    except Exception:
+        pass
+    return turn_res.model_dump()
+
+# --- Expected Value ($EV) Prioritized Queue ---
+
+@app.get("/api/queue/top-ev")
+async def get_top_ev_queue(min_probability: int = 50, limit: int = 50):
+    leads = db.get_top_ev_queue(min_probability=min_probability, limit=limit)
+    results = []
+    for l in leads:
+        wa_data = generate_wa_pitch_and_link(l)
+        l_copy = dict(l)
+        l_copy["clean_phone"] = wa_data["clean_phone"]
+        l_copy["wa_link"] = wa_data["wa_link"]
+
+        rev_min = l.get("missed_rev_min") or l.get("audit_missed_rev_min") or 3450
+        rev_max = l.get("missed_rev_max") or l.get("audit_missed_rev_max") or 6900
+        l_copy["missed_rev_range"] = f"${rev_min:,.0f} - ${rev_max:,.0f}"
+
+        shot_path = l.get("screenshot_path")
+        lead_id = l.get("id")
+        if shot_path and Path(shot_path).exists():
+            l_copy["screenshot_url"] = f"/output/screenshots/{Path(shot_path).name}"
+        elif lead_id and (OUTPUT_DIR / "screenshots" / f"{lead_id}.jpg").exists():
+            l_copy["screenshot_url"] = f"/output/screenshots/{lead_id}.jpg"
+        else:
+            l_copy["screenshot_url"] = None
+
+        results.append(l_copy)
+    return results
+
+# --- 24/7 Autonomous Daemon Endpoints ---
+
+@app.get("/api/scheduler/daemon")
+async def get_daemon_status():
+    return AutonomousScheduler.get_daemon_status()
+
+@app.post("/api/scheduler/daemon/toggle")
+async def toggle_daemon(req: DaemonToggleRequest):
+    if req.enable:
+        status = await AutonomousScheduler.start_daemon(
+            interval_hours=req.interval_hours,
+            limit_per_cycle=req.limit_per_cycle,
+            headless=True,
+            db=db
+        )
+    else:
+        status = AutonomousScheduler.stop_daemon()
+    return status
 
 @app.post("/api/leads/{lead_id}/stage")
 async def update_lead_stage(lead_id: str, req: StageUpdateRequest):

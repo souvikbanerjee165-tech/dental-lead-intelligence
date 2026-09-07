@@ -277,6 +277,8 @@ class DatabaseManager:
                 cursor.execute("ALTER TABLE leads ADD COLUMN sales_verdict TEXT;")
             if "territory_id" not in existing_lead_cols:
                 cursor.execute("ALTER TABLE leads ADD COLUMN territory_id TEXT;")
+            if "expected_value" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN expected_value REAL DEFAULT 0.0;")
 
             cursor.execute("PRAGMA table_info(audits);")
             existing_audit_cols = {row["name"] for row in cursor.fetchall()}
@@ -311,6 +313,21 @@ class DatabaseManager:
                 outcome TEXT NOT NULL,
                 rep_notes TEXT,
                 call_duration_sec INTEGER DEFAULT 0,
+                FOREIGN KEY (lead_id) REFERENCES leads (id)
+            );
+            """)
+
+            # 16. Opportunity Timeline (Longitudinal Practice Lifecycle)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS opportunity_timeline (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lead_id TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT,
+                actor TEXT DEFAULT 'SYSTEM',
+                metadata_json TEXT,
                 FOREIGN KEY (lead_id) REFERENCES leads (id)
             );
             """)
@@ -719,6 +736,12 @@ class DatabaseManager:
                 d["staff_roster"] = json.loads(d["staff_roster"])
             except Exception:
                 pass
+        # Calculate or normalize Expected Value ($EV = Contract LTV $3,979 * Buying Probability)
+        if d.get("expected_value") is not None and float(d.get("expected_value") or 0.0) > 0:
+            d["expected_value"] = float(d["expected_value"])
+        else:
+            prob = float(d.get("buying_probability") or 75)
+            d["expected_value"] = round(3979.0 * (prob / 100.0), 2)
         return d
 
     def get_lead(self, lead_id: str) -> Optional[Dict[str, Any]]:
@@ -808,6 +831,23 @@ class DatabaseManager:
             INSERT INTO stage_transitions (lead_id, from_stage, to_stage, notes, transitioned_at)
             VALUES (?, ?, ?, ?, ?)
             """, (lead_id, old_stage, new_stage, notes, now_str))
+            
+            # Log to opportunity timeline
+            try:
+                from timeline import OpportunityTimelineManager
+                OpportunityTimelineManager.log_event(
+                    db=self,
+                    lead_id=lead_id,
+                    event_type="STAGE_TRANSITION",
+                    title=f"Stage Shift: {old_stage} ➔ {new_stage}",
+                    description=notes or f"Pipeline status moved to {new_stage}.",
+                    actor="SALES_REP",
+                    metadata={"from_stage": old_stage, "to_stage": new_stage},
+                    timestamp=now_str
+                )
+            except Exception:
+                pass
+
             conn.commit()
             return True
 
@@ -821,6 +861,22 @@ class DatabaseManager:
             """, (lead_id, author, note_text, now_str))
             note_id = cursor.lastrowid
             cursor.execute("UPDATE leads SET notes = ?, last_updated = ? WHERE id = ?", (note_text, now_str, lead_id))
+
+            # Log to opportunity timeline
+            try:
+                from timeline import OpportunityTimelineManager
+                OpportunityTimelineManager.log_event(
+                    db=self,
+                    lead_id=lead_id,
+                    event_type="NOTE_ADDED",
+                    title=f"Note by {author}",
+                    description=note_text,
+                    actor=author,
+                    timestamp=now_str
+                )
+            except Exception:
+                pass
+
             conn.commit()
             return note_id
 
@@ -1021,15 +1077,39 @@ class DatabaseManager:
         with self._get_connection() as conn:
             cursor = conn.cursor()
             triggers_json = json.dumps(buying_triggers)
+            expected_val = round(3979.0 * (buying_probability / 100.0), 2)
             cursor.execute("""
             UPDATE leads
             SET buying_probability = ?, should_call = ?, pain_level = ?,
                 practice_type = ?, decision_accessibility = ?,
                 buying_triggers = ?, sales_verdict = ?,
+                expected_value = ?,
                 territory_id = COALESCE(?, territory_id)
             WHERE id = ?
-            """, (buying_probability, should_call, pain_level, practice_type, decision_accessibility, triggers_json, sales_verdict, territory_id, lead_id))
+            """, (buying_probability, should_call, pain_level, practice_type, decision_accessibility, triggers_json, sales_verdict, expected_val, territory_id, lead_id))
             conn.commit()
+
+            # Record timeline event for AI Qualification
+            try:
+                from timeline import OpportunityTimelineManager
+                OpportunityTimelineManager.log_event(
+                    db=self,
+                    lead_id=lead_id,
+                    event_type="AI_QUALIFIED",
+                    title=f"AI Sales Qualification: {buying_probability}% Buying Probability",
+                    description=f"{sales_verdict}. Pain level: {pain_level}. Should call: {should_call}. Expected Pipeline Value: ${expected_val:,.2f}.",
+                    actor="AI_AGENT",
+                    metadata={
+                        "buying_probability": buying_probability,
+                        "should_call": should_call,
+                        "pain_level": pain_level,
+                        "expected_value": expected_val,
+                        "buying_triggers": buying_triggers
+                    }
+                )
+            except Exception:
+                pass
+
             return cursor.rowcount > 0
 
     def get_todays_calls(self, min_probability: int = 75, limit: int = 50) -> List[Dict[str, Any]]:
@@ -1055,6 +1135,61 @@ class DatabaseManager:
                     except Exception:
                         l["buying_triggers"] = [l["buying_triggers"]]
             return leads
+
+    def get_top_ev_queue(self, min_probability: int = 50, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Returns prioritized leads ordered by Expected Pipeline Value ($EV = Contract LTV $3,979 * Buying Prob).
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT l.*, a.maturity_score, a.opportunity_score as audit_opportunity_score,
+                   a.missed_rev_min as audit_missed_rev_min, a.missed_rev_max as audit_missed_rev_max,
+                   a.annual_gap, a.timestamp as last_audit
+            FROM leads l
+            LEFT JOIN audits a ON a.lead_id = l.id AND a.timestamp = (SELECT MAX(a2.timestamp) FROM audits a2 WHERE a2.lead_id = l.id)
+            WHERE (COALESCE(l.buying_probability, 0) >= ? OR l.should_call = 'YES' OR COALESCE(l.opportunity_score, 0) >= 60)
+              AND COALESCE(l.stage, 'FOUND') NOT IN ('WON', 'LOST')
+            ORDER BY COALESCE(NULLIF(l.expected_value, 0), ROUND(3979.0 * (COALESCE(l.buying_probability, 75) / 100.0), 2)) DESC, COALESCE(l.buying_probability, 0) DESC, COALESCE(l.opportunity_score, 0) DESC
+            LIMIT ?
+            """, (min_probability, limit))
+            leads = [self._format_lead_row(r) for r in cursor.fetchall() if r]
+            for l in leads:
+                if l and "buying_triggers" in l and l["buying_triggers"]:
+                    try:
+                        l["buying_triggers"] = json.loads(l["buying_triggers"])
+                    except Exception:
+                        l["buying_triggers"] = [l["buying_triggers"]]
+            leads.sort(key=lambda x: (x.get("expected_value") or 0.0, x.get("buying_probability") or 0), reverse=True)
+            return leads
+
+    # --- Opportunity Timeline ---
+
+    def log_timeline_event(
+        self,
+        lead_id: str,
+        event_type: str,
+        title: str,
+        description: Optional[str] = None,
+        actor: str = "SYSTEM",
+        metadata: Optional[Dict[str, Any]] = None,
+        timestamp: Optional[str] = None
+    ) -> int:
+        from timeline import OpportunityTimelineManager
+        return OpportunityTimelineManager.log_event(
+            db=self,
+            lead_id=lead_id,
+            event_type=event_type,
+            title=title,
+            description=description,
+            actor=actor,
+            metadata=metadata,
+            timestamp=timestamp
+        )
+
+    def get_lead_timeline(self, lead_id: str) -> List[Dict[str, Any]]:
+        from timeline import OpportunityTimelineManager
+        return OpportunityTimelineManager.get_unified_timeline(db=self, lead_id=lead_id)
 
     # --- Call Logs & Closed-Loop Conversion Learning ---
 
@@ -1091,6 +1226,23 @@ class DatabaseManager:
                 INSERT INTO stage_transitions (lead_id, from_stage, to_stage, notes, transitioned_at)
                 VALUES (?, (SELECT stage FROM leads WHERE id = ?), ?, ?, ?)
                 """, (lead_id, lead_id, target_stage, f"Call logged as {outcome}: {rep_notes or ''}", now_str))
+
+            # Record timeline event for the call
+            try:
+                from timeline import OpportunityTimelineManager
+                duration_str = f" ({duration_sec}s)" if duration_sec else ""
+                OpportunityTimelineManager.log_event(
+                    db=self,
+                    lead_id=lead_id,
+                    event_type="CALL_LOGGED",
+                    title=f"Outbound Phone Call: {outcome}{duration_str}",
+                    description=rep_notes or f"Call completed with outcome {outcome}.",
+                    actor="SALES_REP",
+                    metadata={"outcome": outcome, "duration_sec": duration_sec, "rep_notes": rep_notes},
+                    timestamp=now_str
+                )
+            except Exception:
+                pass
 
             conn.commit()
             return log_id

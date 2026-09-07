@@ -91,6 +91,14 @@
         <span class="text-slate-400">Pending Review:</span>
         <span id="nav-queue-count" class="font-bold text-cyan-400 text-sm">--</span>
       </div>
+      <div id="nav-daemon-widget" class="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center space-x-2">
+        <span class="w-2 h-2 rounded-full bg-slate-500" id="nav-daemon-dot"></span>
+        <span class="text-slate-400">24/7 Daemon:</span>
+        <span id="nav-daemon-text" class="font-bold text-slate-300">OFF</span>
+        <button onclick="toggleDaemonFromNav()" id="btn-nav-daemon" class="ml-1 text-[10px] bg-emerald-700 hover:bg-emerald-600 text-white font-bold px-2 py-0.5 rounded cursor-pointer transition">
+          Start
+        </button>
+      </div>
       <button onclick="exportLeads('xlsx')" title="Download all leads in formatted Excel file" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg border border-emerald-400/30 flex items-center gap-1.5 transition shadow-sm cursor-pointer">
         <i class="fa-solid fa-file-excel text-emerald-200"></i>
         <span>Export Excel</span>
@@ -613,9 +621,19 @@
               <h2 class="text-2xl font-extrabold text-white mt-1">Today's Priority Calls</h2>
               <p class="text-xs text-slate-400 max-w-xl mt-1">Hand-picked high-leverage dental practices with confirmed decision makers, high patient volume, and zero after-hours conversational intake.</p>
             </div>
-            <button onclick="loadTodaysCallsData()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
-              <i class="fa-solid fa-rotate-right"></i> Refresh Hot Queue
-            </button>
+            <!-- $EV vs Probability Sort Toggles -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs text-slate-400 font-semibold">Priority:</span>
+              <button onclick="switchCallsSort('ev')" id="btn-sort-ev" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold transition shadow flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-sack-dollar text-emerald-200"></i> Top $EV ($3,979 LTV)
+              </button>
+              <button onclick="switchCallsSort('prob')" id="btn-sort-prob" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-percent text-cyan-400"></i> Probability
+              </button>
+              <button onclick="loadTodaysCallsData()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer" title="Refresh">
+                <i class="fa-solid fa-rotate-right"></i>
+              </button>
+            </div>
           </div>
 
           <!-- KPI Summary Row -->
@@ -862,6 +880,21 @@
             <!-- Populated via JS -->
           </div>
         </div>
+
+        <!-- Opportunity Timeline (Longitudinal History) -->
+        <div class="space-y-3 pt-4 border-t border-slate-800">
+          <div class="flex items-center justify-between">
+            <label class="font-bold text-slate-200 text-xs uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-clock-rotate-left text-blue-400"></i> Opportunity Lifecycle Timeline
+            </label>
+            <button onclick="if(currentSelectedLeadId) loadLeadTimeline(currentSelectedLeadId)" class="text-xs text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer">
+              <i class="fa-solid fa-rotate-right"></i> Refresh Timeline
+            </button>
+          </div>
+          <div id="modal-timeline-container" class="space-y-3 max-h-56 overflow-y-auto pr-1">
+            <!-- Populated dynamically via loadLeadTimeline(leadId) -->
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -883,9 +916,14 @@
             <p id="battlecard-target-doctor" class="text-xs text-indigo-300 font-medium">Target: Dr. Sarah Miller, DDS</p>
           </div>
         </div>
-        <button onclick="closeBattlecardModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
-          <i class="fa-solid fa-xmark"></i>
-        </button>
+        <div class="flex items-center gap-2">
+          <button onclick="if(currentBattlecardLeadId) openCallSimulatorModal(currentBattlecardLeadId)" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs flex items-center gap-1.5 shadow transition cursor-pointer">
+            <i class="fa-solid fa-hand-fist"></i> Spar with Gemini
+          </button>
+          <button onclick="closeBattlecardModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
       </div>
 
       <!-- Modal Body -->
@@ -966,6 +1004,85 @@
               <i class="fa-brands fa-whatsapp text-base"></i> Launch WhatsApp Web Now
             </a>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI CALL SIMULATOR ROLEPLAY SPARRING MODAL -->
+  <div id="modal-call-simulator" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-cyan-500/40 rounded-2xl max-w-3xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-hand-fist"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="sim-clinic-name" class="text-base font-bold text-white">AI Call Roleplay Simulator</h3>
+              <span id="sim-persona-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Sparring Partner</span>
+            </div>
+            <p class="text-xs text-slate-400">Practice cold call objection handling with Gemini simulating the doctor or gatekeeper</p>
+          </div>
+        </div>
+        <button onclick="closeCallSimulatorModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Persona Selector & Live Scorecard Bar -->
+      <div class="px-6 py-3 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-semibold text-slate-400">Opponent Persona:</span>
+          <button onclick="switchSimPersona('GATEKEEPER_RECEPTIONIST')" id="sim-persona-btn-gk" class="px-3 py-1 rounded-lg text-xs font-bold bg-cyan-600 text-white transition cursor-pointer">
+            🛡️ Defensive Gatekeeper
+          </button>
+          <button onclick="switchSimPersona('BUSY_DOCTOR')" id="sim-persona-btn-doc" class="px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer">
+            👨‍⚕️ Busy Doctor (Impatient)
+          </button>
+        </div>
+        <div id="sim-scorecard" class="flex items-center gap-2 text-xs">
+          <span class="text-slate-400">Score:</span>
+          <span id="sim-score-overall" class="font-bold text-cyan-400 bg-cyan-950/60 border border-cyan-500/30 px-2.5 py-0.5 rounded-md font-mono">-- / 10</span>
+          <span id="sim-status-pill" class="px-2 py-0.5 rounded-md font-bold text-[10px] bg-slate-800 text-slate-400">READY</span>
+        </div>
+      </div>
+
+      <!-- Chat Dialogue Area -->
+      <div id="sim-chat-area" class="p-6 overflow-y-auto space-y-4 flex-1 text-xs min-h-[220px]">
+        <!-- Populated via JS -->
+      </div>
+
+      <!-- Tactical Coaching & Objection Pivot Suggestion Box -->
+      <div id="sim-feedback-box" class="hidden px-6 py-3 bg-slate-950 border-t border-slate-800/80 text-xs space-y-1.5 shrink-0">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-cyan-400 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+            <i class="fa-solid fa-chalkboard-user"></i> Tactical Coach Feedback
+          </span>
+          <span id="sim-sub-scores" class="text-[10px] text-slate-400 font-mono">Hook: - | Value: - | Control: -</span>
+        </div>
+        <p id="sim-feedback-text" class="text-slate-300"></p>
+        <div class="bg-cyan-950/30 border border-cyan-500/20 rounded-lg p-2.5 text-cyan-200 flex items-start gap-2">
+          <span class="text-cyan-400 font-bold">Pivot:</span>
+          <span id="sim-pivot-text" class="italic select-all text-slate-200"></span>
+        </div>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="p-4 bg-slate-950 border-t border-slate-800 shrink-0 space-y-2">
+        <div class="flex items-center gap-2">
+          <input type="text" id="sim-input-pitch" placeholder="Speak or type your cold call hook / objection pivot here..." class="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500" onkeydown="if(event.key==='Enter') submitSimulatorPitch()">
+          <button onclick="submitSimulatorPitch()" id="btn-sim-submit" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-1.5 transition shadow cursor-pointer">
+            <i class="fa-solid fa-paper-plane"></i> Pitch
+          </button>
+        </div>
+        <!-- Quick Pitch Helpers -->
+        <div class="flex items-center gap-2 text-[10px] text-slate-400 flex-wrap">
+          <span>Quick Hooks:</span>
+          <button onclick="insertSimPitch('15s')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">15-sec Hook</button>
+          <button onclick="insertSimPitch('gk_help')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Gatekeeper Helper</button>
+          <button onclick="insertSimPitch('weekend_leak')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition cursor-pointer">Weekend Leak Pivot</button>
         </div>
       </div>
     </div>
@@ -1118,6 +1235,11 @@
   <script>
     let currentTab = 'finder';
     let currentSelectedLeadId = null;
+    let currentBattlecardLeadId = null;
+    let currentCallsSortMode = 'ev';
+    let currentSimLeadId = null;
+    let currentSimPersona = 'GATEKEEPER_RECEPTIONIST';
+    let currentSimHistory = [];
     let allLeadsCache = [];
     let searchPollingInterval = null;
     let leafletMap = null;
@@ -1735,6 +1857,7 @@
         notesList.innerHTML = `<div class="text-slate-500 text-[11px]">No notes logged yet.</div>`;
       }
 
+      loadLeadTimeline(leadId);
       document.getElementById('modal-lead').classList.remove('hidden');
     }
 
@@ -1745,6 +1868,43 @@
 
     function closeModal() {
       document.getElementById('modal-lead').classList.add('hidden');
+    }
+
+    async function loadLeadTimeline(leadId) {
+      const container = document.getElementById('modal-timeline-container');
+      if (!container) return;
+      container.innerHTML = `<div class="text-slate-500 text-center py-4"><i class="fa-solid fa-spinner animate-spin mr-1.5"></i>Loading timeline story...</div>`;
+
+      try {
+        const res = await fetch(`/api/leads/${leadId}/timeline`);
+        const data = await res.json();
+        const events = data.events || [];
+
+        if (events.length === 0) {
+          container.innerHTML = `<div class="text-slate-500 text-xs text-center py-3 bg-slate-950 rounded-xl border border-slate-800">No lifecycle events recorded yet.</div>`;
+          return;
+        }
+
+        container.innerHTML = events.map(e => {
+          const ts = e.timestamp ? e.timestamp.replace('T', ' ').substring(0, 16) : '';
+          return `
+            <div class="flex items-start gap-3 relative pb-3 border-l-2 border-slate-800 pl-3 ml-2">
+              <div class="absolute -left-[9px] top-0.5 w-4 h-4 rounded-full bg-slate-900 border border-slate-700 flex items-center justify-center text-[10px]">
+                ${e.icon || '📌'}
+              </div>
+              <div class="flex-1 bg-slate-950 p-2.5 rounded-xl border border-slate-800/80">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="font-bold text-slate-200 text-xs">${e.title}</span>
+                  <span class="text-[10px] text-slate-500 font-mono">${ts}</span>
+                </div>
+                ${e.description ? `<p class="text-[11px] text-slate-400 mt-1 leading-snug">${e.description}</p>` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (err) {
+        container.innerHTML = `<div class="text-red-400 text-xs">Failed to load timeline: ${err.message}</div>`;
+      }
     }
 
     async function moveCurrentLeadStage(newStage) {
@@ -2020,7 +2180,8 @@
       grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Loading AI Qualified Hot Queue...</div>`;
 
       try {
-        const res = await fetch('/api/queue/todays-calls?min_probability=65');
+        const endpoint = (currentCallsSortMode === 'ev') ? '/api/queue/top-ev?min_probability=50' : '/api/queue/todays-calls?min_probability=65';
+        const res = await fetch(endpoint);
         const leads = await res.json();
 
         // Calculate KPI summary
@@ -2063,6 +2224,7 @@
 
         grid.innerHTML = leads.map(lead => {
           const prob = lead.buying_probability || 85;
+          const evVal = lead.expected_value ? Math.round(lead.expected_value) : Math.round(3979.0 * (prob / 100));
           const pain = lead.pain_level || "HIGH";
           const docName = lead.doctor_name || "Practice Principal";
           const docRole = lead.decision_maker_role || "Owner Dentist";
@@ -2081,7 +2243,7 @@
           return `
             <div class="bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-5 shadow-xl space-y-4 transition flex flex-col justify-between">
               <div class="space-y-3">
-                <!-- Header with AI Buying Probability -->
+                <!-- Header with AI Buying Probability & Expected Value -->
                 <div class="flex items-start justify-between gap-2">
                   <div>
                     <h3 class="text-base font-bold text-white leading-tight">${lead.name}</h3>
@@ -2095,7 +2257,9 @@
                     <span class="px-2.5 py-1 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono shadow-sm block">
                       ${prob}% BUY
                     </span>
-                    <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-wider block mt-0.5">Would Call: YES</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-mono shadow-sm block mt-1">
+                      $EV: $${evVal.toLocaleString()}
+                    </span>
                   </div>
                 </div>
 
@@ -2142,19 +2306,22 @@
                 </div>
               </div>
 
-              <!-- Action Bar -->
+              <!-- Action Bar with Simulator Button -->
               <div class="pt-3 border-t border-slate-800 flex items-center gap-2">
                 ${waLink ? `
-                  <a href="${waLink}" target="_blank" class="flex-1 bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow">
+                  <a href="${waLink}" target="_blank" class="flex-1 bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow">
                     <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
                   </a>
                 ` : `
-                  <a href="tel:${lead.phone}" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition">
+                  <a href="tel:${lead.phone}" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition">
                     <i class="fa-solid fa-phone text-xs"></i> Call
                   </a>
                 `}
-                <button onclick="openOutreachModal('${lead.id}')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow cursor-pointer">
-                  <i class="fa-solid fa-paper-plane text-xs"></i> Outreach Copy
+                <button onclick="openCallSimulatorModal('${lead.id}')" class="px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow cursor-pointer" title="AI Call Roleplay Practice">
+                  <i class="fa-solid fa-hand-fist"></i> Spar
+                </button>
+                <button onclick="openOutreachModal('${lead.id}')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow cursor-pointer">
+                  <i class="fa-solid fa-paper-plane text-xs"></i> Outreach
                 </button>
                 <button onclick="openBattlecard('${lead.id}')" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition cursor-pointer" title="Battlecard">
                   <i class="fa-solid fa-shield-halved"></i>
@@ -2166,6 +2333,210 @@
 
       } catch (err) {
         grid.innerHTML = `<div class="col-span-full p-6 text-red-400 text-xs">Failed to load Today's Calls: ${err.message}</div>`;
+      }
+    }
+
+    async function switchCallsSort(mode) {
+      currentCallsSortMode = mode;
+      const btnEv = document.getElementById('btn-sort-ev');
+      const btnProb = document.getElementById('btn-sort-prob');
+      if (mode === 'ev') {
+        btnEv.className = "px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold transition shadow flex items-center gap-1.5 cursor-pointer";
+        btnProb.className = "px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer";
+      } else {
+        btnProb.className = "px-3 py-1.5 rounded-xl bg-cyan-600 text-white text-xs font-bold transition shadow flex items-center gap-1.5 cursor-pointer";
+        btnEv.className = "px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer";
+      }
+      loadTodaysCallsData();
+    }
+
+    // --- AI Call Roleplay Simulator Functions ---
+    async function openCallSimulatorModal(leadId) {
+      currentSimLeadId = leadId;
+      const modal = document.getElementById('modal-call-simulator');
+      modal.classList.remove('hidden');
+      await initSimSession();
+    }
+
+    function closeCallSimulatorModal() {
+      document.getElementById('modal-call-simulator').classList.add('hidden');
+    }
+
+    function switchSimPersona(persona) {
+      currentSimPersona = persona;
+      const btnGk = document.getElementById('sim-persona-btn-gk');
+      const btnDoc = document.getElementById('sim-persona-btn-doc');
+      if (persona === 'GATEKEEPER_RECEPTIONIST') {
+        btnGk.className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-600 text-white transition cursor-pointer";
+        btnDoc.className = "px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer";
+      } else {
+        btnDoc.className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-600 text-white transition cursor-pointer";
+        btnGk.className = "px-3 py-1 rounded-lg text-xs font-bold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer";
+      }
+      initSimSession();
+    }
+
+    async function initSimSession() {
+      const chatArea = document.getElementById('sim-chat-area');
+      const feedbackBox = document.getElementById('sim-feedback-box');
+      if (feedbackBox) feedbackBox.classList.add('hidden');
+      document.getElementById('sim-score-overall').innerText = "-- / 10";
+      document.getElementById('sim-status-pill').innerText = "DIALING...";
+      document.getElementById('sim-status-pill').className = "px-2 py-0.5 rounded-md font-bold text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30";
+      chatArea.innerHTML = `<div class="text-center py-6 text-slate-500"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Connecting to clinic line...</div>`;
+
+      try {
+        const res = await fetch(`/api/leads/${currentSimLeadId}/simulate-call/start`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ persona: currentSimPersona })
+        });
+        const data = await res.json();
+        document.getElementById('sim-clinic-name').innerText = `Roleplay Sparring: ${data.lead_name}`;
+        document.getElementById('sim-status-pill').innerText = "CALL CONNECTED";
+        document.getElementById('sim-status-pill').className = "px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+        currentSimHistory = data.history || [];
+
+        renderSimChat();
+      } catch (err) {
+        chatArea.innerHTML = `<div class="text-red-400 text-xs">Failed to initialize call simulation: ${err.message}</div>`;
+      }
+    }
+
+    function renderSimChat() {
+      const chatArea = document.getElementById('sim-chat-area');
+      chatArea.innerHTML = currentSimHistory.map(msg => {
+        const isAssistant = msg.role === 'assistant';
+        return `
+          <div class="flex items-start gap-2.5 ${isAssistant ? '' : 'flex-row-reverse'}">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs shrink-0 ${isAssistant ? 'bg-indigo-600 text-white' : 'bg-emerald-600 text-white shadow'}">
+              ${isAssistant ? (currentSimPersona === 'BUSY_DOCTOR' ? '👨‍⚕️' : '👩') : '🗣️'}
+            </div>
+            <div class="max-w-[80%] rounded-2xl p-3 text-xs leading-relaxed ${isAssistant ? 'bg-slate-800 text-slate-200 border border-slate-700' : 'bg-emerald-600 text-white shadow-lg'}">
+              <div class="text-[10px] font-bold ${isAssistant ? 'text-indigo-300' : 'text-emerald-200'} mb-0.5">
+                ${msg.speaker || (isAssistant ? 'Prospect' : 'You (Sales Rep)')}
+              </div>
+              <div>${msg.content}</div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      chatArea.scrollTop = chatArea.scrollHeight;
+    }
+
+    async function submitSimulatorPitch() {
+      const input = document.getElementById('sim-input-pitch');
+      const pitch = input.value.trim();
+      if (!pitch || !currentSimLeadId) return;
+
+      input.value = '';
+      currentSimHistory.push({ role: 'user', content: pitch, speaker: 'You (Sales Rep)' });
+      renderSimChat();
+
+      const chatArea = document.getElementById('sim-chat-area');
+      const typingDiv = document.createElement('div');
+      typingDiv.className = "flex items-center gap-2 text-slate-400 text-xs pl-9";
+      typingDiv.innerHTML = `<i class="fa-solid fa-spinner animate-spin text-cyan-400"></i> Prospect evaluating pitch...`;
+      chatArea.appendChild(typingDiv);
+      chatArea.scrollTop = chatArea.scrollHeight;
+
+      try {
+        const res = await fetch(`/api/leads/${currentSimLeadId}/simulate-call/turn`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            persona: currentSimPersona,
+            user_pitch: pitch,
+            history: currentSimHistory
+          })
+        });
+        const data = await res.json();
+        typingDiv.remove();
+
+        currentSimHistory.push({
+          role: 'assistant',
+          content: data.prospect_response,
+          speaker: data.speaker_name
+        });
+        renderSimChat();
+
+        // Update Scorecard
+        const evalData = data.evaluation;
+        document.getElementById('sim-score-overall').innerText = `${evalData.overall_score} / 10`;
+        document.getElementById('sim-status-pill').innerText = data.status;
+        if (data.status === 'MEETING_WON') {
+          document.getElementById('sim-status-pill').className = "px-2 py-0.5 rounded-md font-bold text-[10px] bg-emerald-500 text-slate-950 animate-pulse";
+          showToast("🎉 MEETING WON! You booked the doctor!");
+        } else if (data.status === 'HANGUP') {
+          document.getElementById('sim-status-pill').className = "px-2 py-0.5 rounded-md font-bold text-[10px] bg-rose-500/20 text-rose-400 border border-rose-500/30";
+        }
+
+        // Show tactical feedback
+        const feedbackBox = document.getElementById('sim-feedback-box');
+        feedbackBox.classList.remove('hidden');
+        document.getElementById('sim-sub-scores').innerText = `Hook: ${evalData.hook_score}/10 | Value: ${evalData.value_score}/10 | Control: ${evalData.control_score}/10`;
+        document.getElementById('sim-feedback-text').innerText = evalData.tactical_feedback;
+        document.getElementById('sim-pivot-text').innerText = `"${evalData.suggested_pivot}"`;
+
+      } catch (err) {
+        typingDiv.remove();
+        alert("Simulator error: " + err.message);
+      }
+    }
+
+    function insertSimPitch(type) {
+      const input = document.getElementById('sim-input-pitch');
+      if (type === '15s') {
+        input.value = "Hi, I noticed you have high review volume but no after-hours booking. When an emergency patient calls at 8 PM, who captures that right now?";
+      } else if (type === 'gk_help') {
+        input.value = "Hi Sarah, could you help me for 10 seconds? I had a quick question regarding Dr. Miller's missed after-hours patient intake.";
+      } else if (type === 'weekend_leak') {
+        input.value = "I understand you're slammed with patients. Quick question: most clinics lose 3-5 weekend implant inquiries because nobody answers. Are you capturing those?";
+      }
+      input.focus();
+    }
+
+    // --- 24/7 Autonomous Background Daemon Functions ---
+    async function checkDaemonStatus() {
+      try {
+        const res = await fetch('/api/scheduler/daemon');
+        const data = await res.json();
+        const dot = document.getElementById('nav-daemon-dot');
+        const txt = document.getElementById('nav-daemon-text');
+        const btn = document.getElementById('btn-nav-daemon');
+        if (!dot || !txt || !btn) return;
+
+        if (data.running) {
+          dot.className = "w-2 h-2 rounded-full bg-emerald-400 animate-ping";
+          txt.className = "font-bold text-emerald-400";
+          txt.innerText = "ACTIVE";
+          btn.innerText = "Stop";
+          btn.className = "ml-1 text-[10px] bg-rose-900/80 hover:bg-rose-800 text-rose-200 px-1.5 py-0.5 rounded cursor-pointer transition";
+        } else {
+          dot.className = "w-2 h-2 rounded-full bg-slate-500";
+          txt.className = "font-bold text-slate-400";
+          txt.innerText = "OFF";
+          btn.innerText = "Start";
+          btn.className = "ml-1 text-[10px] bg-emerald-700 hover:bg-emerald-600 text-white px-1.5 py-0.5 rounded cursor-pointer transition";
+        }
+      } catch (e) {}
+    }
+
+    async function toggleDaemonFromNav() {
+      const txt = document.getElementById('nav-daemon-text');
+      const isRunning = txt && txt.innerText.includes("ACTIVE");
+      showToast(isRunning ? "Stopping 24/7 autonomous worker..." : "Starting 24/7 autonomous worker...");
+      try {
+        const res = await fetch('/api/scheduler/daemon/toggle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enable: !isRunning, interval_hours: 6.0, limit_per_cycle: 8 })
+        });
+        const status = await res.json();
+        checkDaemonStatus();
+        showToast(status.running ? "24/7 Worker is now ACTIVE!" : "24/7 Worker stopped.");
+      } catch (err) {
+        alert("Failed to toggle daemon: " + err.message);
       }
     }
 
@@ -2398,6 +2769,7 @@
     window.addEventListener('DOMContentLoaded', () => {
       updateGlobalStats();
       initMap();
+      checkDaemonStatus();
       // Load recent leads on initial view
       fetch('/api/leads?limit=12')
         .then(r => r.json())

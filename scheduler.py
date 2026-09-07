@@ -156,11 +156,33 @@ class AutonomousScheduler:
                 with db._get_connection() as conn:
                     conn.execute("UPDATE leads SET doctor_name = ?, decision_maker_role = ? WHERE id = ?", (doc_name, doc_role, lead_id))
                     conn.commit()
+                try:
+                    from timeline import OpportunityTimelineManager
+                    OpportunityTimelineManager.log_event(
+                        db=db,
+                        lead_id=lead_id,
+                        event_type="DECISION_MAKER_MATCH",
+                        title=f"Decision Maker Identified: {doc_name}",
+                        description=f"Role: {doc_role or 'Owner / Principal Dentist'}. Extracted via team & bio intelligence.",
+                        actor="AI_AGENT",
+                        metadata={"doctor_name": doc_name, "role": doc_role}
+                    )
+                except Exception:
+                    pass
 
             # 5. Promotion to Today's Calls Queue & Outreach Review Queue
             if qualification.is_a_tier or qualification.would_spend_30min_calling == "YES" or (hasattr(scored, 'opportunity_score') and scored.opportunity_score >= 65):
                 try:
                     QueueManager.stage_for_review(scored, db=db)
+                    from timeline import OpportunityTimelineManager
+                    OpportunityTimelineManager.log_event(
+                        db=db,
+                        lead_id=lead_id,
+                        event_type="OUTREACH_STAGED",
+                        title="Omnichannel Outreach Generated & Staged",
+                        description=f"Personalized cold email, SMS, and LinkedIn angles staged for {r_lead.name}.",
+                        actor="AI_AGENT"
+                    )
                 except Exception:
                     pass
                 cycle_summary["qualified_count"] += 1
@@ -190,6 +212,72 @@ class AutonomousScheduler:
             await on_progress(f"✅ Territory cycle finished for {city_query}. {cycle_summary['promoted_to_todays_calls']} A-Tier leads promoted to your call queue.")
 
         return cycle_summary
+
+    # --- 24/7 Autonomous Background Daemon ---
+
+    _daemon_task: Optional[asyncio.Task] = None
+    _daemon_running: bool = False
+    _daemon_interval_hours: float = 6.0
+    _last_daemon_run: Optional[str] = None
+    _next_daemon_run: Optional[str] = None
+
+    @classmethod
+    def get_daemon_status(cls) -> Dict[str, Any]:
+        return {
+            "running": cls._daemon_running,
+            "interval_hours": cls._daemon_interval_hours,
+            "last_run": cls._last_daemon_run,
+            "next_run": cls._next_daemon_run
+        }
+
+    @classmethod
+    async def start_daemon(
+        cls,
+        interval_hours: float = 6.0,
+        limit_per_cycle: int = 8,
+        headless: bool = True,
+        db: Optional[DatabaseManager] = None
+    ) -> Dict[str, Any]:
+        """Launches continuous 24/7 autonomous prospecting cycles."""
+        if cls._daemon_running:
+            return cls.get_daemon_status()
+
+        cls._daemon_running = True
+        cls._daemon_interval_hours = interval_hours
+
+        async def _daemon_loop():
+            while cls._daemon_running:
+                cls._last_daemon_run = datetime.now().isoformat()
+                next_ts = time.time() + (cls._daemon_interval_hours * 3600)
+                cls._next_daemon_run = datetime.fromtimestamp(next_ts).isoformat()
+                try:
+                    logger.info(f"Running scheduled autonomous daemon cycle at {cls._last_daemon_run}")
+                    await cls.run_autonomous_cycle(
+                        limit=limit_per_cycle,
+                        headless=headless,
+                        db=db
+                    )
+                except Exception as e:
+                    logger.error(f"Autonomous daemon cycle error: {e}")
+
+                sleep_seconds = int(cls._daemon_interval_hours * 3600)
+                for _ in range(sleep_seconds):
+                    if not cls._daemon_running:
+                        break
+                    await asyncio.sleep(1)
+
+        cls._daemon_task = asyncio.create_task(_daemon_loop())
+        return cls.get_daemon_status()
+
+    @classmethod
+    def stop_daemon(cls) -> Dict[str, Any]:
+        """Stops the 24/7 autonomous daemon."""
+        cls._daemon_running = False
+        if cls._daemon_task and not cls._daemon_task.done():
+            cls._daemon_task.cancel()
+        cls._daemon_task = None
+        cls._next_daemon_run = None
+        return cls.get_daemon_status()
 
     @classmethod
     async def run_morning_cycle(
