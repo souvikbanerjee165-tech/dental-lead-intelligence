@@ -20,7 +20,7 @@ from crm import CRMStage, CRMStageManager
 from queue_manager import QueueManager
 from auditor import WebsiteAuditor
 from personalizer import OutreachPersonalizer
-from proposals import ProposalGenerator
+from proposals import ProposalGenerator, calculate_practice_roi, generate_tailored_proposal
 from report_generator import OpportunityReportGenerator
 from lead_finder import GoogleMapsLeadFinder
 from explainer import ScoreExplainer
@@ -31,6 +31,8 @@ from ai_qualifier import AIQualifier
 from outreach_generator import OutreachGenerator
 from timeline import OpportunityTimelineManager
 from simulator import AICallSimulator
+from triggers import TriggerEngine, compute_html_hash, compute_tech_hash
+from loom_script import generate_loom_pitch
 
 # Setup directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -142,6 +144,17 @@ class DaemonToggleRequest(BaseModel):
     enable: bool = True
     interval_hours: float = 6.0
     limit_per_cycle: int = 8
+
+class ROICalculatorRequest(BaseModel):
+    recovered_patients_per_month: Optional[int] = 5
+    avg_case_value: Optional[int] = 900
+    monthly_fee: Optional[int] = 299
+
+class CheckChangesRequest(BaseModel):
+    html_content: Optional[str] = None
+    technologies: Optional[List[str]] = None
+    new_reviews: Optional[int] = None
+    new_rating: Optional[float] = None
 
 # --- Helper Functions ---
 
@@ -740,6 +753,166 @@ async def toggle_daemon(req: DaemonToggleRequest):
     else:
         status = AutonomousScheduler.stop_daemon()
     return status
+
+# --- AI Revenue OS Endpoints (Conversion Trinity) ---
+
+@app.get("/api/queue/top-urgent")
+async def get_top_urgent_queue(min_urgency: int = 50, limit: int = 50):
+    """Returns calling queue prioritized primarily by Urgency ('Why Now' timing) and secondarily by $EV."""
+    leads = db.get_top_urgent_queue(min_urgency=min_urgency, limit=limit)
+    results = []
+    for l in leads:
+        wa_data = generate_wa_pitch_and_link(l)
+        l_copy = dict(l)
+        l_copy["clean_phone"] = wa_data["clean_phone"]
+        l_copy["wa_link"] = wa_data["wa_link"]
+
+        rev_min = l.get("missed_rev_min") or l.get("audit_missed_rev_min") or 3450
+        rev_max = l.get("missed_rev_max") or l.get("audit_missed_rev_max") or 6900
+        l_copy["missed_rev_range"] = f"${rev_min:,.0f} - ${rev_max:,.0f}"
+
+        shot_path = l.get("screenshot_path")
+        lead_id = l.get("id")
+        if shot_path and Path(shot_path).exists():
+            l_copy["screenshot_url"] = f"/output/screenshots/{Path(shot_path).name}"
+        elif lead_id and (OUTPUT_DIR / "screenshots" / f"{lead_id}.jpg").exists():
+            l_copy["screenshot_url"] = f"/output/screenshots/{lead_id}.jpg"
+        else:
+            l_copy["screenshot_url"] = None
+
+        results.append(l_copy)
+    return results
+
+@app.get("/api/leads/{lead_id}/roi")
+async def get_lead_roi(
+    lead_id: str,
+    patients: int = Query(default=5, ge=1, le=50),
+    case_value: int = Query(default=900, ge=100, le=10000),
+    fee: int = Query(default=299, ge=50, le=5000)
+):
+    """Calculates practice-specific dental unit economics and ROI multiples."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    roi = calculate_practice_roi(
+        lead_data=lead,
+        recovered_patients_per_month=patients,
+        avg_case_value=case_value,
+        monthly_fee=fee
+    )
+    return {"lead_id": lead_id, "practice_name": lead.get("name"), "roi": roi}
+
+@app.post("/api/leads/{lead_id}/roi")
+async def calculate_custom_lead_roi(lead_id: str, req: ROICalculatorRequest):
+    """Calculates custom practice unit economics based on user parameters."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    roi = calculate_practice_roi(
+        lead_data=lead,
+        recovered_patients_per_month=req.recovered_patients_per_month or 5,
+        avg_case_value=req.avg_case_value or 900,
+        monthly_fee=req.monthly_fee or 299
+    )
+    return {"lead_id": lead_id, "practice_name": lead.get("name"), "roi": roi}
+
+@app.get("/api/leads/{lead_id}/proposal")
+async def get_tailored_proposal_data(
+    lead_id: str,
+    patients: int = Query(default=5, ge=1, le=50),
+    case_value: int = Query(default=900, ge=100, le=10000),
+    fee: int = Query(default=299, ge=50, le=5000)
+):
+    """Generates a complete, tailored sales proposal ready for presentation or client delivery."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    custom_roi = calculate_practice_roi(
+        lead_data=lead,
+        recovered_patients_per_month=patients,
+        avg_case_value=case_value,
+        monthly_fee=fee
+    )
+    proposal = generate_tailored_proposal(lead=lead, custom_roi=custom_roi)
+    return proposal
+
+@app.get("/api/leads/{lead_id}/loom-script")
+async def get_lead_loom_script(lead_id: str):
+    """Generates a time-coded 2-minute personalized Loom video pitch script."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    script = generate_loom_pitch(lead=lead)
+    return script
+
+@app.get("/api/leads/{lead_id}/triggers")
+async def get_lead_triggers(lead_id: str):
+    """Retrieves all detected trigger events for a dental practice."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    triggers = db.get_lead_triggers(lead_id)
+    return {
+        "lead_id": lead_id,
+        "practice_name": lead.get("name"),
+        "urgency_score": lead.get("urgency_score", 75),
+        "why_now_reasons": lead.get("why_now_reasons", []),
+        "triggers": triggers,
+        "total_triggers": len(triggers)
+    }
+
+@app.post("/api/leads/{lead_id}/check-changes")
+async def check_lead_changes(lead_id: str, req: Optional[CheckChangesRequest] = None):
+    """
+    On-demand change detection & 'Why Now?' urgency re-computation.
+    Compares existing record against new crawl or simulation data.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    new_data: Dict[str, Any] = {}
+    if req:
+        if req.html_content:
+            new_data["html_hash"] = compute_html_hash(req.html_content)
+        if req.technologies:
+            new_data["tech_hash"] = compute_tech_hash(req.technologies)
+        if req.new_reviews is not None:
+            new_data["review_count"] = req.new_reviews
+        if req.new_rating is not None:
+            new_data["rating"] = req.new_rating
+
+    # Detect delta
+    detected_triggers = TriggerEngine.detect_changes(lead, new_data)
+
+    # Persist any detected triggers
+    for t in detected_triggers:
+        db.log_trigger_event(
+            lead_id=lead_id,
+            event_type=t["event_type"],
+            title=t["title"],
+            description=t["description"],
+            severity=t["severity"],
+            old_val=t.get("old_val"),
+            new_val=t.get("new_val")
+        )
+
+    # Re-calculate urgency and reasons
+    all_triggers = db.get_lead_triggers(lead_id)
+    new_urgency = TriggerEngine.calculate_urgency_score(lead, triggers=all_triggers)
+    new_reasons = TriggerEngine.generate_why_now_reasons(lead, triggers=all_triggers)
+
+    db.update_lead_urgency(lead_id, urgency_score=new_urgency, why_now_reasons=new_reasons)
+
+    return {
+        "status": "success",
+        "lead_id": lead_id,
+        "new_triggers_detected": len(detected_triggers),
+        "detected_triggers": detected_triggers,
+        "urgency_score": new_urgency,
+        "why_now_reasons": new_reasons
+    }
 
 @app.post("/api/leads/{lead_id}/stage")
 async def update_lead_stage(lead_id: str, req: StageUpdateRequest):

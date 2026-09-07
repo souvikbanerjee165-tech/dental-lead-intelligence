@@ -46,6 +46,8 @@ class OpportunityTimelineManager:
         "STAGE_TRANSITION": "🚀",
         "NOTE_ADDED": "📝",
         "SIMULATION_PRACTICED": "🥋",
+        "TRIGGER_EVENT": "🔥",
+        "CHANGE_DETECTED": "🔍",
     }
 
     EVENT_BADGES = {
@@ -59,6 +61,8 @@ class OpportunityTimelineManager:
         "STAGE_TRANSITION": "bg-pink-900/60 text-pink-300 border border-pink-500/30",
         "NOTE_ADDED": "bg-gray-800 text-gray-300",
         "SIMULATION_PRACTICED": "bg-cyan-900/60 text-cyan-300 border border-cyan-500/30",
+        "TRIGGER_EVENT": "bg-rose-900/60 text-rose-300 border border-rose-500/30",
+        "CHANGE_DETECTED": "bg-amber-900/60 text-amber-300 border border-amber-500/30",
     }
 
     @classmethod

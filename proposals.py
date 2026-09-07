@@ -1,3 +1,9 @@
+"""
+AI ROI Calculator & Tailored Proposal Customizer.
+Transforms audit evidence and practice metrics into dentist-specific unit economics
+and client-ready 1-click sales proposals.
+"""
+
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -8,6 +14,7 @@ from config import OUTPUT_DIR
 PROPOSALS_DIR = OUTPUT_DIR / "proposals"
 PROPOSALS_DIR.mkdir(parents=True, exist_ok=True)
 
+
 class ProposalPackage(BaseModel):
     tier: int
     name: str
@@ -17,6 +24,7 @@ class ProposalPackage(BaseModel):
     deliverables: List[str]
     projected_monthly_patients_recaptured: int
     projected_annual_recapture: float
+
 
 class ProposalGenerator:
     """Transforms audit findings, financial leakage, and competitor pressure into high-converting client proposals."""
@@ -59,20 +67,20 @@ class ProposalGenerator:
             setup_fee=2500.0,
             monthly_retainer=650.0,
             deliverables=[
-                "Everything in Tier 1 (24/7 Conversational AI Receptionist)",
-                "Turnkey Online Booking Widget (NexHealth / LocalMed / custom PMS sync)",
-                "Automated appointment confirmation & 2-way SMS reminder flow",
-                "Mobile-first scheduling CTA integration across all web pages",
-                "Zero telephone tag for new patient intake"
+                "Everything in Tier 1 (24/7 AI Receptionist)",
+                "Full Practice EHR/PMS calendar integration (Dentrix, Curve, Eaglesoft)",
+                "Two-way patient conversational booking over Web & SMS",
+                "Automated appointment reminder & reschedule sequences",
+                "Dedicated conversion analytics & weekly ROI review"
             ],
-            projected_monthly_patients_recaptured=int(scored_lead.estimated_missed_calls_monthly_max or 18),
-            projected_annual_recapture=float(annual_loss * 0.80)
+            projected_monthly_patients_recaptured=int((scored_lead.estimated_missed_calls_monthly_min or 8) * 1.8),
+            projected_annual_recapture=float(annual_loss * 0.75)
         )
 
         p3 = ProposalPackage(
             tier=3,
-            name="Complete Practice Growth Engine",
-            tagline="Full automated intake, CRM pipeline, and competitor-beating patient acquisition",
+            name="Practice Growth Engine",
+            tagline="End-to-end patient acquisition, after-hours recapture, and reputation defense",
             setup_fee=4500.0,
             monthly_retainer=950.0,
             deliverables=[
@@ -209,3 +217,160 @@ class ProposalGenerator:
             f.write(html_content)
 
         return html_file
+
+
+# --- AI ROI Calculator & Customizer (Phase 1 Revenue OS) ---
+
+def calculate_practice_roi(
+    lead_data: Dict[str, Any],
+    recovered_patients_per_month: int = 5,
+    avg_case_value: int = 900,
+    monthly_fee: int = 299
+) -> Dict[str, Any]:
+    """
+    Computes precise dental practice unit economics and annual ROI multiplier.
+    """
+    recovered_patients = max(1, int(recovered_patients_per_month))
+    case_val = max(100, int(avg_case_value))
+    fee = max(50, int(monthly_fee))
+
+    monthly_revenue = recovered_patients * case_val
+    annual_revenue = monthly_revenue * 12
+
+    monthly_cost = fee
+    annual_cost = monthly_cost * 12
+
+    net_annual_profit = annual_revenue - annual_cost
+    roi_multiple = round(annual_revenue / annual_cost, 1) if annual_cost > 0 else 10.0
+
+    daily_cost = round(annual_cost / 365, 2)
+
+    return {
+        "recovered_patients_per_month": recovered_patients,
+        "avg_case_value": case_val,
+        "monthly_fee": fee,
+        "monthly_revenue_recovered": monthly_revenue,
+        "annual_revenue_recovered": annual_revenue,
+        "annual_cost": annual_cost,
+        "net_annual_profit": net_annual_profit,
+        "roi_multiplier": roi_multiple,
+        "daily_cost": daily_cost,
+        "breakeven_summary": f"Recovering just 1 patient every {max(1, round(case_val / fee))} months completely pays for your investment.",
+        "headline_roi": f"{roi_multiple}x Projected Return on Investment"
+    }
+
+
+def generate_tailored_proposal(
+    lead: Dict[str, Any],
+    custom_roi: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Generates a structured, client-facing sales proposal tailored to a specific dental clinic.
+    """
+    practice_name = lead.get("name", "Dental Practice")
+    doctor_name = lead.get("doctor_name") or "Practice Owner & Lead Clinician"
+    phone = lead.get("phone", "Primary Line")
+    address = lead.get("address", "Local Practice")
+    website = lead.get("website", "")
+    rating = float(lead.get("rating") or 4.8)
+    review_count = int(lead.get("review_count") or 35)
+
+    roi = custom_roi or calculate_practice_roi(lead)
+
+    now_formatted = datetime.now().strftime("%B %d, %Y")
+
+    # Diagnosed friction points
+    friction_points = []
+    missed_max = int(lead.get("missed_rev_max") or 4500)
+    if missed_max > 0:
+        friction_points.append({
+            "issue": "Uncaptured After-Hours Patient Demand",
+            "impact": f"Patients inquiring between 5 PM and 8 AM receive voicemail or abandoned contact forms, risking ${int(lead.get('missed_rev_min', 2000)):,}-${missed_max:,}/mo in unbooked chairs.",
+            "solution": "24/7 AI Receptionist responds instantly in 4 seconds over Web & SMS to secure bookings."
+        })
+    else:
+        friction_points.append({
+            "issue": "Missed Call Latency During Chair Hours",
+            "impact": "When front-desk is checking in patients or sterilizing equipment, phone calls roll to voicemail where 67% never leave a message.",
+            "solution": "Instant Missed-Call Auto-Textback with a 1-click booking link before the patient dials a competitor."
+        })
+
+    friction_points.append({
+        "issue": "Mobile Friction on Website",
+        "impact": "Prospective patients browsing on mobile phones abandon complex forms or multi-step booking portals.",
+        "solution": "1-click conversational chat intake natively on WhatsApp and Mobile Web."
+    })
+
+    friction_points.append({
+        "issue": "Review Velocity Gap",
+        "impact": f"Currently at {review_count} reviews ({rating}★). Local competitors actively capture 5-8 new 5-star reviews monthly.",
+        "solution": "Automated post-appointment review booster via SMS to dominate local Google Maps search rank."
+    })
+
+    # Implementation roadmap
+    clean_doc = doctor_name.replace("Dr. ", "")
+    roadmap = [
+        {
+            "phase": "Phase 1: Setup & Practice Onboarding",
+            "days": "Days 1 – 3",
+            "description": "Zero staff disruption. We map your clinic operating hours, service menu (implants, clear aligners, hygiene), and configure calendar sync."
+        },
+        {
+            "phase": "Phase 2: Private Sandbox Review",
+            "days": "Days 4 – 7",
+            "description": f"Dr. {clean_doc} and the office manager test-drive the AI receptionist to verify conversational tone and clinical accuracy."
+        },
+        {
+            "phase": "Phase 3: Live Patient Capture & Review Booster",
+            "days": "Day 8 Onward",
+            "description": "System goes live. After-hours visitors, weekend inquiries, and missed calls are automatically captured and booked directly into open chair slots."
+        }
+    ]
+
+    pricing_options = [
+        {
+            "name": "Intake Essentials",
+            "price": 299,
+            "billing": "per month",
+            "features": [
+                "24/7 Website AI Chat Receptionist",
+                "Instant Missed-Call Auto-Textback",
+                "Direct Calendar / Appointment Sync",
+                "After-Hours Patient Triage",
+                "Weekly Performance Digest"
+            ],
+            "recommended": False
+        },
+        {
+            "name": "Growth Acceleration (Recommended)",
+            "price": 497,
+            "billing": "per month",
+            "features": [
+                "Everything in Essentials",
+                "Omnichannel WhatsApp & SMS Patient Intake",
+                "High-Value Treatment Qualification (Implants/Invisalign)",
+                "Automated 5-Star Google Review Booster",
+                "VIP Priority Support & Monthly Optimization Call",
+                "100% Done-For-You Practice Customization"
+            ],
+            "recommended": True
+        }
+    ]
+
+    return {
+        "lead_id": lead.get("id"),
+        "practice_name": practice_name,
+        "doctor_name": doctor_name,
+        "address": address,
+        "phone": phone,
+        "website": website,
+        "date_prepared": now_formatted,
+        "screenshot_url": lead.get("screenshot_path") or "/static/img/dental-mockup.png",
+        "hero_title": f"Patient Intake & Revenue Optimization Proposal for {practice_name}",
+        "executive_summary": f"A targeted action plan for Dr. {clean_doc} to eliminate front-desk phone friction, capture after-hours patient inquiries, and generate an estimated ${roi['annual_revenue_recovered']:,}/year in net new chair production.",
+        "roi_breakdown": roi,
+        "diagnosed_friction": friction_points,
+        "implementation_roadmap": roadmap,
+        "pricing_options": pricing_options,
+        "guarantee": "30-Day Zero-Risk Guarantee: If this system does not deliver at least 3 newly scheduled patient appointments in your first 30 days, you receive a complete 100% refund. We assume all the risk."
+    }

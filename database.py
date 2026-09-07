@@ -279,6 +279,14 @@ class DatabaseManager:
                 cursor.execute("ALTER TABLE leads ADD COLUMN territory_id TEXT;")
             if "expected_value" not in existing_lead_cols:
                 cursor.execute("ALTER TABLE leads ADD COLUMN expected_value REAL DEFAULT 0.0;")
+            if "urgency_score" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN urgency_score INTEGER DEFAULT 75;")
+            if "why_now_reasons" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN why_now_reasons TEXT DEFAULT '[]';")
+            if "html_hash" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN html_hash TEXT;")
+            if "tech_hash" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN tech_hash TEXT;")
 
             cursor.execute("PRAGMA table_info(audits);")
             existing_audit_cols = {row["name"] for row in cursor.fetchall()}
@@ -328,6 +336,22 @@ class DatabaseManager:
                 description TEXT,
                 actor TEXT DEFAULT 'SYSTEM',
                 metadata_json TEXT,
+                FOREIGN KEY (lead_id) REFERENCES leads (id)
+            );
+            """)
+
+            # 17. Trigger Events (Website Changes & Buying Signals)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS trigger_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                lead_id TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                severity TEXT DEFAULT 'MEDIUM',
+                detected_at TEXT NOT NULL,
+                old_val TEXT,
+                new_val TEXT,
                 FOREIGN KEY (lead_id) REFERENCES leads (id)
             );
             """)
@@ -742,6 +766,24 @@ class DatabaseManager:
         else:
             prob = float(d.get("buying_probability") or 75)
             d["expected_value"] = round(3979.0 * (prob / 100.0), 2)
+
+        # Parse or populate Why Now timing reasons
+        if "why_now_reasons" in d and isinstance(d["why_now_reasons"], str):
+            try:
+                d["why_now_reasons"] = json.loads(d["why_now_reasons"])
+            except Exception:
+                pass
+        if not d.get("why_now_reasons"):
+            from triggers import TriggerEngine
+            d["why_now_reasons"] = TriggerEngine.generate_why_now_reasons(d)
+
+        # Calculate or normalize Urgency Score (0 - 100)
+        if d.get("urgency_score") is None or d.get("urgency_score") == 0:
+            from triggers import TriggerEngine
+            d["urgency_score"] = TriggerEngine.calculate_urgency_score(d)
+        else:
+            d["urgency_score"] = int(d["urgency_score"])
+
         return d
 
     def get_lead(self, lead_id: str) -> Optional[Dict[str, Any]]:
@@ -1299,4 +1341,87 @@ class DatabaseManager:
                     f"Top objection is front-desk bandwidth; best rebuttal is 5-second instant missed-call textback."
                 ]
             }
+
+    def log_trigger_event(
+        self,
+        lead_id: str,
+        event_type: str,
+        title: str,
+        description: str,
+        severity: str = "MEDIUM",
+        old_val: Optional[str] = None,
+        new_val: Optional[str] = None
+    ) -> int:
+        """Records a trigger event and hooks it directly into the Opportunity Timeline."""
+        now_iso = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO trigger_events (lead_id, event_type, title, description, severity, detected_at, old_val, new_val)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (lead_id, event_type, title, description, severity, now_iso, old_val, new_val))
+            event_id = cursor.lastrowid
+            conn.commit()
+
+        # Cross-log into Opportunity Timeline
+        try:
+            from timeline import OpportunityTimelineManager
+            OpportunityTimelineManager.log_event(
+                self,
+                lead_id=lead_id,
+                event_type="TRIGGER_EVENT",
+                title=f"Trigger Signal: {title}",
+                description=description,
+                actor="AI_AGENT",
+                metadata={"event_type": event_type, "severity": severity, "old_val": old_val, "new_val": new_val}
+            )
+        except Exception as e:
+            logger.warning(f"Could not cross-log trigger event to timeline: {e}")
+
+        return event_id
+
+    def get_lead_triggers(self, lead_id: str) -> List[Dict[str, Any]]:
+        """Fetches all trigger events detected for a specific lead, ordered newest first."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT * FROM trigger_events
+            WHERE lead_id = ?
+            ORDER BY detected_at DESC
+            """, (lead_id,))
+            return [dict(r) for r in cursor.fetchall()]
+
+    def update_lead_urgency(self, lead_id: str, urgency_score: int, why_now_reasons: List[str]):
+        """Persists updated Urgency Score and 'Why Now?' timing triggers."""
+        why_json = json.dumps(why_now_reasons)
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            UPDATE leads
+            SET urgency_score = ?, why_now_reasons = ?
+            WHERE id = ?
+            """, (urgency_score, why_json, lead_id))
+            conn.commit()
+
+    def get_top_urgent_queue(self, min_urgency: int = 50, limit: int = 25) -> List[Dict[str, Any]]:
+        """
+        Returns leads prioritized primarily by Urgency Score ('Why Now' timing)
+        and secondarily by Expected Value ($EV).
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT l.*,
+                   COALESCE(l.urgency_score, 75) as calculated_urgency,
+                   COALESCE(NULLIF(l.expected_value, 0), ROUND(3979.0 * (COALESCE(l.buying_probability, 75) / 100.0), 2)) as effective_ev
+            FROM leads l
+            WHERE l.stage NOT IN ('CLOSED_WON', 'CLOSED_LOST', 'UNQUALIFIED')
+            ORDER BY calculated_urgency DESC, effective_ev DESC
+            LIMIT ?
+            """, (limit,))
+            leads = [self._format_lead_row(r) for r in cursor.fetchall()]
+
+        leads.sort(key=lambda x: (x.get("urgency_score", 0), x.get("expected_value", 0.0)), reverse=True)
+        return leads
+
 

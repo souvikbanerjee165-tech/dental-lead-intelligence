@@ -621,11 +621,14 @@
               <h2 class="text-2xl font-extrabold text-white mt-1">Today's Priority Calls</h2>
               <p class="text-xs text-slate-400 max-w-xl mt-1">Hand-picked high-leverage dental practices with confirmed decision makers, high patient volume, and zero after-hours conversational intake.</p>
             </div>
-            <!-- $EV vs Probability Sort Toggles -->
+            <!-- Priority Sort Toggles (Urgency / EV / Probability) -->
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-xs text-slate-400 font-semibold">Priority:</span>
-              <button onclick="switchCallsSort('ev')" id="btn-sort-ev" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold transition shadow flex items-center gap-1.5 cursor-pointer">
-                <i class="fa-solid fa-sack-dollar text-emerald-200"></i> Top $EV ($3,979 LTV)
+              <button onclick="switchCallsSort('urgent')" id="btn-sort-urgent" class="px-3 py-1.5 rounded-xl bg-amber-600 text-white text-xs font-bold transition shadow flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-fire text-amber-200"></i> Why Now (Urgency)
+              </button>
+              <button onclick="switchCallsSort('ev')" id="btn-sort-ev" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition shadow flex items-center gap-1.5 cursor-pointer">
+                <i class="fa-solid fa-sack-dollar text-emerald-400"></i> Top $EV ($3,979)
               </button>
               <button onclick="switchCallsSort('prob')" id="btn-sort-prob" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer">
                 <i class="fa-solid fa-percent text-cyan-400"></i> Probability
@@ -825,10 +828,14 @@
       <!-- Modal Body -->
       <div class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
         <!-- Key Metrics Cards -->
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
             <span class="text-slate-400 block mb-1">Opportunity Score</span>
             <span id="modal-lead-score" class="text-base font-bold text-emerald-400">--</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+            <span class="text-slate-400 block mb-1">Why Now Urgency</span>
+            <span id="modal-lead-urgency" class="text-base font-bold text-amber-400">--</span>
           </div>
           <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
             <span class="text-slate-400 block mb-1">Missed Monthly Rev</span>
@@ -837,6 +844,40 @@
           <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
             <span class="text-slate-400 block mb-1">Current Stage</span>
             <span id="modal-lead-stage" class="text-base font-bold text-cyan-400">--</span>
+          </div>
+        </div>
+
+        <!-- Interactive ROI Simulator Widget -->
+        <div class="bg-slate-950 p-4 rounded-xl border border-purple-500/30 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-purple-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+              <i class="fa-solid fa-calculator"></i> Interactive ROI Simulator
+            </span>
+            <span id="modal-lead-roi-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/30">15.1x ROI</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-[10px] text-slate-400 font-semibold block mb-1">Recovered Patients / Mo: <span id="val-roi-patients" class="text-white font-bold">5</span></label>
+              <input type="range" id="slider-roi-patients" min="1" max="20" value="5" oninput="updateModalRoiSimulation()" class="w-full accent-purple-500">
+            </div>
+            <div>
+              <label class="text-[10px] text-slate-400 font-semibold block mb-1">Avg Case Value: <span id="val-roi-case" class="text-white font-bold">$900</span></label>
+              <input type="range" id="slider-roi-case" min="300" max="3000" step="50" value="900" oninput="updateModalRoiSimulation()" class="w-full accent-purple-500">
+            </div>
+          </div>
+          <div class="grid grid-cols-3 gap-2 pt-2 border-t border-slate-800/80 text-center">
+            <div class="bg-slate-900/80 p-2 rounded-lg">
+              <span class="text-[9px] text-slate-400 block">Annual Production</span>
+              <span id="modal-roi-annual-prod" class="text-xs font-bold text-emerald-400 font-mono">$54,000</span>
+            </div>
+            <div class="bg-slate-900/80 p-2 rounded-lg">
+              <span class="text-[9px] text-slate-400 block">Annual Fee ($299/mo)</span>
+              <span class="text-xs font-bold text-slate-300 font-mono">$3,588</span>
+            </div>
+            <div class="bg-slate-900/80 p-2 rounded-lg border border-purple-500/20">
+              <span class="text-[9px] text-purple-300 block">Net Practice Gain</span>
+              <span id="modal-roi-net-gain" class="text-xs font-bold text-purple-300 font-mono">+$50,412</span>
+            </div>
           </div>
         </div>
 
@@ -1224,6 +1265,73 @@
     </div>
   </div>
 
+  <!-- CLIENT-READY AI ROI PROPOSAL MODAL -->
+  <div id="modal-proposal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-purple-500/30 rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 text-purple-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-file-invoice-dollar"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="prop-header-practice" class="text-base font-bold text-white">Client Proposal</h3>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">Client Ready</span>
+            </div>
+            <p id="prop-header-sub" class="text-xs text-slate-400">Tailored practice intake optimization & guaranteed patient ROI proposal</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="window.print()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+            <i class="fa-solid fa-print"></i> Print / Save PDF
+          </button>
+          <button onclick="closeProposalModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Proposal Body -->
+      <div id="prop-modal-body" class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+        <!-- Content injected dynamically via loadProposalModalData() -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 2-MINUTE LOOM VIDEO SCRIPT TELEPROMPTER MODAL -->
+  <div id="modal-loom" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-rose-500/30 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-video"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="loom-header-title" class="text-base font-bold text-white">2-Min Personalized Loom Video Pitch</h3>
+              <span id="loom-duration-badge" class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">~105 Seconds</span>
+            </div>
+            <p id="loom-header-sub" class="text-xs text-slate-400">High-converting cold video outreach script with stage directions</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="copyLoomScript()" class="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 transition cursor-pointer shadow">
+            <i class="fa-solid fa-copy"></i> Copy Script
+          </button>
+          <button onclick="closeLoomModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Loom Body -->
+      <div id="loom-modal-body" class="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+        <!-- Injected dynamically via loadLoomModalData() -->
+      </div>
+    </div>
+  </div>
 
   <!-- Toast Notification Container -->
   <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-emerald-500/40 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
@@ -1817,8 +1925,14 @@
       document.getElementById('modal-lead-name').innerText = lead.name;
       document.getElementById('modal-lead-address').innerText = `${lead.address || 'Texas'} • ${lead.website || 'No website'}`;
       document.getElementById('modal-lead-score').innerText = `${lead.opportunity_score || 0}/100`;
+      document.getElementById('modal-lead-urgency').innerText = `🔥 ${lead.urgency_score || 85}%`;
       document.getElementById('modal-lead-leakage').innerText = `${lead.missed_rev_range || '$3,450–$6,900'}/mo`;
       document.getElementById('modal-lead-stage').innerText = lead.stage || 'FOUND';
+
+      // Reset and trigger ROI simulator inside modal
+      document.getElementById('slider-roi-patients').value = 5;
+      document.getElementById('slider-roi-case').value = 900;
+      updateModalRoiSimulation();
 
       document.getElementById('modal-lead-pitch').innerText = wa.pitch;
       document.getElementById('modal-lead-phone').innerText = `Phone: ${lead.phone || 'Not found'}`;
@@ -1868,6 +1982,23 @@
 
     function closeModal() {
       document.getElementById('modal-lead').classList.add('hidden');
+    }
+
+    function updateModalRoiSimulation() {
+      const pElem = document.getElementById('slider-roi-patients');
+      const cElem = document.getElementById('slider-roi-case');
+      if (!pElem || !cElem) return;
+      const patients = parseInt(pElem.value);
+      const caseVal = parseInt(cElem.value);
+      document.getElementById('val-roi-patients').innerText = patients;
+      document.getElementById('val-roi-case').innerText = `$${caseVal.toLocaleString()}`;
+      const annualProd = patients * caseVal * 12;
+      const annualFee = 299 * 12;
+      const netGain = annualProd - annualFee;
+      const roiMult = (annualProd / annualFee).toFixed(1);
+      document.getElementById('modal-roi-annual-prod').innerText = `$${annualProd.toLocaleString()}`;
+      document.getElementById('modal-roi-net-gain').innerText = `+$${netGain.toLocaleString()}`;
+      document.getElementById('modal-lead-roi-badge').innerText = `${roiMult}x ROI`;
     }
 
     async function loadLeadTimeline(leadId) {
@@ -2180,7 +2311,9 @@
       grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Loading AI Qualified Hot Queue...</div>`;
 
       try {
-        const endpoint = (currentCallsSortMode === 'ev') ? '/api/queue/top-ev?min_probability=50' : '/api/queue/todays-calls?min_probability=65';
+        const endpoint = (currentCallsSortMode === 'urgent') ? '/api/queue/top-urgent?min_urgency=50' :
+                         (currentCallsSortMode === 'ev') ? '/api/queue/top-ev?min_probability=50' : 
+                         '/api/queue/todays-calls?min_probability=65';
         const res = await fetch(endpoint);
         const leads = await res.json();
 
@@ -2225,10 +2358,11 @@
         grid.innerHTML = leads.map(lead => {
           const prob = lead.buying_probability || 85;
           const evVal = lead.expected_value ? Math.round(lead.expected_value) : Math.round(3979.0 * (prob / 100));
+          const urgency = lead.urgency_score || 85;
           const pain = lead.pain_level || "HIGH";
           const docName = lead.doctor_name || "Practice Principal";
           const docRole = lead.decision_maker_role || "Owner Dentist";
-          const triggers = lead.buying_triggers || [
+          const triggers = lead.why_now_reasons || lead.buying_triggers || [
             "High patient review volume losing after-hours booking",
             "Zero conversational intake after 5 PM",
             "Owner-operated practice with high decision accessibility"
@@ -2243,7 +2377,7 @@
           return `
             <div class="bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-5 shadow-xl space-y-4 transition flex flex-col justify-between">
               <div class="space-y-3">
-                <!-- Header with AI Buying Probability & Expected Value -->
+                <!-- Header with AI Buying Probability, Urgency & Expected Value -->
                 <div class="flex items-start justify-between gap-2">
                   <div>
                     <h3 class="text-base font-bold text-white leading-tight">${lead.name}</h3>
@@ -2254,8 +2388,11 @@
                     </div>
                   </div>
                   <div class="text-right shrink-0">
-                    <span class="px-2.5 py-1 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono shadow-sm block">
+                    <span class="px-2.5 py-0.5 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono shadow-sm block">
                       ${prob}% BUY
+                    </span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-amber-950/80 text-amber-300 border border-amber-500/40 font-mono shadow-sm block mt-1">
+                      🔥 ${urgency}% Urgency
                     </span>
                     <span class="px-2 py-0.5 rounded-lg text-[10px] font-black bg-emerald-950 text-emerald-300 border border-emerald-500/40 font-mono shadow-sm block mt-1">
                       $EV: $${evVal.toLocaleString()}
@@ -2270,7 +2407,7 @@
                   <span class="px-2 py-0.5 rounded-md font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Leak: ${revRange}/mo</span>
                 </div>
 
-                <!-- Buying Triggers -->
+                <!-- Why Call Right Now (Urgency & Triggers) -->
                 <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-1">
                   <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Why Call Right Now:</span>
                   <ul class="space-y-1">
@@ -2306,24 +2443,30 @@
                 </div>
               </div>
 
-              <!-- Action Bar with Simulator Button -->
-              <div class="pt-3 border-t border-slate-800 flex items-center gap-2">
+              <!-- Action Bar with Simulator, Proposal, Loom Buttons -->
+              <div class="pt-3 border-t border-slate-800 flex items-center gap-1.5 flex-wrap">
                 ${waLink ? `
-                  <a href="${waLink}" target="_blank" class="flex-1 bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow">
-                    <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
+                  <a href="${waLink}" target="_blank" class="bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1 transition shadow">
+                    <i class="fa-brands fa-whatsapp text-sm"></i>
                   </a>
                 ` : `
-                  <a href="tel:${lead.phone}" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition">
-                    <i class="fa-solid fa-phone text-xs"></i> Call
+                  <a href="tel:${lead.phone}" class="bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1 transition">
+                    <i class="fa-solid fa-phone text-xs"></i>
                   </a>
                 `}
-                <button onclick="openCallSimulatorModal('${lead.id}')" class="px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1.5 transition shadow cursor-pointer" title="AI Call Roleplay Practice">
+                <button onclick="openCallSimulatorModal('${lead.id}')" class="px-2.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1 transition shadow cursor-pointer" title="AI Call Roleplay Practice">
                   <i class="fa-solid fa-hand-fist"></i> Spar
                 </button>
-                <button onclick="openOutreachModal('${lead.id}')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow cursor-pointer">
+                <button onclick="openProposalModal('${lead.id}')" class="px-2.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1 transition shadow cursor-pointer" title="Tailored AI ROI Proposal">
+                  <i class="fa-solid fa-file-invoice-dollar"></i> Proposal
+                </button>
+                <button onclick="openLoomModal('${lead.id}')" class="px-2.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1 transition shadow cursor-pointer" title="2-Min Personalized Loom Script">
+                  <i class="fa-solid fa-video"></i> Loom
+                </button>
+                <button onclick="openOutreachModal('${lead.id}')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-2 rounded-xl text-xs flex items-center justify-center gap-1 transition shadow cursor-pointer">
                   <i class="fa-solid fa-paper-plane text-xs"></i> Outreach
                 </button>
-                <button onclick="openBattlecard('${lead.id}')" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition cursor-pointer" title="Battlecard">
+                <button onclick="openBattlecard('${lead.id}')" class="px-2.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition cursor-pointer" title="Battlecard">
                   <i class="fa-solid fa-shield-halved"></i>
                 </button>
               </div>
@@ -2338,17 +2481,246 @@
 
     async function switchCallsSort(mode) {
       currentCallsSortMode = mode;
+      const btnUrgent = document.getElementById('btn-sort-urgent');
       const btnEv = document.getElementById('btn-sort-ev');
       const btnProb = document.getElementById('btn-sort-prob');
-      if (mode === 'ev') {
-        btnEv.className = "px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold transition shadow flex items-center gap-1.5 cursor-pointer";
-        btnProb.className = "px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer";
-      } else {
-        btnProb.className = "px-3 py-1.5 rounded-xl bg-cyan-600 text-white text-xs font-bold transition shadow flex items-center gap-1.5 cursor-pointer";
-        btnEv.className = "px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer";
-      }
+      
+      if (btnUrgent) btnUrgent.className = "px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow flex items-center gap-1.5 cursor-pointer " + (mode === 'urgent' ? "bg-amber-600 text-white font-bold" : "bg-slate-800 hover:bg-slate-700 text-slate-300");
+      if (btnEv) btnEv.className = "px-3 py-1.5 rounded-xl text-xs font-semibold transition shadow flex items-center gap-1.5 cursor-pointer " + (mode === 'ev' ? "bg-emerald-600 text-white font-bold" : "bg-slate-800 hover:bg-slate-700 text-slate-300");
+      if (btnProb) btnProb.className = "px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer " + (mode === 'prob' ? "bg-cyan-600 text-white font-bold" : "bg-slate-800 hover:bg-slate-700 text-slate-300");
+      
       loadTodaysCallsData();
     }
+
+    // --- Tailored Proposal Modal Functions ---
+    let currentProposalLeadId = null;
+    async function openProposalModal(leadId) {
+      currentProposalLeadId = leadId;
+      const modal = document.getElementById('modal-proposal');
+      modal.classList.remove('hidden');
+      const body = document.getElementById('prop-modal-body');
+      body.innerHTML = `<div class="py-16 text-center text-slate-400"><i class="fa-solid fa-spinner animate-spin text-purple-400 mr-2"></i>Generating personalized ROI proposal...</div>`;
+
+      try {
+        const res = await fetch(`/api/leads/${leadId}/proposal`);
+        const p = await res.json();
+        renderProposalContent(p);
+      } catch (err) {
+        body.innerHTML = `<div class="p-6 text-rose-400">Failed to load proposal: ${err.message}</div>`;
+      }
+    }
+
+    function closeProposalModal() {
+      document.getElementById('modal-proposal').classList.add('hidden');
+    }
+
+    function renderProposalContent(p) {
+      document.getElementById('prop-header-practice').innerText = p.practice_name;
+      document.getElementById('prop-header-sub').innerText = `Prepared for ${p.doctor_name} • ${p.date_prepared}`;
+      const r = p.roi_breakdown;
+
+      const html = `
+        <div class="space-y-6">
+          <!-- Hero Banner -->
+          <div class="bg-gradient-to-r from-purple-950/60 via-slate-900 to-slate-900 border border-purple-500/30 rounded-2xl p-5 shadow-lg space-y-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">Practice Growth Architecture</span>
+            <h2 class="text-xl font-extrabold text-white">${p.hero_title}</h2>
+            <p class="text-slate-300 text-xs leading-relaxed max-w-3xl">${p.executive_summary}</p>
+          </div>
+
+          <!-- Diagnosed Friction Points -->
+          <div class="space-y-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-triangle-exclamation text-amber-400"></i> Diagnosed Conversion Friction
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              ${p.diagnosed_friction.map(f => `
+                <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                  <h4 class="font-bold text-slate-200 text-xs">${f.issue}</h4>
+                  <p class="text-[11px] text-slate-400 leading-snug">${f.impact}</p>
+                  <div class="pt-1 border-t border-slate-800/80 text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                    <i class="fa-solid fa-check"></i> ${f.solution}
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Unit Economics & ROI Breakdown -->
+          <div class="bg-slate-950 p-5 rounded-2xl border border-emerald-500/30 shadow-xl space-y-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <span class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">Financial Impact Model</span>
+                <h3 class="text-base font-extrabold text-white">Guaranteed Dental Unit Economics</h3>
+              </div>
+              <span class="px-3 py-1 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">
+                ${r.headline_roi}
+              </span>
+            </div>
+
+            <!-- 4 Metrics Grid -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <span class="text-[10px] text-slate-400 font-semibold block">Recovered Patients</span>
+                <span class="text-lg font-black text-white font-mono">${r.recovered_patients_per_month} / mo</span>
+                <span class="text-[10px] text-slate-500 block mt-0.5">@ $${r.avg_case_value} Case Val</span>
+              </div>
+              <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <span class="text-[10px] text-slate-400 font-semibold block">Annual Gross Production</span>
+                <span class="text-lg font-black text-emerald-400 font-mono">$${r.annual_revenue_recovered.toLocaleString()}</span>
+                <span class="text-[10px] text-slate-500 block mt-0.5">$${r.monthly_revenue_recovered.toLocaleString()}/mo</span>
+              </div>
+              <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 text-center">
+                <span class="text-[10px] text-slate-400 font-semibold block">Annual Investment</span>
+                <span class="text-lg font-black text-slate-300 font-mono">$${r.annual_cost.toLocaleString()}</span>
+                <span class="text-[10px] text-slate-500 block mt-0.5">$${r.monthly_fee}/mo retainer</span>
+              </div>
+              <div class="bg-slate-900 p-3 rounded-xl border border-emerald-500/30 text-center bg-emerald-950/20">
+                <span class="text-[10px] text-emerald-300 font-semibold block">Net Annual Profit</span>
+                <span class="text-lg font-black text-emerald-300 font-mono">$${r.net_annual_profit.toLocaleString()}</span>
+                <span class="text-[10px] text-emerald-400 block mt-0.5">${r.roi_multiplier}x ROI</span>
+              </div>
+            </div>
+
+            <div class="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 text-emerald-200 text-xs font-semibold flex items-center gap-2">
+              <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+              <span>${r.breakeven_summary}</span>
+            </div>
+          </div>
+
+          <!-- 3-Phase Implementation Roadmap -->
+          <div class="space-y-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-timeline text-cyan-400"></i> Turnkey Rollout Roadmap
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+              ${p.implementation_roadmap.map(step => `
+                <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1.5">
+                  <span class="text-[10px] font-bold text-cyan-400 font-mono uppercase block">${step.days}</span>
+                  <h4 class="font-bold text-white text-xs">${step.phase}</h4>
+                  <p class="text-[11px] text-slate-400 leading-relaxed">${step.description}</p>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Pricing Options -->
+          <div class="space-y-2">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-tags text-indigo-400"></i> Investment Options
+            </h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              ${p.pricing_options.map(tier => `
+                <div class="bg-slate-950 p-5 rounded-2xl border ${tier.recommended ? 'border-purple-500/60 bg-purple-950/10 relative' : 'border-slate-800'} space-y-3">
+                  ${tier.recommended ? `<span class="absolute top-3 right-3 px-2 py-0.5 rounded-full text-[9px] font-bold bg-purple-500 text-white uppercase">Most Selected</span>` : ''}
+                  <div>
+                    <h4 class="text-sm font-bold text-white">${tier.name}</h4>
+                    <div class="text-2xl font-black text-white font-mono mt-1">$${tier.price} <span class="text-xs text-slate-400 font-normal">/ month</span></div>
+                  </div>
+                  <ul class="space-y-1.5 pt-2 border-t border-slate-800 text-[11px] text-slate-300">
+                    ${tier.features.map(f => `
+                      <li class="flex items-center gap-1.5">
+                        <i class="fa-solid fa-check text-emerald-400 text-xs"></i>
+                        <span>${f}</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+
+          <!-- Ironclad Risk-Free Guarantee -->
+          <div class="p-4 rounded-2xl bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
+            <i class="fa-solid fa-shield-halved text-amber-400 text-xl shrink-0 mt-0.5"></i>
+            <div>
+              <h4 class="font-bold text-amber-300 text-xs mb-0.5">100% Risk-Free Practice Guarantee</h4>
+              <p class="text-[11px] leading-relaxed text-amber-200/90">${p.guarantee}</p>
+            </div>
+          </div>
+        </div>
+      `;
+      document.getElementById('prop-modal-body').innerHTML = html;
+    }
+
+    // --- Loom Video Pitch Teleprompter Functions ---
+    let currentLoomPitchData = null;
+    async function openLoomModal(leadId) {
+      const modal = document.getElementById('modal-loom');
+      modal.classList.remove('hidden');
+      const body = document.getElementById('loom-modal-body');
+      body.innerHTML = `<div class="py-16 text-center text-slate-400"><i class="fa-solid fa-spinner animate-spin text-rose-400 mr-2"></i>Generating 2-min personalized video script...</div>`;
+
+      try {
+        const res = await fetch(`/api/leads/${leadId}/loom-script`);
+        const s = await res.json();
+        currentLoomPitchData = s;
+        renderLoomContent(s);
+      } catch (err) {
+        body.innerHTML = `<div class="p-6 text-rose-400">Failed to load Loom script: ${err.message}</div>`;
+      }
+    }
+
+    function closeLoomModal() {
+      document.getElementById('modal-loom').classList.add('hidden');
+    }
+
+    function renderLoomContent(s) {
+      document.getElementById('loom-header-title').innerText = s.video_title;
+      document.getElementById('loom-duration-badge').innerText = `~${s.est_duration_sec}s (${s.word_count} words)`;
+
+      const html = `
+        <div class="space-y-4">
+          <!-- Email Subject Line Helper -->
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Suggested Email Subject:</span>
+              <span id="loom-subject-text" class="text-xs font-semibold text-white font-mono">${s.email_subject_line}</span>
+            </div>
+            <button onclick="copyLoomSubject()" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] font-semibold flex items-center gap-1 transition cursor-pointer">
+              <i class="fa-solid fa-copy"></i> Copy
+            </button>
+          </div>
+
+          <!-- Scene-by-Scene Teleprompter Flow -->
+          <div class="space-y-3">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Scene-by-Scene Video Flow:</span>
+            ${s.scenes.map((scene, idx) => `
+              <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 hover:border-slate-700 transition">
+                <div class="flex items-center justify-between text-[11px] pb-1.5 border-b border-slate-800">
+                  <span class="font-bold text-rose-400 flex items-center gap-1.5">
+                    <span class="w-5 h-5 rounded-full bg-rose-500/20 text-rose-300 flex items-center justify-center text-[10px]">${idx + 1}</span>
+                    ${scene.section}
+                  </span>
+                  <span class="font-mono text-slate-500 font-bold text-[10px]">${scene.time}</span>
+                </div>
+                <div class="p-2 rounded-lg bg-slate-900/90 text-slate-400 text-[11px] flex items-start gap-2">
+                  <i class="fa-solid fa-display text-cyan-400 mt-0.5"></i>
+                  <span><strong>SCREEN ACTION:</strong> ${scene.screen_action}</span>
+                </div>
+                <div class="p-3 rounded-lg bg-rose-950/20 border border-rose-500/20 text-slate-200 text-xs font-sans leading-relaxed select-all">
+                  "${scene.voiceover}"
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      document.getElementById('loom-modal-body').innerHTML = html;
+    }
+
+    function copyLoomScript() {
+      if (!currentLoomPitchData) return;
+      navigator.clipboard.writeText(currentLoomPitchData.teleprompter_text);
+      showToast("Loom teleprompter script copied to clipboard!");
+    }
+
+    function copyLoomSubject() {
+      if (!currentLoomPitchData) return;
+      navigator.clipboard.writeText(currentLoomPitchData.email_subject_line);
+      showToast("Subject line copied!");
+    }
+
 
     // --- AI Call Roleplay Simulator Functions ---
     async function openCallSimulatorModal(leadId) {
