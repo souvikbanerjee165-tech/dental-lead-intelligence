@@ -22,6 +22,8 @@ output/*.json
 output/screenshots/*
 output/reports/*
 output/proposals/*
+output/backups/*
+output/logs/*
 !output/screenshots/.gitkeep
 !output/reports/.gitkeep
 !output/proposals/.gitkeep

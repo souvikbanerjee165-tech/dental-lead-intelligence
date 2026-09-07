@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
@@ -38,6 +38,10 @@ from health_monitor import SystemHealthMonitor
 from cost_tracker import CostTelemetryTracker
 from settings_manager import SettingsManager
 from security import SecurityHeadersMiddleware, validate_startup_security, human_jitter_delay, compress_image_if_possible
+from auth_manager import auth_manager, verify_auth_dependency
+from structured_logger import audit_logger, SecretMaskingLogFilter
+import logging
+logging.getLogger().addFilter(SecretMaskingLogFilter())
 
 # Setup directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -186,6 +190,10 @@ class SettingsUpdateRequest(BaseModel):
     rate_limit_max_delay_sec: Optional[float] = None
     auto_backup_enabled: Optional[bool] = None
     agency_name: Optional[str] = None
+
+class LoginRequest(BaseModel):
+    password: str
+    username: Optional[str] = "admin"
 
 # --- Helper Functions ---
 
@@ -1261,7 +1269,7 @@ async def get_agency_settings():
 
 @app.post("/api/settings")
 async def update_agency_settings(req: SettingsUpdateRequest):
-    """Updates and persists runtime configurations instantly across the platform."""
+    """Updates and persists runtime configurations instantly across the platform with strict validation."""
     updates = req.model_dump(exclude_unset=True)
     if "min_reviews" in updates and "min_reviews_threshold" not in updates:
         updates["min_reviews_threshold"] = updates["min_reviews"]
@@ -1270,13 +1278,57 @@ async def update_agency_settings(req: SettingsUpdateRequest):
     if "monthly_fee" in updates and "default_monthly_retainer" not in updates:
         updates["default_monthly_retainer"] = updates["monthly_fee"]
 
-    updated = settings_mgr.update_settings(updates)
-    return {"status": "success", "settings": updated}
+    try:
+        updated = settings_mgr.update_settings(updates)
+        audit_logger.log_event("settings_updated", module="settings", level="INFO", metadata={"updated_keys": list(updates.keys())})
+        return {"status": "success", "settings": updated}
+    except ValueError as e:
+        audit_logger.log_event("settings_validation_failed", module="settings", level="WARNING", metadata={"error": str(e)})
+        raise HTTPException(status_code=400, detail=str(e))
 
 @app.get("/api/system/security")
 async def get_system_security_status():
     """Returns security auditing, headers verification, and masked credential status."""
     return validate_startup_security()
+
+# --- v1.1 Enterprise Authentication & Audit Logging Endpoints ---
+
+@app.post("/api/auth/login")
+async def login(req: LoginRequest):
+    """Verifies master credentials and issues a signed session token."""
+    expected_pass = auth_manager.get_configured_password()
+    if not auth_manager.verify_password(req.password, expected_pass):
+        audit_logger.log_event("login_failed", module="auth", level="WARNING", metadata={"username": req.username})
+        raise HTTPException(status_code=401, detail="Invalid password or access PIN")
+
+    token = auth_manager.create_session_token(username=req.username)
+    audit_logger.log_event("login_success", module="auth", level="INFO", metadata={"username": req.username})
+    return {"status": "success", "session_token": token, "username": req.username}
+
+@app.get("/api/auth/status")
+async def auth_status(request: Request):
+    """Reports whether authentication is required and validates the active session."""
+    req_auth = auth_manager.is_auth_required()
+    token = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+    elif "session_token" in request.cookies:
+        token = request.cookies.get("session_token")
+    elif "x-session-token" in request.headers:
+        token = request.headers.get("x-session-token")
+
+    valid, username_or_err = auth_manager.validate_session_token(token) if token else (False, "No token provided")
+    return {
+        "auth_required": req_auth,
+        "authenticated": valid if req_auth else True,
+        "user": username_or_err if valid else ("local_admin" if not req_auth else None)
+    }
+
+@app.get("/api/system/audit-logs")
+async def get_audit_logs(limit: int = 50):
+    """Retrieves recent structured JSON audit events."""
+    return {"events": audit_logger.get_recent_events(limit=limit)}
 
 if __name__ == "__main__":
     import webbrowser

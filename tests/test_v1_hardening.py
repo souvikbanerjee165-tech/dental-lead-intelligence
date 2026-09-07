@@ -184,7 +184,9 @@ def test_security_hardening_middleware_and_checks():
     # Verify Security Response Headers injected by SecurityHeadersMiddleware
     assert resp.headers.get("X-Content-Type-Options") == "nosniff"
     assert resp.headers.get("X-Frame-Options") == "SAMEORIGIN"
-    assert resp.headers.get("X-XSS-Protection") == "1; mode=block"
+    assert "Content-Security-Policy" in resp.headers
+    assert "Permissions-Policy" in resp.headers
+    assert resp.headers.get("X-XSS-Protection") is None
     assert resp.headers.get("Referrer-Policy") == "strict-origin-when-cross-origin"
 
     # Startup security validation
