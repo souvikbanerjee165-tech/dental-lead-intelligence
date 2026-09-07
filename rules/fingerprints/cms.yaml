@@ -1,0 +1,80 @@
+# CMS & Frontend Framework Fingerprints
+fingerprints:
+  - id: cms-wordpress
+    name: WordPress
+    category: CMS & Frameworks
+    patterns:
+      - "wp-content"
+      - "wp-includes"
+      - "wp-json"
+    headers:
+      - "x-powered-by: wordpress"
+    confidence: 0.98
+
+  - id: cms-webflow
+    name: Webflow
+    category: CMS & Frameworks
+    patterns:
+      - "uploads-ssl\\.webflow\\.com"
+      - "assets\\.webflow\\.com"
+      - "webflow\\.js"
+    confidence: 0.99
+
+  - id: cms-squarespace
+    name: Squarespace
+    category: CMS & Frameworks
+    patterns:
+      - "static1\\.squarespace\\.com"
+      - "squarespace-headers"
+    confidence: 0.99
+
+  - id: cms-wix
+    name: Wix
+    category: CMS & Frameworks
+    patterns:
+      - "static\\.wixstatic\\.com"
+      - "wix\\.com"
+      - "wixsite\\.com"
+    confidence: 0.99
+
+  - id: cms-shopify
+    name: Shopify
+    category: CMS & Frameworks
+    patterns:
+      - "cdn\\.shopify\\.com"
+      - "shopify-payment"
+    confidence: 0.99
+
+  - id: cms-nextjs
+    name: Next.js
+    category: CMS & Frameworks
+    patterns:
+      - "__NEXT_DATA__"
+      - "/_next/static/"
+    confidence: 0.99
+
+  - id: cms-react
+    name: React
+    category: CMS & Frameworks
+    patterns:
+      - "data-reactroot"
+      - "react\\.production\\.min\\.js"
+      - "react-dom"
+    confidence: 0.95
+
+  - id: cms-angular
+    name: Angular
+    category: CMS & Frameworks
+    patterns:
+      - "ng-version"
+      - "angular\\.min\\.js"
+    confidence: 0.95
+
+  - id: cms-vue
+    name: Vue.js
+    category: CMS & Frameworks
+    patterns:
+      - "data-v-"
+      - "vue\\.runtime"
+      - "vue\\.min\\.js"
+    confidence: 0.95

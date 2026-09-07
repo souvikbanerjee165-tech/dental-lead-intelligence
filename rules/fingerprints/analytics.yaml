@@ -1,0 +1,41 @@
+# Analytics & Tag Management Fingerprints
+fingerprints:
+  - id: analytics-ga4
+    name: Google Analytics 4 (GA4)
+    category: Analytics
+    patterns:
+      - "googletagmanager\\.com/gtag/js\\?id=G-"
+      - "gtag\\(['\"]config['\"],\\s*['\"]G-"
+    confidence: 0.98
+
+  - id: analytics-ua
+    name: Universal Analytics (Legacy)
+    category: Analytics
+    patterns:
+      - "google-analytics\\.com/analytics\\.js"
+      - "['\"]UA-\\d+-\\d+['\"]"
+    confidence: 0.95
+
+  - id: analytics-hotjar
+    name: Hotjar
+    category: Analytics
+    patterns:
+      - "static\\.hotjar\\.com"
+      - "hjid"
+    confidence: 0.95
+
+  - id: analytics-mixpanel
+    name: Mixpanel
+    category: Analytics
+    patterns:
+      - "cdn\\.mxpnl\\.com"
+      - "mixpanel\\.init"
+    confidence: 0.95
+
+  - id: tagman-gtm
+    name: Google Tag Manager
+    category: Tag Managers
+    patterns:
+      - "googletagmanager\\.com/gtm\\.js\\?id=GTM-"
+      - "GTM-[A-Z0-9]+"
+    confidence: 0.98

@@ -1,0 +1,11 @@
+{
+  "clinic_name": "Modern Dental Studio",
+  "expected": {
+    "booking": false,
+    "chatbot": true,
+    "cms": "Squarespace",
+    "ga4": false,
+    "ad_pixels": true,
+    "ssl": true
+  }
+}

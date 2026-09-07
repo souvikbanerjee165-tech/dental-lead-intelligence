@@ -1,0 +1,43 @@
+# CRM & Marketing Automation Fingerprints
+fingerprints:
+  - id: crm-gohighlevel
+    name: GoHighLevel / LeadConnector
+    category: CRM & Marketing
+    patterns:
+      - "leadconnectorhq\\.com"
+      - "msgsndr\\.com"
+      - "services\\.leadconnector"
+    confidence: 0.99
+
+  - id: crm-hubspot
+    name: HubSpot CRM
+    category: CRM & Marketing
+    patterns:
+      - "js\\.hs-scripts\\.com"
+      - "js\\.hubspot\\.com"
+      - "hubspot-messages-iframe"
+    confidence: 0.99
+
+  - id: crm-activecampaign
+    name: ActiveCampaign
+    category: CRM & Marketing
+    patterns:
+      - "activecampaign\\.com"
+      - "trackcmp\\.net"
+    confidence: 0.95
+
+  - id: crm-salesforce
+    name: Salesforce / Pardot
+    category: CRM & Marketing
+    patterns:
+      - "pi\\.pardot\\.com"
+      - "salesforce\\.com"
+    confidence: 0.95
+
+  - id: crm-mailchimp
+    name: Mailchimp
+    category: CRM & Marketing
+    patterns:
+      - "chimpstatic\\.com"
+      - "mailchimp\\.com"
+    confidence: 0.95

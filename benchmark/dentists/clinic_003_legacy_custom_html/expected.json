@@ -1,0 +1,11 @@
+{
+  "clinic_name": "Heritage Family Dentistry",
+  "expected": {
+    "booking": false,
+    "chatbot": false,
+    "cms": null,
+    "ga4": false,
+    "ad_pixels": false,
+    "ssl": false
+  }
+}

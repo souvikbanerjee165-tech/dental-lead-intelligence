@@ -1,0 +1,41 @@
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache & build artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Local databases & storage
+*.db
+storage.db
+output/*.csv
+output/*.xlsx
+output/*.json
+output/screenshots/*
+output/reports/*
+output/proposals/*
+!output/screenshots/.gitkeep
+!output/reports/.gitkeep
+!output/proposals/.gitkeep
+
+# Environment secrets
+.env
+.env.local
+*.env
+
+# Vercel
+.vercel/
+
+# Operating system / IDE
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

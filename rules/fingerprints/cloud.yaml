@@ -1,0 +1,52 @@
+# Cloud Infrastructure & CDN Fingerprints
+fingerprints:
+  - id: cloud-cloudflare
+    name: Cloudflare
+    category: Cloud & CDN
+    patterns:
+      - "cloudflare"
+      - "cdnjs\\.cloudflare\\.com"
+    headers:
+      - "server: cloudflare"
+      - "cf-ray"
+    confidence: 0.99
+
+  - id: cloud-wpengine
+    name: WP Engine
+    category: Cloud & CDN
+    patterns:
+      - "wpengine\\.netdna-cdn\\.com"
+      - "wpe-"
+    headers:
+      - "x-powered-by: wp engine"
+    confidence: 0.99
+
+  - id: cloud-aws
+    name: AWS CloudFront / S3
+    category: Cloud & CDN
+    patterns:
+      - "cloudfront\\.net"
+      - "amazonaws\\.com"
+    headers:
+      - "x-amz-cf-id"
+      - "x-amz-request-id"
+    confidence: 0.95
+
+  - id: cloud-vercel
+    name: Vercel
+    category: Cloud & CDN
+    patterns:
+      - "vercel\\.app"
+      - "vercel\\.live"
+    headers:
+      - "x-vercel-id"
+    confidence: 0.99
+
+  - id: cloud-netlify
+    name: Netlify
+    category: Cloud & CDN
+    patterns:
+      - "netlify\\.app"
+    headers:
+      - "x-nf-request-id"
+    confidence: 0.99

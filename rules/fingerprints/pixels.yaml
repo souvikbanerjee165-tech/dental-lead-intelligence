@@ -1,0 +1,25 @@
+# Ad & Retargeting Pixel Fingerprints
+fingerprints:
+  - id: pixel-meta
+    name: Meta / Facebook Pixel
+    category: Ad Pixels
+    patterns:
+      - "connect\\.facebook\\.net/en_US/fbevents\\.js"
+      - "fbq\\(['\"]init['\"]"
+      - "fbq\\("
+    confidence: 0.98
+
+  - id: pixel-tiktok
+    name: TikTok Pixel
+    category: Ad Pixels
+    patterns:
+      - "analytics\\.tiktok\\.com"
+      - "ttq\\.load"
+    confidence: 0.95
+
+  - id: pixel-google-ads
+    name: Google Ads Conversion Tag
+    category: Ad Pixels
+    patterns:
+      - "gtag\\(['\"]config['\"],\\s*['\"]AW-"
+    confidence: 0.95

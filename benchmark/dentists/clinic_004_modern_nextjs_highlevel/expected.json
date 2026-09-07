@@ -1,0 +1,11 @@
+{
+  "clinic_name": "Apex Advanced Orthodontics",
+  "expected": {
+    "booking": true,
+    "chatbot": false,
+    "cms": "Next.js",
+    "ga4": true,
+    "ad_pixels": true,
+    "ssl": true
+  }
+}

@@ -1,0 +1,1699 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dental WhatsApp Growth Engine & Lead Intelligence</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#ecfdf5',
+              100: '#d1fae5',
+              500: '#10b981',
+              600: '#059669',
+              700: '#047857',
+              whatsapp: '#25D366',
+              whatsappdark: '#128C7E',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Leaflet.js for Interactive Geographic Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+    .kanban-col { min-height: calc(100vh - 280px); }
+    
+    /* Dark Theme Leaflet Customization */
+    .leaflet-popup-content-wrapper {
+      background: #0f172a !important;
+      color: #f8fafc !important;
+      border: 1px solid #334155 !important;
+      border-radius: 12px !important;
+      padding: 0 !important;
+      box-shadow: 0 10px 25px -5px rgba(0,0,0,0.6) !important;
+    }
+    .leaflet-popup-content {
+      margin: 12px 14px !important;
+      line-height: 1.4 !important;
+    }
+    .leaflet-popup-tip {
+      background: #0f172a !important;
+    }
+    .leaflet-container {
+      background-color: #020617 !important;
+    }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased overflow-hidden">
+
+  <!-- Top Navbar -->
+  <header class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between shrink-0">
+    <div class="flex items-center space-x-4">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-emerald-500/20">
+        <i class="fa-solid fa-tooth"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <h1 class="text-lg font-bold text-white tracking-tight">Dental WhatsApp Growth Engine</h1>
+          <span class="px-2 py-0.5 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full flex items-center gap-1.5">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Ready
+          </span>
+        </div>
+        <p class="text-xs text-slate-400">Automated Clinic Scraper, WhatsApp Leakage Detection & 1-Click Outreach</p>
+      </div>
+    </div>
+
+    <!-- Quick Stats in Navbar -->
+    <div class="flex items-center space-x-4 text-xs">
+      <div class="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center space-x-2">
+        <span class="text-slate-400">Total Clinics:</span>
+        <span id="nav-total-leads" class="font-bold text-emerald-400 text-sm">--</span>
+      </div>
+      <div class="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center space-x-2">
+        <span class="text-slate-400">Total Pipeline Leakage:</span>
+        <span id="nav-total-leakage" class="font-bold text-amber-400 text-sm">--</span>
+      </div>
+      <div class="bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 flex items-center space-x-2">
+        <span class="text-slate-400">Pending Review:</span>
+        <span id="nav-queue-count" class="font-bold text-cyan-400 text-sm">--</span>
+      </div>
+      <button onclick="exportLeads('xlsx')" title="Download all leads in formatted Excel file" class="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3 py-1.5 rounded-lg border border-emerald-400/30 flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+        <i class="fa-solid fa-file-excel text-emerald-200"></i>
+        <span>Export Excel</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="flex-1 flex overflow-hidden">
+    
+    <!-- Left Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900/90 border-r border-slate-800 flex flex-col justify-between shrink-0 p-4">
+      <div class="space-y-1.5">
+        <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-3 mb-2">Main Menu</div>
+        
+        <button onclick="switchTab('finder')" id="tab-btn-finder" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <i class="fa-solid fa-magnifying-glass-location text-base w-5 text-center"></i>
+          <span>Lead Finder</span>
+        </button>
+
+        <button onclick="switchTab('briefing')" id="tab-btn-briefing" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-bullseye text-base w-5 text-center text-amber-400"></i>
+            <span>Morning Hit List</span>
+          </div>
+          <span id="badge-briefing" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">DAILY</span>
+        </button>
+
+        <button onclick="switchTab('queue')" id="tab-btn-queue" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <div class="flex items-center space-x-3">
+            <i class="fa-brands fa-whatsapp text-base w-5 text-center text-[#25D366]"></i>
+            <span>WhatsApp Queue</span>
+          </div>
+          <span id="badge-queue" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">0</span>
+        </button>
+
+        <button onclick="switchTab('kanban')" id="tab-btn-kanban" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <i class="fa-solid fa-table-columns text-base w-5 text-center text-cyan-400"></i>
+          <span>CRM Pipeline</span>
+        </button>
+
+        <button onclick="switchTab('leads')" id="tab-btn-leads" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <i class="fa-solid fa-address-book text-base w-5 text-center text-purple-400"></i>
+          <span>All Leads Database</span>
+        </button>
+
+        <button onclick="switchTab('proposals')" id="tab-btn-proposals" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <i class="fa-solid fa-file-invoice-dollar text-base w-5 text-center text-indigo-400"></i>
+          <span>Proposal Generator</span>
+        </button>
+      </div>
+
+      <!-- Footer Info Box -->
+      <div class="bg-slate-850 p-3.5 rounded-xl border border-slate-800 text-xs text-slate-400 space-y-2">
+        <div class="flex items-center justify-between text-slate-300 font-semibold">
+          <span>Target Offer</span>
+          <span class="text-emerald-400 text-[11px] font-bold uppercase">WhatsApp Auto</span>
+        </div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          Pitch: 24/7 missed-call recapture & automated patient booking for dental clinics.
+        </p>
+        <div class="pt-1 flex items-center justify-between text-[10px] text-slate-500 border-t border-slate-800">
+          <span>Local Engine</span>
+          <span>Port 8000</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 overflow-y-auto bg-slate-950 p-6">
+
+      <!-- TAB 1: LEAD FINDER -->
+      <section id="view-finder" class="space-y-6 max-w-6xl mx-auto">
+        <!-- Search Controls Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+          <div class="absolute -right-16 -top-16 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
+          
+          <div class="max-w-2xl">
+            <h2 class="text-xl font-bold text-white mb-1">Find Dental Practices & Detect WhatsApp Gaps</h2>
+            <p class="text-sm text-slate-400 mb-6">Enter a city or query to search Google Maps, inspect practice websites, compute missed call leakage, and stage customized WhatsApp pitches.</p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+            <div class="md:col-span-5">
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Target Location / Query</label>
+              <div class="relative">
+                <i class="fa-solid fa-location-dot absolute left-3.5 top-3 text-slate-400"></i>
+                <input type="text" id="input-query" value="Dentists in Austin, TX" class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+              </div>
+            </div>
+
+            <div class="md:col-span-3">
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Practice Limit</label>
+              <select id="input-limit" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:border-emerald-500 transition">
+                <option value="5">5 Practices (Fast)</option>
+                <option value="10" selected>10 Practices (Recommended)</option>
+                <option value="20">20 Practices (Full Cohort)</option>
+                <option value="30">30 Practices (Deep Sweep)</option>
+              </select>
+            </div>
+
+            <div class="md:col-span-4 flex space-x-2">
+              <button onclick="startDiscovery()" id="btn-start-search" class="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white font-semibold px-5 py-2.5 rounded-xl shadow-lg shadow-emerald-500/20 transition flex items-center justify-center space-x-2 text-sm">
+                <i class="fa-solid fa-bolt"></i>
+                <span>Start Discovery</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Fast Quick City Chips -->
+          <div class="mt-4 flex items-center space-x-2 text-xs text-slate-400">
+            <span class="font-medium text-slate-500">Quick Targets:</span>
+            <button onclick="setQuery('Dentists in Austin, TX')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Austin, TX</button>
+            <button onclick="setQuery('Dentists in Dallas, TX')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Dallas, TX</button>
+            <button onclick="setQuery('Dentists in Houston, TX')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Houston, TX</button>
+            <button onclick="setQuery('Dentists in San Antonio, TX')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">San Antonio, TX</button>
+            <button onclick="setQuery('Dentists in Fort Worth, TX')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition">Fort Worth, TX</button>
+          </div>
+        </div>
+
+        <!-- Live Scraping Progress Box (Hidden by default) -->
+        <div id="box-progress" class="hidden bg-slate-900 border border-emerald-500/30 rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center animate-spin">
+                <i class="fa-solid fa-spinner"></i>
+              </div>
+              <div>
+                <h3 id="progress-title" class="text-sm font-bold text-white">Running Automated Search & Audits...</h3>
+                <p id="progress-msg" class="text-xs text-slate-400">Connecting to Google Maps via headless Playwright...</p>
+              </div>
+            </div>
+            <span id="progress-pct" class="text-lg font-black text-emerald-400 font-mono">0%</span>
+          </div>
+
+          <!-- Progress Bar -->
+          <div class="w-full bg-slate-800 h-2.5 rounded-full overflow-hidden">
+            <div id="progress-bar-fill" class="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-300" style="width: 0%"></div>
+          </div>
+
+          <!-- Live Multi-Metric Counters -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold text-sm">✔</div>
+              <div>
+                <div id="counter-clinics-found" class="text-base font-bold text-white font-mono">0</div>
+                <div class="text-[11px] text-slate-400">clinics found</div>
+              </div>
+            </div>
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">✔</div>
+              <div>
+                <div id="counter-websites-analyzed" class="text-base font-bold text-white font-mono">0</div>
+                <div class="text-[11px] text-slate-400">websites analyzed</div>
+              </div>
+            </div>
+            <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center space-x-3">
+              <div class="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-sm">✔</div>
+              <div>
+                <div id="counter-high-opp" class="text-base font-bold text-amber-300 font-mono">0</div>
+                <div class="text-[11px] text-slate-400">high-opportunity practices</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Live Activity Log Terminal -->
+          <div class="pt-2">
+            <div class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center justify-between">
+              <span>Live Engine Activity Log</span>
+              <span class="text-emerald-400 flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Active Stream</span>
+            </div>
+            <div id="progress-terminal" class="bg-slate-950 border border-slate-800/90 rounded-xl p-3 text-[11px] font-mono text-slate-300 h-28 overflow-y-auto space-y-1 select-text">
+              <div class="text-slate-500">// Ready to initiate scraping and automated analysis...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Territory Map & Practice Density Section -->
+        <div id="map-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider">Territory Map & Clinic Density</h3>
+            </div>
+            <div class="flex items-center space-x-3 text-xs">
+              <span id="map-clinic-count" class="text-slate-400">0 practices mapped</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Interactive Pins</span>
+            </div>
+          </div>
+          <div id="clinics-map" style="height: 320px; z-index: 1;" class="w-full rounded-xl border border-slate-800 bg-slate-950"></div>
+        </div>
+
+        <!-- Discovered Leads Live Grid -->
+        <div class="space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-emerald-400"></i> Recently Discovered Dental Prospects
+            </h3>
+            <div class="flex items-center space-x-2">
+              <span id="count-discovered" class="text-xs text-slate-500 mr-2">Showing top leads</span>
+              <button onclick="exportLeads('xlsx')" class="px-2.5 py-1 rounded-lg bg-slate-850 hover:bg-slate-800 text-emerald-400 border border-slate-700/80 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+                <i class="fa-solid fa-file-excel"></i> Export Excel
+              </button>
+              <button onclick="exportLeads('csv')" class="px-2.5 py-1 rounded-lg bg-slate-850 hover:bg-slate-800 text-slate-300 border border-slate-700/80 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+                <i class="fa-solid fa-file-csv"></i> Export CSV
+              </button>
+            </div>
+          </div>
+
+          <div id="grid-discovered" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- Populated via JavaScript -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: OUTREACH REVIEW QUEUE & WHATSAPP DIRECT -->
+      <section id="view-queue" class="hidden space-y-6 max-w-6xl mx-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex items-center justify-between shadow-xl">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <i class="fa-brands fa-whatsapp text-[#25D366]"></i> WhatsApp Outreach Review Queue
+            </h2>
+            <p class="text-sm text-slate-400 mt-1">Review pre-drafted WhatsApp pitches and click to open WhatsApp Web with the doctor's message pre-filled.</p>
+          </div>
+          <div class="flex space-x-3">
+            <button onclick="dispatchApprovedQueue()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-semibold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-emerald-500/20 transition">
+              <i class="fa-solid fa-paper-plane"></i> Batch Dispatch Approved
+            </button>
+          </div>
+        </div>
+
+        <!-- Queue Items Container -->
+        <div id="queue-items-container" class="space-y-4">
+          <!-- Populated dynamically -->
+        </div>
+      </section>
+
+      <!-- TAB 3: CRM KANBAN BOARD -->
+      <section id="view-kanban" class="hidden space-y-4">
+        <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+          <div>
+            <h2 class="text-xl font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-table-columns text-cyan-400"></i> Dental Sales Lifecycle Pipeline
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Click any lead to view notes, history, or advance their stage.</p>
+          </div>
+          <div class="flex space-x-2">
+            <button onclick="loadKanbanData()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-rotate-right"></i> Refresh
+            </button>
+          </div>
+        </div>
+
+        <!-- Kanban Board Columns Container -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 overflow-x-auto pb-6">
+          
+          <!-- Col 1: FOUND -->
+          <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-3 flex flex-col kanban-col">
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-slate-400"></span> Discovered
+              </span>
+              <span id="badge-count-FOUND" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0</span>
+            </div>
+            <div id="col-FOUND" class="flex-1 space-y-2 overflow-y-auto"></div>
+          </div>
+
+          <!-- Col 2: AUDITED -->
+          <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-3 flex flex-col kanban-col">
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-blue-400"></span> Audited
+              </span>
+              <span id="badge-count-AUDITED" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0</span>
+            </div>
+            <div id="col-AUDITED" class="flex-1 space-y-2 overflow-y-auto"></div>
+          </div>
+
+          <!-- Col 3: EMAIL_PREPARED (Review Queue) -->
+          <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-3 flex flex-col kanban-col">
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span> Pitch Ready
+              </span>
+              <span id="badge-count-EMAIL_PREPARED" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0</span>
+            </div>
+            <div id="col-EMAIL_PREPARED" class="flex-1 space-y-2 overflow-y-auto"></div>
+          </div>
+
+          <!-- Col 4: SENT -->
+          <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-3 flex flex-col kanban-col">
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span> Contacted
+              </span>
+              <span id="badge-count-SENT" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0</span>
+            </div>
+            <div id="col-SENT" class="flex-1 space-y-2 overflow-y-auto"></div>
+          </div>
+
+          <!-- Col 5: REPLIED -->
+          <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-3 flex flex-col kanban-col">
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-purple-400"></span> Replied
+              </span>
+              <span id="badge-count-REPLIED" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0</span>
+            </div>
+            <div id="col-REPLIED" class="flex-1 space-y-2 overflow-y-auto"></div>
+          </div>
+
+          <!-- Col 6: MEETING -->
+          <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-3 flex flex-col kanban-col">
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-indigo-400"></span> Demo Booked
+              </span>
+              <span id="badge-count-MEETING" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0</span>
+            </div>
+            <div id="col-MEETING" class="flex-1 space-y-2 overflow-y-auto"></div>
+          </div>
+
+          <!-- Col 7: WON -->
+          <div class="bg-slate-900/60 rounded-xl border border-slate-800 p-3 flex flex-col kanban-col">
+            <div class="flex items-center justify-between pb-2.5 mb-2 border-b border-slate-800">
+              <span class="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Closed Won
+              </span>
+              <span id="badge-count-WON" class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400">0</span>
+            </div>
+            <div id="col-WON" class="flex-1 space-y-2 overflow-y-auto"></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- TAB 4: ALL LEADS DATABASE -->
+      <section id="view-leads" class="hidden space-y-4 max-w-6xl mx-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
+          <div class="w-full sm:w-80 relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400 text-xs"></i>
+            <input type="text" id="filter-lead-search" oninput="filterAllLeads()" placeholder="Search by clinic name, phone..." class="w-full bg-slate-950 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+          </div>
+
+          <div class="flex items-center space-x-2 flex-wrap gap-2">
+            <select id="filter-lead-stage" onchange="filterAllLeads()" class="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500">
+              <option value="ALL">All Pipeline Stages</option>
+              <option value="FOUND">Found</option>
+              <option value="AUDITED">Audited</option>
+              <option value="EMAIL_PREPARED">Pitch Ready</option>
+              <option value="SENT">Sent</option>
+              <option value="REPLIED">Replied</option>
+              <option value="MEETING">Meeting</option>
+              <option value="WON">Won</option>
+            </select>
+            <button onclick="loadAllLeadsTable()" title="Refresh" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs transition cursor-pointer">
+              <i class="fa-solid fa-rotate-right"></i>
+            </button>
+            <button onclick="exportLeads('xlsx')" class="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+              <i class="fa-solid fa-file-excel"></i> Export Excel
+            </button>
+            <button onclick="exportLeads('csv')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer">
+              <i class="fa-solid fa-file-csv"></i> Export CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950/80 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4">Clinic Name</th>
+                  <th class="py-3 px-4">Stage</th>
+                  <th class="py-3 px-4">Opportunity</th>
+                  <th class="py-3 px-4">Est. Leakage</th>
+                  <th class="py-3 px-4">Phone / WhatsApp</th>
+                  <th class="py-3 px-4">Website</th>
+                  <th class="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="table-all-leads-body" class="divide-y divide-slate-800/60 text-slate-300">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: PROPOSALS -->
+      <section id="view-proposals" class="hidden space-y-6 max-w-4xl mx-auto">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
+          <h2 class="text-xl font-bold text-white mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-file-invoice-dollar text-indigo-400"></i> Turnkey Client Proposal Generator
+          </h2>
+          <p class="text-sm text-slate-400 mb-6">Create a white-label, interactive 3-tier client proposal (Setup Fee + Monthly Retainer) to send to practice owners.</p>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Practice Name</label>
+              <input type="text" id="prop-clinic-name" placeholder="e.g. Austin Premier Dental" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Website URL</label>
+              <input type="text" id="prop-clinic-url" placeholder="https://austinpremierdental.com" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+
+          <div class="mt-6 flex justify-end">
+            <button onclick="generateCustomProposal()" id="btn-generate-prop" class="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold px-6 py-2.5 rounded-xl shadow-lg shadow-indigo-500/20 text-sm flex items-center gap-2 transition">
+              <i class="fa-solid fa-wand-magic-sparkles"></i> Generate Interactive Proposal
+            </button>
+          </div>
+        </div>
+
+        <!-- Proposal Result Container -->
+        <div id="prop-result-card" class="hidden bg-slate-900 border border-indigo-500/30 rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-lg">
+                <i class="fa-solid fa-check"></i>
+              </div>
+              <div>
+                <h3 class="text-base font-bold text-white" id="prop-result-title">Proposal Generated!</h3>
+                <p class="text-xs text-slate-400">Complete 3-tier growth package with financial recapture model.</p>
+              </div>
+            </div>
+            <a id="prop-result-link" href="#" target="_blank" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2 rounded-xl flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Proposal in New Tab
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: MORNING HIT LIST (BRIEFING) -->
+      <section id="view-briefing" class="hidden space-y-6 max-w-6xl mx-auto">
+        <!-- Executive Briefing Header Card -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center space-x-2 mb-1">
+                <span class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+                  <i class="fa-solid fa-sun text-amber-400"></i> Autonomous Morning Briefing
+                </span>
+                <span id="briefing-date" class="text-xs text-slate-400 font-mono">Today</span>
+              </div>
+              <h2 class="text-xl font-extrabold text-white tracking-tight">Today’s High-Priority Hit List</h2>
+              <p class="text-xs text-slate-400 mt-1 max-w-2xl">
+                Curated high-value dental clinics with identified decision makers, verified revenue leakage, and customized 1-click WhatsApp outreach.
+              </p>
+            </div>
+
+            <!-- Quick Run Morning Harvest Controls -->
+            <div class="flex items-center gap-3 bg-slate-950/80 p-2 rounded-xl border border-slate-800">
+              <input type="text" id="briefing-city" value="Austin, TX" placeholder="Target City" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500 w-36">
+              <button onclick="triggerMorningHarvest()" id="btn-run-briefing" class="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow cursor-pointer">
+                <i class="fa-solid fa-play"></i> Run Morning Harvester
+              </button>
+            </div>
+          </div>
+
+          <!-- KPI Summary Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            <div class="bg-slate-950/90 border border-slate-800 p-4 rounded-xl">
+              <span class="text-[11px] font-medium text-slate-400 block mb-1">🎯 Targets Ready Today</span>
+              <span id="briefing-target-count" class="text-2xl font-bold text-white">--</span>
+            </div>
+            <div class="bg-slate-950/90 border border-slate-800 p-4 rounded-xl">
+              <span class="text-[11px] font-medium text-slate-400 block mb-1">🩺 Doctors Identified</span>
+              <span id="briefing-doctor-count" class="text-2xl font-bold text-indigo-400">--</span>
+            </div>
+            <div class="bg-slate-950/90 border border-slate-800 p-4 rounded-xl">
+              <span class="text-[11px] font-medium text-slate-400 block mb-1">💰 Monthly Missed Rev</span>
+              <span id="briefing-monthly-rev" class="text-2xl font-bold text-amber-400">--</span>
+            </div>
+            <div class="bg-slate-950/90 border border-slate-800 p-4 rounded-xl">
+              <span class="text-[11px] font-medium text-slate-400 block mb-1">📈 Annual Pipeline ARR</span>
+              <span id="briefing-annual-arr" class="text-2xl font-bold text-emerald-400">--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Briefing Target Cards Container -->
+        <div id="briefing-targets-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Rendered via JS -->
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- LEAD 360 MODAL / DRAWER -->
+  <div id="modal-lead" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900 shrink-0">
+        <div>
+          <h3 id="modal-lead-name" class="text-lg font-bold text-white">Lead Details</h3>
+          <p id="modal-lead-address" class="text-xs text-slate-400">Address & details</p>
+        </div>
+        <button onclick="closeModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+        <!-- Key Metrics Cards -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+            <span class="text-slate-400 block mb-1">Opportunity Score</span>
+            <span id="modal-lead-score" class="text-base font-bold text-emerald-400">--</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+            <span class="text-slate-400 block mb-1">Missed Monthly Rev</span>
+            <span id="modal-lead-leakage" class="text-base font-bold text-amber-400">--</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+            <span class="text-slate-400 block mb-1">Current Stage</span>
+            <span id="modal-lead-stage" class="text-base font-bold text-cyan-400">--</span>
+          </div>
+        </div>
+
+        <!-- WhatsApp Outreach Box -->
+        <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-emerald-400 flex items-center gap-1.5">
+              <i class="fa-brands fa-whatsapp text-base"></i> Tailored WhatsApp Pitch
+            </span>
+            <button onclick="copyModalPitch()" class="text-xs text-emerald-400 hover:text-emerald-300 flex items-center gap-1">
+              <i class="fa-solid fa-copy"></i> Copy Message
+            </button>
+          </div>
+          <div id="modal-lead-pitch" class="bg-slate-950 p-3 rounded-lg text-slate-300 font-sans whitespace-pre-wrap leading-relaxed border border-emerald-500/20 select-all"></div>
+          <div class="flex items-center justify-between pt-1">
+            <span id="modal-lead-phone" class="text-slate-400">Phone: --</span>
+            <a id="modal-lead-wa-btn" href="#" target="_blank" class="bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg transition">
+              <i class="fa-brands fa-whatsapp text-lg"></i> Open in WhatsApp Web
+            </a>
+          </div>
+        </div>
+
+        <!-- Stage Progression Selector -->
+        <div class="space-y-2">
+          <label class="font-bold text-slate-300 block">Advance Pipeline Stage</label>
+          <div class="flex gap-2 flex-wrap" id="modal-stage-buttons">
+            <!-- Stage buttons rendered via JS -->
+          </div>
+        </div>
+
+        <!-- Sales Notes Section -->
+        <div class="space-y-3">
+          <label class="font-bold text-slate-300 block">Sales Notes & Rep Intelligence</label>
+          <div class="flex gap-2">
+            <input type="text" id="modal-input-note" placeholder="Add note (e.g. Called front desk; spoke with Sarah...)" class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500">
+            <button onclick="submitModalNote()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 px-4 py-2 rounded-xl font-medium transition">
+              Add Note
+            </button>
+          </div>
+          <div id="modal-notes-list" class="space-y-2 max-h-36 overflow-y-auto">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PRE-CALL SALES BATTLECARD MODAL -->
+  <div id="modal-battlecard" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-4xl w-full max-h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-gradient-to-r from-slate-900 via-slate-850 to-slate-900 shrink-0">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center justify-center text-lg shadow">
+            <i class="fa-solid fa-shield-halved"></i>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <h3 id="battlecard-clinic-name" class="text-base font-bold text-white">Sales Intelligence Briefing</h3>
+              <span id="battlecard-score-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Fit: --</span>
+            </div>
+            <p id="battlecard-target-doctor" class="text-xs text-indigo-300 font-medium">Target: Dr. Sarah Miller, DDS</p>
+          </div>
+        </div>
+        <button onclick="closeBattlecardModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 text-xs">
+        <!-- Top Metrics Ribbon -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 text-[10px] block">DECISION MAKER</span>
+            <span id="battlecard-doc-display" class="font-bold text-indigo-300 text-sm truncate block">--</span>
+            <span id="battlecard-role-display" class="text-[10px] text-slate-500 block">--</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 text-[10px] block">COMPETITOR STACK</span>
+            <span id="battlecard-comp-display" class="font-bold text-amber-400 text-sm truncate block">--</span>
+            <span id="battlecard-tech-weakness" class="text-[10px] text-slate-500 line-clamp-1 block">--</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 text-[10px] block">MISSED MONTHLY REV</span>
+            <span id="battlecard-rev-display" class="font-bold text-emerald-400 text-sm block">--</span>
+            <span id="battlecard-annual-display" class="text-[10px] text-slate-500 block">--</span>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <span class="text-slate-400 text-[10px] block">PHONE & BOOKING</span>
+            <span id="battlecard-phone-display" class="font-bold text-slate-200 text-sm block">--</span>
+            <span id="battlecard-booking-display" class="text-[10px] text-slate-500 truncate block">--</span>
+          </div>
+        </div>
+
+        <!-- 15-Second Cold Call Opening Script -->
+        <div class="bg-slate-950 rounded-xl border border-amber-500/30 p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-amber-400 flex items-center gap-1.5 text-xs uppercase tracking-wider">
+              <i class="fa-solid fa-phone-volume"></i> 15-Second Direct-to-Doctor Call Script
+            </span>
+            <button onclick="copyBattlecardText('battlecard-doc-script')" class="text-amber-400 hover:text-amber-300 font-semibold flex items-center gap-1 text-[11px] cursor-pointer">
+              <i class="fa-solid fa-copy"></i> Copy Script
+            </button>
+          </div>
+          <p id="battlecard-doc-script" class="bg-slate-900 p-3.5 rounded-lg text-slate-200 text-xs leading-relaxed font-sans border border-slate-800 select-all"></p>
+        </div>
+
+        <!-- Gatekeeper Script -->
+        <div class="bg-slate-950 rounded-xl border border-slate-800 p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-300 flex items-center gap-1.5 text-xs uppercase tracking-wider">
+              <i class="fa-solid fa-user-shield"></i> Gatekeeper / Office Manager Transition Hook
+            </span>
+            <button onclick="copyBattlecardText('battlecard-gatekeeper-script')" class="text-slate-400 hover:text-slate-200 font-semibold flex items-center gap-1 text-[11px] cursor-pointer">
+              <i class="fa-solid fa-copy"></i> Copy Script
+            </button>
+          </div>
+          <p id="battlecard-gatekeeper-script" class="bg-slate-900 p-3.5 rounded-lg text-slate-300 text-xs leading-relaxed font-sans border border-slate-800 select-all"></p>
+        </div>
+
+        <!-- Objection Handling Matrix -->
+        <div class="space-y-3">
+          <h4 class="font-bold text-slate-200 uppercase tracking-wider text-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-comments text-cyan-400"></i> Objection Handling Matrix
+          </h4>
+          <div id="battlecard-objection-list" class="space-y-2.5">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <!-- 1-Click WhatsApp Pitch -->
+        <div class="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-emerald-400 flex items-center gap-1.5 text-xs uppercase tracking-wider">
+              <i class="fa-brands fa-whatsapp text-sm text-[#25D366]"></i> Direct WhatsApp Follow-up
+            </span>
+            <button onclick="copyBattlecardText('battlecard-wa-text')" class="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 text-[11px] cursor-pointer">
+              <i class="fa-solid fa-copy"></i> Copy Message
+            </button>
+          </div>
+          <p id="battlecard-wa-text" class="bg-slate-950 p-3 rounded-lg text-slate-300 text-xs leading-relaxed font-sans border border-emerald-500/20 select-all"></p>
+          <div class="flex items-center justify-end pt-1">
+            <a id="battlecard-wa-btn" href="#" target="_blank" class="bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg transition">
+              <i class="fa-brands fa-whatsapp text-base"></i> Launch WhatsApp Web Now
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-emerald-500/40 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
+    <span id="toast-msg">Action successful!</span>
+  </div>
+
+  <!-- Application Logic -->
+  <script>
+    let currentTab = 'finder';
+    let currentSelectedLeadId = null;
+    let allLeadsCache = [];
+    let searchPollingInterval = null;
+    let leafletMap = null;
+    let markersLayer = null;
+
+    // Initialize Interactive Geographic Map
+    function initMap() {
+      if (leafletMap) return;
+      const mapElem = document.getElementById('clinics-map');
+      if (!mapElem) return;
+      
+      try {
+        leafletMap = L.map('clinics-map', { zoomControl: true }).setView([30.2672, -97.7431], 11);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 19
+        }).addTo(leafletMap);
+        markersLayer = L.featureGroup().addTo(leafletMap);
+      } catch (err) {
+        console.error("Map initialization failed", err);
+      }
+    }
+
+    function renderMapMarkers(leads) {
+      if (!leafletMap) initMap();
+      if (!markersLayer || !leads) return;
+      markersLayer.clearLayers();
+
+      let validCount = 0;
+      leads.forEach(lead => {
+        if (lead.latitude && lead.longitude) {
+          validCount++;
+          const score = (lead.opportunity_score !== undefined && lead.opportunity_score !== null) ? lead.opportunity_score : (lead.score || 0);
+          const revRange = lead.missed_rev_range || '$3,450–$6,900';
+          const waLink = lead.wa_link || (lead.clean_phone ? `https://wa.me/${lead.clean_phone}` : "");
+          const isHighOpp = score >= 60;
+          const pinColor = isHighOpp ? '#10b981' : '#f59e0b';
+
+          const customIcon = L.divIcon({
+            className: 'custom-pin',
+            html: `<div style="background-color: ${pinColor}; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; font-size: 11px; box-shadow: 0 0 10px ${pinColor}88; border: 2px solid #ffffff;">${score}</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          });
+
+          const marker = L.marker([lead.latitude, lead.longitude], { icon: customIcon });
+
+          const popupHtml = `
+            <div class="text-xs space-y-2 min-w-[210px] text-slate-100 font-sans p-1">
+              <div class="font-bold text-sm text-white line-clamp-1">${lead.name}</div>
+              <div class="text-amber-400 font-medium text-[11px]">★ ${lead.rating || 4.9} (${lead.review_count || 50}+ reviews)</div>
+              <div class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2">
+                <div class="text-[9px] uppercase font-bold text-amber-300">Missed Revenue Gap</div>
+                <div class="text-sm font-extrabold text-amber-400 font-mono">${revRange}<span class="text-[10px] font-normal text-slate-400">/mo</span></div>
+              </div>
+              ${waLink ? `
+                <a href="${waLink}" target="_blank" class="mt-1 block w-full text-center bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-1.5 px-2 rounded-lg text-xs transition">
+                  <i class="fa-brands fa-whatsapp"></i> Chat on WhatsApp
+                </a>
+              ` : '<div class="text-slate-500 text-[10px] text-center">No mobile phone</div>'}
+            </div>
+          `;
+          marker.bindPopup(popupHtml);
+          markersLayer.addLayer(marker);
+        }
+      });
+
+      const countElem = document.getElementById('map-clinic-count');
+      if (countElem) {
+        countElem.innerText = `${validCount} practices mapped`;
+      }
+
+      if (validCount > 0 && leafletMap) {
+        try {
+          leafletMap.fitBounds(markersLayer.getBounds().pad(0.15));
+        } catch (e) {}
+      }
+    }
+
+    // Switch Tabs
+    function switchTab(tab) {
+      currentTab = tab;
+      ['finder', 'briefing', 'queue', 'kanban', 'leads', 'proposals'].forEach(t => {
+        const view = document.getElementById(`view-${t}`);
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (view && btn) {
+          if (t === tab) {
+            view.classList.remove('hidden');
+            btn.className = "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+          } else {
+            view.classList.add('hidden');
+            btn.className = "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent";
+          }
+        }
+      });
+
+      if (tab === 'finder' && leafletMap) {
+        setTimeout(() => leafletMap.invalidateSize(), 200);
+      }
+      if (tab === 'briefing') loadBriefingData();
+      if (tab === 'queue') loadQueueData();
+      if (tab === 'kanban') loadKanbanData();
+      if (tab === 'leads') loadAllLeadsTable();
+      updateGlobalStats();
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toast-msg').innerText = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2500);
+    }
+
+    function setQuery(q) {
+      document.getElementById('input-query').value = q;
+    }
+
+    // Export Leads to Excel (.xlsx) or CSV
+    function exportLeads(format = 'xlsx') {
+      const stageElem = document.getElementById('filter-lead-stage');
+      const stage = (currentTab === 'leads' && stageElem) ? stageElem.value : 'ALL';
+      let url = `/api/leads/export?format=${format}`;
+      if (stage && stage !== 'ALL') {
+        url += `&stage=${encodeURIComponent(stage)}`;
+      }
+      showToast(`Generating ${format.toUpperCase()} export...`);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', '');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Global Stats
+    async function updateGlobalStats() {
+      try {
+        const res = await fetch('/api/stats');
+        const data = await res.json();
+        document.getElementById('nav-total-leads').innerText = data.total_leads || 0;
+        document.getElementById('nav-total-leakage').innerText = '$' + Number(data.total_leakage || 0).toLocaleString() + '/yr';
+        document.getElementById('nav-queue-count').innerText = data.queue.pending || 0;
+        document.getElementById('badge-queue').innerText = data.queue.pending || 0;
+      } catch (err) {
+        console.error("Failed to load stats", err);
+      }
+    }
+
+    // Start Lead Discovery
+    async function startDiscovery() {
+      const query = document.getElementById('input-query').value.trim();
+      const limit = parseInt(document.getElementById('input-limit').value) || 10;
+
+      if (!query) return alert("Please enter a search location/query");
+
+      const btn = document.getElementById('btn-start-search');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i><span>Searching...</span>`;
+
+      const progressBox = document.getElementById('box-progress');
+      progressBox.classList.remove('hidden');
+
+      // Reset counters & terminal
+      document.getElementById('counter-clinics-found').innerText = '0';
+      document.getElementById('counter-websites-analyzed').innerText = '0';
+      document.getElementById('counter-high-opp').innerText = '0';
+      document.getElementById('progress-pct').innerText = '0%';
+      document.getElementById('progress-bar-fill').style.width = '0%';
+      document.getElementById('progress-terminal').innerHTML = `<div class="text-slate-500">// Initializing automated discovery for "${query}"...</div>`;
+
+      try {
+        const res = await fetch('/api/search/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query, limit, generate_reports: true, auto_queue: true })
+        });
+        const data = await res.json();
+        const jobId = data.job_id;
+
+        // Poll search progress
+        if (searchPollingInterval) clearInterval(searchPollingInterval);
+        searchPollingInterval = setInterval(async () => {
+          const sRes = await fetch(`/api/search/status/${jobId}`);
+          const sData = await sRes.json();
+
+          document.getElementById('progress-title').innerText = sData.status === 'completed' ? 'Search Completed!' : 'Scraping & Auditing Practices...';
+          document.getElementById('progress-msg').innerText = sData.message;
+          document.getElementById('progress-pct').innerText = `${sData.progress}%`;
+          document.getElementById('progress-bar-fill').style.width = `${sData.progress}%`;
+
+          // Update Multi-Metric Counters
+          if (sData.clinics_found !== undefined) document.getElementById('counter-clinics-found').innerText = sData.clinics_found;
+          if (sData.websites_analyzed !== undefined) document.getElementById('counter-websites-analyzed').innerText = sData.websites_analyzed;
+          if (sData.high_opportunity_count !== undefined) document.getElementById('counter-high-opp').innerText = sData.high_opportunity_count;
+
+          // Render live terminal activity
+          if (sData.logs && sData.logs.length > 0) {
+            const terminal = document.getElementById('progress-terminal');
+            terminal.innerHTML = sData.logs.map(log => `<div>${log}</div>`).join('');
+            terminal.scrollTop = terminal.scrollHeight;
+          }
+
+          // Render newly discovered leads and map live
+          if (sData.discovered_leads && sData.discovered_leads.length > 0) {
+            renderDiscoveredGrid(sData.discovered_leads);
+            renderMapMarkers(sData.discovered_leads);
+          }
+
+          if (sData.status === 'completed' || sData.status === 'error') {
+            clearInterval(searchPollingInterval);
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fa-solid fa-bolt"></i><span>Start Discovery</span>`;
+            updateGlobalStats();
+            showToast(sData.status === 'completed' ? "Discovery and WhatsApp analysis complete!" : "Discovery finished with notes.");
+          }
+        }, 1500);
+
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-bolt"></i><span>Start Discovery</span>`;
+        alert("Discovery request failed: " + err.message);
+      }
+    }
+
+    function renderDiscoveredGrid(leads) {
+      const grid = document.getElementById('grid-discovered');
+      if (!leads || leads.length === 0) {
+        grid.innerHTML = `<div class="col-span-full text-center py-8 text-slate-500 text-xs">No dental practices found.</div>`;
+        return;
+      }
+
+      grid.innerHTML = leads.map(lead => {
+        const score = (lead.opportunity_score !== undefined && lead.opportunity_score !== null) ? lead.opportunity_score : (lead.score || 0);
+        const annualLoss = (lead.annual_gap !== undefined && lead.annual_gap !== null) ? lead.annual_gap : (lead.annual_loss || 65000);
+        const revRange = lead.missed_rev_range || '$3,450–$6,900';
+        const waLink = lead.wa_link || (lead.clean_phone ? `https://wa.me/${lead.clean_phone}` : "");
+        const leadId = lead.id || '';
+        const isHigh = score >= 65;
+
+        // Screenshot or fallback visual
+        const thumbnailHtml = lead.screenshot_url ? `
+          <div class="h-36 w-full rounded-t-2xl overflow-hidden bg-slate-950 border-b border-slate-800 relative group">
+            <img src="${lead.screenshot_url}" alt="${lead.name}" class="w-full h-full object-cover object-top hover:scale-105 transition duration-500" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'h-24 w-full bg-slate-900 flex items-center justify-center text-slate-500 font-mono text-[11px]\\'>Homepage Inspected</div>';">
+            <div class="absolute bottom-2 left-2 bg-slate-900/90 backdrop-blur px-2 py-0.5 rounded text-[10px] text-slate-300 font-mono border border-slate-700/60 flex items-center gap-1 shadow">
+              <i class="fa-solid fa-camera text-emerald-400"></i> Homepage Screenshot
+            </div>
+          </div>
+        ` : `
+          <div class="h-24 w-full rounded-t-2xl bg-gradient-to-r from-slate-900 via-slate-850 to-slate-950 border-b border-slate-800 flex items-center justify-between px-4 py-3">
+            <div class="flex items-center space-x-2.5">
+              <div class="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                <i class="fa-solid fa-tooth"></i>
+              </div>
+              <div class="truncate max-w-[170px]">
+                <div class="text-[11px] font-mono text-slate-300 truncate">${lead.website || 'No website detected'}</div>
+                <div class="text-[10px] text-slate-500">Live Website Inspection</div>
+              </div>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/50">Desktop View</span>
+          </div>
+        `;
+
+        // Why Score Explanations
+        const whyList = (lead.why_score_reasons && lead.why_score_reasons.length > 0) ? lead.why_score_reasons : [
+          'No 24/7 after-hours WhatsApp instant booking intake',
+          'High patient review velocity risking uncaptured call leakage',
+          'Competitors in area offering 24/7 automated scheduling'
+        ];
+
+        return `
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl hover:border-emerald-500/40 transition flex flex-col overflow-hidden">
+          ${thumbnailHtml}
+          
+          <div class="p-4 space-y-3 flex-1 flex flex-col justify-between">
+            <!-- Header Title & Score -->
+            <div class="space-y-1">
+              <div class="flex items-start justify-between gap-2">
+                <h4 class="font-bold text-white text-sm line-clamp-1 flex-1" title="${lead.name}">${lead.name}</h4>
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0 ${isHigh ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'}">
+                  Fit: ${score}/100
+                </span>
+              </div>
+              ${lead.doctor_name ? `
+                <div class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 text-[10px] font-semibold">
+                  <i class="fa-solid fa-user-doctor text-[9px]"></i> ${lead.doctor_name}
+                </div>
+              ` : ''}
+              <div class="flex items-center space-x-2 text-[11px]">
+                <span class="text-amber-400 font-semibold">★ ${lead.rating || 4.9}</span>
+                <span class="text-slate-500">(${lead.review_count || 50}+ reviews)</span>
+                ${lead.phone ? `<span class="text-slate-500 truncate">• ${lead.phone}</span>` : ''}
+              </div>
+            </div>
+
+            <!-- Estimated Monthly Missed Revenue (Prominently Highlighted) -->
+            <div class="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <div class="text-[10px] uppercase font-bold text-amber-300 tracking-wider">Estimated Missed Revenue</div>
+                <div class="text-base font-extrabold text-amber-400 font-mono">${revRange}<span class="text-xs font-normal text-slate-400">/mo</span></div>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Annual Leakage</span>
+                <span class="text-xs font-bold text-slate-300 font-mono">~$${Number(annualLoss).toLocaleString()}/yr</span>
+              </div>
+            </div>
+
+            <!-- Why [Score]? Gemini AI Explanations -->
+            <div class="bg-slate-950/70 rounded-xl p-3 border border-slate-800/80 space-y-1.5">
+              <div class="flex items-center justify-between text-[11px]">
+                <span class="font-bold text-slate-200 flex items-center gap-1 text-emerald-400">
+                  <i class="fa-solid fa-wand-magic-sparkles text-[10px]"></i> Why Score ${score}?
+                </span>
+                <span class="text-[9px] font-mono text-slate-500">Gemini Intelligence</span>
+              </div>
+              <ul class="space-y-1">
+                ${whyList.slice(0, 3).map(r => `
+                  <li class="flex items-start gap-1.5 text-[11px] text-slate-300 leading-snug">
+                    <span class="text-emerald-400 mt-0.5 font-bold">•</span>
+                    <span>${r}</span>
+                  </li>
+                `).join('')}
+              </ul>
+            </div>
+
+            <!-- Card Bottom Actions -->
+            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-1.5">
+              ${waLink ? `
+                <a href="${waLink}" target="_blank" class="flex-1 bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-1.5 px-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md transition">
+                  <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
+                </a>
+              ` : `
+                <button disabled class="flex-1 bg-slate-800 text-slate-500 font-medium py-1.5 px-2.5 rounded-xl text-xs cursor-not-allowed">
+                  No Phone
+                </button>
+              `}
+              <button onclick="openBattlecard('${leadId}')" class="px-2.5 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-xs font-semibold text-amber-300 border border-amber-500/30 flex items-center gap-1 transition cursor-pointer" title="Pre-Call Sales Battlecard">
+                <i class="fa-solid fa-shield-halved text-amber-400"></i> Battlecard
+              </button>
+              <button onclick="openLeadModal('${leadId}')" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300 hover:text-white transition cursor-pointer" title="360 Details">
+                <i class="fa-solid fa-circle-info"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        `;
+      }).join('');
+    }
+
+    // Load Queue Data
+    async function loadQueueData() {
+      const container = document.getElementById('queue-items-container');
+      container.innerHTML = `<div class="p-8 text-center text-slate-500 text-sm"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Loading review queue...</div>`;
+
+      try {
+        const res = await fetch('/api/queue?status=PENDING_REVIEW');
+        const items = await res.json();
+
+        if (items.length === 0) {
+          container.innerHTML = `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-3">
+              <i class="fa-brands fa-whatsapp text-4xl text-slate-700"></i>
+              <h3 class="text-base font-bold text-slate-300">All Caught Up!</h3>
+              <p class="text-xs text-slate-500">No outreach items pending review. Run a Lead Discovery search to populate more targets.</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = items.map(item => `
+          <div class="bg-slate-900 border border-slate-800 hover:border-emerald-500/30 rounded-2xl p-5 shadow-lg space-y-4 transition">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="flex items-center gap-2">
+                  <h3 class="text-base font-bold text-white">${item.lead_name}</h3>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">${item.priority_tier}</span>
+                </div>
+                <span class="text-xs text-slate-400">${item.phone || 'No phone'} • ${item.website || 'No website'}</span>
+              </div>
+              <span class="text-xs font-bold text-amber-400 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                Fit Score: ${item.opportunity_score}/100
+              </span>
+            </div>
+
+            <!-- Pitch Draft -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+              <div class="flex items-center justify-between text-[11px] text-slate-400 border-b border-slate-800/80 pb-1.5">
+                <span class="font-semibold text-slate-300">WhatsApp / Email Pitch Draft:</span>
+                <button onclick="copyText('${encodeURIComponent(item.body)}')" class="hover:text-emerald-400 flex items-center gap-1">
+                  <i class="fa-solid fa-copy"></i> Copy Text
+                </button>
+              </div>
+              <p class="text-xs text-slate-300 font-sans whitespace-pre-wrap leading-relaxed">${item.body}</p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex items-center justify-between pt-1">
+              <div class="flex items-center space-x-2">
+                ${item.wa_link ? `
+                  <a href="${item.wa_link}" target="_blank" onclick="approveAndOpen('${item.id}', '${item.wa_link}')" class="bg-[#25D366] hover:bg-[#128C7E] text-slate-950 text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-md transition">
+                    <i class="fa-brands fa-whatsapp text-base"></i> Open & Send via WhatsApp Web
+                  </a>
+                ` : `<span class="text-xs text-slate-500 italic">No mobile phone to trigger WhatsApp directly</span>`}
+                ${item.pdf_path ? `
+                  <a href="/${item.pdf_path}" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium px-3 py-2 rounded-xl flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-file-pdf text-red-400"></i> View PDF
+                  </a>
+                ` : ''}
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <button onclick="rejectQueueItem('${item.id}')" class="text-slate-400 hover:text-red-400 text-xs px-3 py-2 rounded-xl hover:bg-slate-800 transition">
+                  <i class="fa-solid fa-xmark"></i> Reject
+                </button>
+                <button onclick="approveQueueItem('${item.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold px-4 py-2 rounded-xl transition">
+                  <i class="fa-solid fa-check"></i> Approve
+                </button>
+              </div>
+            </div>
+          </div>
+        `).join('');
+
+      } catch (err) {
+        container.innerHTML = `<div class="p-4 text-red-400 text-xs">Error loading queue: ${err.message}</div>`;
+      }
+    }
+
+    async function approveQueueItem(qid) {
+      await fetch(`/api/queue/${qid}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: "Approved from Visual Review Queue" })
+      });
+      showToast("Outreach item approved!");
+      loadQueueData();
+      updateGlobalStats();
+    }
+
+    async function rejectQueueItem(qid) {
+      await fetch(`/api/queue/${qid}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: "Rejected by user" })
+      });
+      showToast("Outreach item rejected.");
+      loadQueueData();
+      updateGlobalStats();
+    }
+
+    async function approveAndOpen(qid, waLink) {
+      await approveQueueItem(qid);
+      window.open(waLink, '_blank');
+    }
+
+    async function dispatchApprovedQueue() {
+      const res = await fetch('/api/queue/dispatch', { method: 'POST' });
+      const data = await res.json();
+      showToast(`Dispatched ${data.count} approved outreach touches!`);
+      loadQueueData();
+      updateGlobalStats();
+    }
+
+    // Load Kanban Data
+    async function loadKanbanData() {
+      try {
+        const res = await fetch('/api/leads');
+        const leads = await res.json();
+        allLeadsCache = leads;
+
+        const stages = ['FOUND', 'AUDITED', 'EMAIL_PREPARED', 'SENT', 'REPLIED', 'MEETING', 'WON'];
+        stages.forEach(st => {
+          const col = document.getElementById(`col-${st}`);
+          const badge = document.getElementById(`badge-count-${st}`);
+          if (col) col.innerHTML = '';
+          if (badge) badge.innerText = '0';
+        });
+
+        const stageCounts = {};
+        stages.forEach(s => stageCounts[s] = 0);
+
+        leads.forEach(lead => {
+          const st = (lead.stage || 'FOUND').toUpperCase();
+          if (!stageCounts[st]) stageCounts[st] = 0;
+          stageCounts[st]++;
+
+          const col = document.getElementById(`col-${st}`);
+          if (col) {
+            col.innerHTML += `
+              <div onclick="openLeadModal('${lead.id}')" class="bg-slate-950 hover:bg-slate-900 border border-slate-800 hover:border-emerald-500/40 p-3 rounded-xl shadow cursor-pointer space-y-2 transition">
+                <div class="font-bold text-white text-xs line-clamp-1">${lead.name}</div>
+                <div class="flex items-center justify-between text-[10px] text-slate-400">
+                  <span>★ ${lead.rating || 4.9}</span>
+                  <span class="text-amber-400 font-bold">${lead.opportunity_score || 0}/100</span>
+                </div>
+                ${lead.phone ? `
+                  <div class="text-[10px] text-slate-500 truncate flex items-center gap-1">
+                    <i class="fa-solid fa-phone text-[9px]"></i> ${lead.phone}
+                  </div>
+                ` : ''}
+              </div>
+            `;
+          }
+        });
+
+        stages.forEach(st => {
+          const badge = document.getElementById(`badge-count-${st}`);
+          if (badge) badge.innerText = stageCounts[st] || 0;
+        });
+
+      } catch (err) {
+        console.error("Error loading kanban", err);
+      }
+    }
+
+    // Load All Leads Table
+    async function loadAllLeadsTable() {
+      const stage = document.getElementById('filter-lead-stage').value;
+      const search = document.getElementById('filter-lead-search').value;
+
+      let url = `/api/leads?limit=100`;
+      if (stage !== 'ALL') url += `&stage=${stage}`;
+      if (search) url += `&search=${encodeURIComponent(search)}`;
+
+      const res = await fetch(url);
+      const leads = await res.json();
+      allLeadsCache = leads;
+
+      const tbody = document.getElementById('table-all-leads-body');
+      if (leads.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500 text-xs">No dental leads found matching criteria.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = leads.map(l => `
+        <tr class="hover:bg-slate-850 transition">
+          <td class="py-3 px-4">
+            <div class="font-bold text-white">${l.name}</div>
+            ${l.doctor_name ? `<div class="text-[11px] text-indigo-300 font-medium"><i class="fa-solid fa-user-doctor text-[9px] mr-1"></i>${l.doctor_name}</div>` : ''}
+          </td>
+          <td class="py-3 px-4"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300">${l.stage || 'FOUND'}</span></td>
+          <td class="py-3 px-4 font-bold text-amber-400">${l.opportunity_score || 0}/100</td>
+          <td class="py-3 px-4 text-slate-300">$${Number(l.annual_gap || 65000).toLocaleString()}/yr</td>
+          <td class="py-3 px-4 text-slate-400">${l.phone || 'N/A'}</td>
+          <td class="py-3 px-4 text-slate-400 truncate max-w-[150px]"><a href="${l.website}" target="_blank" class="hover:text-emerald-400">${l.website || '-'}</a></td>
+          <td class="py-3 px-4 text-right space-x-1">
+            <button onclick="openBattlecard('${l.id}')" class="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition text-[11px] cursor-pointer" title="Pre-Call Battlecard">
+              <i class="fa-solid fa-shield-halved"></i>
+            </button>
+            <button onclick="openLeadModal('${l.id}')" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-emerald-600 hover:text-white text-slate-300 transition text-[11px] cursor-pointer" title="360 Details">
+              View 360
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function filterAllLeads() {
+      loadAllLeadsTable();
+    }
+
+    // Lead Modal / 360 Details
+    async function openLeadModal(leadId) {
+      currentSelectedLeadId = leadId;
+      const res = await fetch(`/api/leads/${leadId}`);
+      const data = await res.json();
+
+      const lead = data.lead;
+      const wa = data.whatsapp;
+
+      document.getElementById('modal-lead-name').innerText = lead.name;
+      document.getElementById('modal-lead-address').innerText = `${lead.address || 'Texas'} • ${lead.website || 'No website'}`;
+      document.getElementById('modal-lead-score').innerText = `${lead.opportunity_score || 0}/100`;
+      document.getElementById('modal-lead-leakage').innerText = `${lead.missed_rev_range || '$3,450–$6,900'}/mo`;
+      document.getElementById('modal-lead-stage').innerText = lead.stage || 'FOUND';
+
+      document.getElementById('modal-lead-pitch').innerText = wa.pitch;
+      document.getElementById('modal-lead-phone').innerText = `Phone: ${lead.phone || 'Not found'}`;
+
+      const waBtn = document.getElementById('modal-lead-wa-btn');
+      if (wa.wa_link) {
+        waBtn.href = wa.wa_link;
+        waBtn.classList.remove('opacity-50', 'pointer-events-none');
+      } else {
+        waBtn.href = "#";
+        waBtn.classList.add('opacity-50', 'pointer-events-none');
+      }
+
+      // Render Stage buttons
+      const stages = ['FOUND', 'AUDITED', 'EMAIL_PREPARED', 'SENT', 'REPLIED', 'MEETING', 'WON'];
+      const stageBtnBox = document.getElementById('modal-stage-buttons');
+      stageBtnBox.innerHTML = stages.map(st => `
+        <button onclick="moveCurrentLeadStage('${st}')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition ${st === lead.stage ? 'bg-emerald-500 text-slate-950' : 'bg-slate-800 hover:bg-slate-700 text-slate-300'}">
+          ${st}
+        </button>
+      `).join('');
+
+      // Render Notes
+      const notesList = document.getElementById('modal-notes-list');
+      if (data.notes && data.notes.length > 0) {
+        notesList.innerHTML = data.notes.map(n => `
+          <div class="bg-slate-950 p-2.5 rounded-lg border border-slate-800 text-[11px]">
+            <div class="text-slate-400 flex items-center justify-between mb-1">
+              <span>${n.author || 'Rep'}</span>
+              <span>${n.created_at ? n.created_at.split('T')[0] : ''}</span>
+            </div>
+            <div class="text-slate-200">${n.note_text}</div>
+          </div>
+        `).join('');
+      } else {
+        notesList.innerHTML = `<div class="text-slate-500 text-[11px]">No notes logged yet.</div>`;
+      }
+
+      document.getElementById('modal-lead').classList.remove('hidden');
+    }
+
+    function openLeadModalByName(name) {
+      const match = allLeadsCache.find(l => l.name === name);
+      if (match) openLeadModal(match.id);
+    }
+
+    function closeModal() {
+      document.getElementById('modal-lead').classList.add('hidden');
+    }
+
+    async function moveCurrentLeadStage(newStage) {
+      if (!currentSelectedLeadId) return;
+      await fetch(`/api/leads/${currentSelectedLeadId}/stage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stage: newStage, notes: `Moved to ${newStage} via Modal` })
+      });
+      showToast(`Lead moved to ${newStage}`);
+      openLeadModal(currentSelectedLeadId);
+      updateGlobalStats();
+      if (currentTab === 'kanban') loadKanbanData();
+    }
+
+    async function submitModalNote() {
+      const input = document.getElementById('modal-input-note');
+      const note = input.value.trim();
+      if (!note || !currentSelectedLeadId) return;
+
+      await fetch(`/api/leads/${currentSelectedLeadId}/note`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note: note, author: "Sales Rep" })
+      });
+      input.value = '';
+      showToast("Note saved!");
+      openLeadModal(currentSelectedLeadId);
+    }
+
+    function copyModalPitch() {
+      const text = document.getElementById('modal-lead-pitch').innerText;
+      navigator.clipboard.writeText(text);
+      showToast("WhatsApp message copied to clipboard!");
+    }
+
+    function copyText(encoded) {
+      navigator.clipboard.writeText(decodeURIComponent(encoded));
+      showToast("Copied to clipboard!");
+    }
+
+    // Morning Autonomous Briefing Functions
+    async function loadBriefingData() {
+      const grid = document.getElementById('briefing-targets-grid');
+      grid.innerHTML = `<div class="col-span-full py-8 text-center text-slate-500 text-sm"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Compiling morning sales intelligence...</div>`;
+
+      try {
+        const res = await fetch('/api/briefing/today');
+        const data = await res.json();
+
+        document.getElementById('briefing-date').innerText = data.briefing_date || 'Today';
+        document.getElementById('briefing-target-count').innerText = `${data.total_targets_ready} Clinics`;
+        document.getElementById('briefing-doctor-count').innerText = `${data.doctors_identified_count} Doctors`;
+        document.getElementById('briefing-monthly-rev').innerText = `$${Number(data.combined_monthly_missed_revenue || 0).toLocaleString()}/mo`;
+        document.getElementById('briefing-annual-arr').innerText = `$${Number(data.total_annual_arr_opportunity || 0).toLocaleString()} ARR`;
+
+        const badgeBriefing = document.getElementById('badge-briefing');
+        if (badgeBriefing) badgeBriefing.innerText = data.total_targets_ready;
+
+        if (!data.targets || data.targets.length === 0) {
+          grid.innerHTML = `
+            <div class="col-span-full bg-slate-900 border border-slate-800 rounded-2xl p-12 text-center space-y-3">
+              <i class="fa-solid fa-mug-hot text-4xl text-slate-700"></i>
+              <h3 class="text-base font-bold text-slate-300">No Target Clinics Yet</h3>
+              <p class="text-xs text-slate-500 max-w-md mx-auto">
+                Run a Lead Discovery search or click "Run Morning Harvester" above to automatically pull and prioritize fresh dental leads.
+              </p>
+            </div>
+          `;
+          return;
+        }
+
+        grid.innerHTML = data.targets.map(t => {
+          const revRange = `$${Number(t.missed_rev_min || 3500).toLocaleString()} – $${Number(t.missed_rev_max || 6800).toLocaleString()}/mo`;
+          const whyBullets = (t.why_score_reasons && t.why_score_reasons.length > 0) ? t.why_score_reasons : [
+            'Missing 24/7 after-hours WhatsApp instant booking',
+            'High patient review volume risking uncaptured phone tag'
+          ];
+
+          return `
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl hover:border-amber-500/40 transition flex flex-col justify-between space-y-4">
+              <div>
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 mb-1.5">
+                      <i class="fa-solid fa-user-doctor text-[10px]"></i> ${t.doctor_name}
+                    </span>
+                    <h4 class="text-base font-bold text-white line-clamp-1" title="${t.name}">${t.name}</h4>
+                    <p class="text-xs text-slate-400 truncate">${t.address || 'Address on file'}</p>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <span class="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 block">
+                      Score: ${t.opportunity_score}/100
+                    </span>
+                    <span class="text-amber-400 font-semibold text-xs mt-1 block">★ ${t.rating} (${t.reviews} reviews)</span>
+                  </div>
+                </div>
+
+                <!-- Leakage Highlight -->
+                <div class="mt-3 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 flex items-center justify-between">
+                  <div>
+                    <span class="text-[10px] uppercase font-bold text-amber-300 tracking-wider block">Estimated Missed Revenue</span>
+                    <span class="text-base font-extrabold text-amber-400 font-mono">${revRange}</span>
+                  </div>
+                  <div class="text-right">
+                    <span class="text-[10px] text-slate-400 block">Annual Contract Gap</span>
+                    <span class="text-xs font-bold text-slate-300 font-mono">~$${Number(t.annual_gap).toLocaleString()}/yr</span>
+                  </div>
+                </div>
+
+                <!-- Why Target Today? -->
+                <div class="mt-3 bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-1">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Why Call Today:</span>
+                  <ul class="space-y-0.5">
+                    ${whyBullets.slice(0, 2).map(r => `
+                      <li class="text-[11px] text-slate-300 flex items-start gap-1.5">
+                        <span class="text-emerald-400">•</span> <span>${r}</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+              </div>
+
+              <!-- Action Bar -->
+              <div class="pt-3 border-t border-slate-800 flex items-center gap-2">
+                <button onclick="openBattlecard('${t.id}')" class="flex-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow cursor-pointer">
+                  <i class="fa-solid fa-shield-halved text-sm"></i> Pre-Call Battlecard
+                </button>
+                ${t.wa_link ? `
+                  <a href="${t.wa_link}" target="_blank" class="flex-1 bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp Pitch
+                  </a>
+                ` : `
+                  <button disabled class="flex-1 bg-slate-800 text-slate-500 font-medium py-2 px-3 rounded-xl text-xs cursor-not-allowed">
+                    No Phone
+                  </button>
+                `}
+                <button onclick="openLeadModal('${t.id}')" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition text-xs cursor-pointer" title="360 Details">
+                  <i class="fa-solid fa-circle-info"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        grid.innerHTML = `<div class="col-span-full p-6 text-red-400 text-xs">Failed to load briefing: ${err.message}</div>`;
+      }
+    }
+
+    async function triggerMorningHarvest() {
+      const city = document.getElementById('briefing-city').value.trim() || "Austin, TX";
+      const btn = document.getElementById('btn-run-briefing');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Harvesting...`;
+
+      showToast(`Running autonomous harvester for ${city}...`);
+      try {
+        const res = await fetch(`/api/briefing/run-morning?city=${encodeURIComponent(city)}&limit=4`, { method: 'POST' });
+        const data = await res.json();
+        showToast("Morning harvest complete! Prioritizing targets...");
+        loadBriefingData();
+        updateGlobalStats();
+      } catch (err) {
+        alert("Harvester failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-play"></i> Run Morning Harvester`;
+      }
+    }
+
+    // Battlecard Modal Functions
+    async function openBattlecard(leadId) {
+      const modal = document.getElementById('modal-battlecard');
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/leads/${leadId}/battlecard`);
+        const b = await res.json();
+
+        document.getElementById('battlecard-clinic-name').innerText = b.business_name;
+        document.getElementById('battlecard-score-badge').innerText = `Fit: ${b.opportunity_score}/100`;
+        document.getElementById('battlecard-target-doctor').innerText = `Target: ${b.doctor_name} (${b.decision_maker_role || 'Practice Principal'})`;
+
+        document.getElementById('battlecard-doc-display').innerText = b.doctor_name;
+        document.getElementById('battlecard-role-display').innerText = b.decision_maker_role || 'Practice Principal';
+
+        document.getElementById('battlecard-comp-display').innerText = b.competitor_detected !== 'None' ? b.competitor_detected : 'No Chat Tool';
+        document.getElementById('battlecard-tech-weakness').innerText = b.tech_weakness;
+
+        document.getElementById('battlecard-rev-display').innerText = b.estimated_monthly_leakage;
+        document.getElementById('battlecard-annual-display').innerText = b.estimated_annual_leakage;
+
+        document.getElementById('battlecard-phone-display').innerText = b.phone || 'No phone';
+        document.getElementById('battlecard-booking-display').innerText = b.booking_status;
+
+        document.getElementById('battlecard-doc-script').innerText = b.cold_call_doctor_script;
+        document.getElementById('battlecard-gatekeeper-script').innerText = b.gatekeeper_script;
+
+        // Objection List
+        const objList = document.getElementById('battlecard-objection-list');
+        objList.innerHTML = (b.objection_matrix || []).map((o, idx) => `
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-amber-300 text-[11px]">${o.objection}</span>
+              <button onclick="copyRawText('${encodeURIComponent(o.rebuttal)}')" class="text-slate-400 hover:text-white text-[10px] flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy
+              </button>
+            </div>
+            <p class="text-slate-300 text-[11px] leading-relaxed pl-2 border-l-2 border-emerald-500/40">${o.rebuttal}</p>
+          </div>
+        `).join('');
+
+        document.getElementById('battlecard-wa-text').innerText = b.whatsapp_pitch_message;
+        document.getElementById('battlecard-wa-btn').href = b.whatsapp_direct_url;
+
+      } catch (err) {
+        alert("Failed to load battlecard: " + err.message);
+        closeBattlecardModal();
+      }
+    }
+
+    function closeBattlecardModal() {
+      document.getElementById('modal-battlecard').classList.add('hidden');
+    }
+
+    function copyBattlecardText(elemId) {
+      const text = document.getElementById(elemId).innerText;
+      navigator.clipboard.writeText(text);
+      showToast("Script copied to clipboard!");
+    }
+
+    function copyRawText(encoded) {
+      navigator.clipboard.writeText(decodeURIComponent(encoded));
+      showToast("Rebuttal copied to clipboard!");
+    }
+
+    // Generate Proposal
+    async function generateCustomProposal() {
+      const name = document.getElementById('prop-clinic-name').value.trim() || "Premier Dental Care";
+      const url = document.getElementById('prop-clinic-url').value.trim() || "https://example.com";
+
+      const btn = document.getElementById('btn-generate-prop');
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i><span>Generating...</span>`;
+
+      try {
+        const res = await fetch('/api/proposal/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, url })
+        });
+        const data = await res.json();
+
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate Interactive Proposal</span>`;
+
+        document.getElementById('prop-result-card').classList.remove('hidden');
+        document.getElementById('prop-result-title').innerText = `Proposal Ready for ${name}!`;
+        document.getElementById('prop-result-link').href = data.proposal_url;
+
+        showToast("Proposal generated successfully!");
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate Interactive Proposal</span>`;
+        alert("Failed to generate proposal: " + err.message);
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      updateGlobalStats();
+      initMap();
+      // Load recent leads on initial view
+      fetch('/api/leads?limit=12')
+        .then(r => r.json())
+        .then(leads => {
+          allLeadsCache = leads;
+          const grid = document.getElementById('grid-discovered');
+          if (leads.length > 0) {
+            renderDiscoveredGrid(leads);
+            renderMapMarkers(leads);
+          } else {
+            grid.innerHTML = `
+              <div class="col-span-full py-12 text-center text-slate-500 bg-slate-900/50 rounded-2xl border border-slate-800/80 p-8 space-y-3">
+                <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto text-xl shadow-lg">
+                  <i class="fa-solid fa-magnifying-glass-location"></i>
+                </div>
+                <h4 class="text-sm font-bold text-slate-200">Database is Clean & Ready</h4>
+                <p class="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+                  Enter a city above (e.g. <span class="text-emerald-400 font-medium">Dentists in Austin, TX</span>) and click <span class="text-white font-semibold">"Start Discovery"</span> to scrape real dental practices, inspect websites for WhatsApp gaps, and start reaching out.
+                </p>
+              </div>
+            `;
+          }
+        })
+        .catch(() => {});
+    });
+  </script>
+</body>
+</html>

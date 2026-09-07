@@ -1,0 +1,84 @@
+# Online Booking & Dental Scheduling Fingerprints
+fingerprints:
+  - id: book-nexhealth
+    name: NexHealth
+    category: Online Booking
+    patterns:
+      - "nexhealth\\.com"
+      - "nexhealth-widget"
+    confidence: 0.99
+
+  - id: book-localmed
+    name: LocalMed
+    category: Online Booking
+    patterns:
+      - "localmed\\.com"
+    confidence: 0.99
+
+  - id: book-zocdoc
+    name: Zocdoc
+    category: Online Booking
+    patterns:
+      - "zocdoc\\.com"
+    confidence: 0.99
+
+  - id: book-calendly
+    name: Calendly
+    category: Online Booking
+    patterns:
+      - "calendly\\.com"
+    confidence: 0.99
+
+  - id: book-acuity
+    name: Acuity Scheduling
+    category: Online Booking
+    patterns:
+      - "acuityscheduling\\.com"
+      - "squarespacescheduling\\.com"
+    confidence: 0.99
+
+  - id: book-jane
+    name: Jane App
+    category: Online Booking
+    patterns:
+      - "jane\\.app"
+    confidence: 0.99
+
+  - id: book-weave
+    name: Weave Scheduling
+    category: Online Booking
+    patterns:
+      - "getweave\\.com"
+    confidence: 0.99
+
+  - id: book-solutionreach
+    name: Solutionreach
+    category: Online Booking
+    patterns:
+      - "solutionreach\\.com"
+      - "sr-schedule"
+    confidence: 0.99
+
+  - id: book-square
+    name: Square Appointments
+    category: Online Booking
+    patterns:
+      - "squareup\\.com/appointments"
+    confidence: 0.99
+
+  - id: book-dentrix
+    name: Dentrix Hub
+    category: Online Booking
+    patterns:
+      - "dentrix\\.com"
+      - "dentrixhub\\.com"
+    confidence: 0.99
+
+  - id: book-generic
+    name: Custom Booking Link / Form
+    category: Online Booking
+    patterns:
+      - "booking-widget"
+      - "online-scheduling"
+      - "schedule-appointment"
+    confidence: 0.85

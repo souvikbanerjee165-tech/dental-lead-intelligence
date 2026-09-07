@@ -1,0 +1,61 @@
+# Dental Practice Digital Maturity & Health Framework
+framework:
+  id: dental-v1
+  name: Dental Practice Digital Maturity Framework
+  vertical: Dental / Orthodontic / Oral Surgery
+  version: "1.0.0"
+
+  financial_assumptions:
+    average_patient_initial_value: 250.0  # Dollars
+    after_hours_search_percentage: 0.42   # 42% search after 5pm
+    review_traffic_multiplier:
+      tier1_high: { min_reviews: 200, monthly_inquiries_min: 30, monthly_inquiries_max: 55 }
+      tier2_mid:  { min_reviews: 50,  monthly_inquiries_min: 18, monthly_inquiries_max: 35 }
+      tier3_low:  { min_reviews: 0,   monthly_inquiries_min: 10, monthly_inquiries_max: 20 }
+
+  pillars:
+    - id: website_quality
+      name: Website Quality & Performance
+      weight: 0.20
+      checks:
+        - { check: reachable, points: 30 }
+        - { check: ssl, points: 25 }
+        - { check: mobile_responsive, points: 25 }
+        - { check: fast_load, threshold_sec: 2.5, points: 20 }
+
+    - id: patient_experience
+      name: Patient Experience & Accessibility
+      weight: 0.25
+      checks:
+        - { check: online_booking, points: 40 }
+        - { check: ai_chatbot, points: 35 }
+        - { check: faq_section, points: 15 }
+        - { check: whatsapp_or_messaging, points: 10 }
+
+    - id: seo_readiness
+      name: SEO & Discoverability
+      weight: 0.15
+      checks:
+        - { check: meta_description, points: 25 }
+        - { check: single_h1, points: 20 }
+        - { check: h2_structure, points: 15 }
+        - { check: opengraph_tags, points: 15 }
+        - { check: alt_coverage_high, threshold_pct: 70, points: 15 }
+
+    - id: automation_intake
+      name: Automation & AI Intake
+      weight: 0.25
+      checks:
+        - { check: ai_chatbot, points: 40 }
+        - { check: crm_integration, points: 25 }
+        - { check: analytics_tracking, points: 20 }
+        - { check: ad_pixels, points: 15 }
+
+    - id: conversion_architecture
+      name: Conversion Architecture
+      weight: 0.15
+      checks:
+        - { check: clickable_phone, points: 25 }
+        - { check: online_booking_cta, points: 25 }
+        - { check: emergency_notice, points: 25 }
+        - { check: insurance_accepted_section, points: 25 }

@@ -1,0 +1,89 @@
+# AI Receptionist & Chatbot Fingerprints
+fingerprints:
+  - id: chat-intercom
+    name: Intercom
+    category: Chatbots
+    patterns:
+      - "widget\\.intercom\\.io"
+      - "intercomSettings"
+    confidence: 0.99
+
+  - id: chat-tidio
+    name: Tidio Live Chat
+    category: Chatbots
+    patterns:
+      - "code\\.tidio\\.co"
+      - "tidio-chat"
+    confidence: 0.99
+
+  - id: chat-drift
+    name: Drift
+    category: Chatbots
+    patterns:
+      - "js\\.driftt\\.com"
+      - "drift\\.load"
+    confidence: 0.99
+
+  - id: chat-crisp
+    name: Crisp Chat
+    category: Chatbots
+    patterns:
+      - "client\\.crisp\\.chat"
+      - "\\$crisp"
+    confidence: 0.99
+
+  - id: chat-livechat
+    name: LiveChat
+    category: Chatbots
+    patterns:
+      - "cdn\\.livechatinc\\.com"
+    confidence: 0.98
+
+  - id: chat-zendesk
+    name: Zendesk Chat
+    category: Chatbots
+    patterns:
+      - "zopim\\.com"
+      - "static\\.zdassets\\.com"
+    confidence: 0.98
+
+  - id: chat-tawkto
+    name: Tawk.to
+    category: Chatbots
+    patterns:
+      - "embed\\.tawk\\.to"
+    confidence: 0.98
+
+  - id: chat-chatbase
+    name: Chatbase AI
+    category: Chatbots
+    patterns:
+      - "chatbase\\.co/embed"
+      - "chatbase\\.co"
+    confidence: 0.99
+
+  - id: chat-voiceflow
+    name: Voiceflow AI
+    category: Chatbots
+    patterns:
+      - "voiceflow\\.com"
+      - "cdn\\.voiceflow\\.com"
+    confidence: 0.99
+
+  - id: chat-botpress
+    name: Botpress AI
+    category: Chatbots
+    patterns:
+      - "botpress\\.cloud"
+      - "botpress\\.com"
+    confidence: 0.99
+
+  - id: chat-generic
+    name: Custom AI Chat Assistant
+    category: Chatbots
+    patterns:
+      - "chat-widget"
+      - "ai-assistant"
+      - "chatbot-container"
+      - "chat-bubble"
+    confidence: 0.85

@@ -1,0 +1,11 @@
+{
+  "clinic_name": "Austin Smile Dental",
+  "expected": {
+    "booking": true,
+    "chatbot": false,
+    "cms": "WordPress",
+    "ga4": true,
+    "ad_pixels": false,
+    "ssl": true
+  }
+}

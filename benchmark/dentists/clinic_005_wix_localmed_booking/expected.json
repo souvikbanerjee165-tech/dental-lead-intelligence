@@ -1,0 +1,11 @@
+{
+  "clinic_name": "Hill Country Family Dental",
+  "expected": {
+    "booking": true,
+    "chatbot": false,
+    "cms": "Wix",
+    "ga4": false,
+    "ad_pixels": true,
+    "ssl": true
+  }
+}
