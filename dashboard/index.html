@@ -111,12 +111,33 @@
           <span>Lead Finder</span>
         </button>
 
+        <button onclick="switchTab('todays-calls')" id="tab-btn-todays-calls" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-phone-volume text-base w-5 text-center text-emerald-400"></i>
+            <span>Today's Calls</span>
+          </div>
+          <span id="badge-todays-calls" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">HOT</span>
+        </button>
+
         <button onclick="switchTab('briefing')" id="tab-btn-briefing" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
           <div class="flex items-center space-x-3">
             <i class="fa-solid fa-bullseye text-base w-5 text-center text-amber-400"></i>
             <span>Morning Hit List</span>
           </div>
           <span id="badge-briefing" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">DAILY</span>
+        </button>
+
+        <button onclick="switchTab('territories')" id="tab-btn-territories" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-earth-americas text-base w-5 text-center text-blue-400"></i>
+            <span>Territory Auto-Pilot</span>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">AUTO</span>
+        </button>
+
+        <button onclick="switchTab('learning')" id="tab-btn-learning" class="w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <i class="fa-solid fa-brain text-base w-5 text-center text-rose-400"></i>
+          <span>Conversion Learning</span>
         </button>
 
         <button onclick="switchTab('queue')" id="tab-btn-queue" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
@@ -579,6 +600,193 @@
         </div>
       </section>
 
+      <!-- TAB: TODAY'S CALLS (HOT QUEUE) -->
+      <section id="view-todays-calls" class="hidden space-y-6 max-w-6xl mx-auto">
+        <!-- Header & Executive Stats -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-emerald-950/40 border border-emerald-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-wide">AI Sales Director Queue</span>
+                <span class="text-slate-400 text-xs">• Minimum 70% Buying Probability</span>
+              </div>
+              <h2 class="text-2xl font-extrabold text-white mt-1">Today's Priority Calls</h2>
+              <p class="text-xs text-slate-400 max-w-xl mt-1">Hand-picked high-leverage dental practices with confirmed decision makers, high patient volume, and zero after-hours conversational intake.</p>
+            </div>
+            <button onclick="loadTodaysCallsData()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
+              <i class="fa-solid fa-rotate-right"></i> Refresh Hot Queue
+            </button>
+          </div>
+
+          <!-- KPI Summary Row -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800">
+            <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Hot Prospects Ready</span>
+              <span id="kpi-today-count" class="text-xl font-extrabold text-emerald-400 font-mono">--</span>
+            </div>
+            <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Avg Buying Prob</span>
+              <span id="kpi-today-avg-prob" class="text-xl font-extrabold text-cyan-400 font-mono">--%</span>
+            </div>
+            <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Target Doctor Match</span>
+              <span id="kpi-today-doc-count" class="text-xl font-extrabold text-amber-400 font-mono">--</span>
+            </div>
+            <div class="bg-slate-950/70 p-3 rounded-xl border border-slate-800/80">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Combined Monthly Leak</span>
+              <span id="kpi-today-leakage" class="text-xl font-extrabold text-emerald-400 font-mono">$--</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hot Leads Cards Grid -->
+        <div id="grid-todays-calls" class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- Populated dynamically via loadTodaysCallsData() -->
+        </div>
+      </section>
+
+      <!-- TAB: AUTONOMOUS TERRITORIES -->
+      <section id="view-territories" class="hidden space-y-6 max-w-6xl mx-auto">
+        <!-- Control Card -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-blue-950/40 border border-blue-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-500/20 text-blue-400 border border-blue-500/30 uppercase tracking-wide">Round-Robin Auto-Pilot</span>
+                <span class="text-slate-400 text-xs">• Top 50 High-Yield US Dental Markets</span>
+              </div>
+              <h2 class="text-2xl font-extrabold text-white mt-1">Autonomous Territory Expansion</h2>
+              <p class="text-xs text-slate-400 max-w-2xl mt-1">The system automatically navigates from city to city, executes deduplication, audits technology stacks, extracts decision makers, and pre-loads your call queue while you sleep.</p>
+            </div>
+
+            <!-- Auto Run Button -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-blue-500/30 flex flex-col sm:flex-row items-center gap-4 w-full lg:w-auto">
+              <div>
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Next Up In Queue:</span>
+                <div id="territory-next-display" class="text-base font-extrabold text-white">Loading territory...</div>
+                <div id="territory-next-sub" class="text-xs text-blue-400">Affluence & Population</div>
+              </div>
+              <button onclick="triggerNextTerritoryCycle()" id="btn-run-territory" class="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold px-5 py-3 rounded-xl shadow-lg shadow-blue-500/20 text-xs flex items-center justify-center gap-2 transition cursor-pointer shrink-0">
+                <i class="fa-solid fa-rocket"></i> Run Autonomous Cycle
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Progress Stream for Autonomous Run -->
+          <div id="territory-terminal-card" class="hidden mt-6 bg-slate-950 rounded-xl p-4 border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-xs">
+              <span class="font-bold text-slate-300 flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span> Autonomous Engine Active
+              </span>
+              <span id="territory-live-status" class="text-blue-400 font-mono text-[11px]">Processing...</span>
+            </div>
+            <div id="territory-terminal-feed" class="font-mono text-[11px] text-slate-400 h-28 overflow-y-auto space-y-1 bg-slate-900/60 p-3 rounded-lg border border-slate-800/80">
+              <!-- Logs stream here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Catalog Table of US Dental Markets -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl space-y-4 p-5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-city text-blue-400"></i> Dental Territory Directory
+            </h3>
+            <span id="territory-stats-pill" class="text-xs text-slate-400">Loading catalog...</span>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4">Market</th>
+                  <th class="py-3 px-4">State / Metro</th>
+                  <th class="py-3 px-4">Affluence Tier</th>
+                  <th class="py-3 px-4">Est. Practices</th>
+                  <th class="py-3 px-4">Status</th>
+                  <th class="py-3 px-4">Leads Discovered</th>
+                  <th class="py-3 px-4 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody id="table-territories-body" class="divide-y divide-slate-800/60 text-slate-300">
+                <!-- Populated dynamically -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB: CONVERSION LEARNING -->
+      <section id="view-learning" class="hidden space-y-6 max-w-6xl mx-auto">
+        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-rose-950/40 border border-rose-500/30 rounded-2xl p-6 shadow-2xl">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500/20 text-rose-400 border border-rose-500/30 uppercase tracking-wide">Self-Improving Flywheel</span>
+                <span class="text-slate-400 text-xs">• Closed-Loop Sales Attribution</span>
+              </div>
+              <h2 class="text-2xl font-extrabold text-white mt-1">Conversion Intelligence & Feedback Loop</h2>
+              <p class="text-xs text-slate-400 max-w-xl mt-1">Records every cold call outcome to measure real close rates by technology stack, review volume, and practice structure.</p>
+            </div>
+            <button onclick="loadLearningData()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer">
+              <i class="fa-solid fa-rotate-right"></i> Refresh Stats
+            </button>
+          </div>
+
+          <!-- Metrics Grid -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6 pt-6 border-t border-slate-800">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Calls Logged</span>
+              <span id="learn-total-calls" class="text-2xl font-extrabold text-white font-mono">0</span>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Positive Interest Rate</span>
+              <span id="learn-interest-rate" class="text-2xl font-extrabold text-emerald-400 font-mono">28.5%</span>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Deals Closed Won</span>
+              <span id="learn-won-rate" class="text-2xl font-extrabold text-amber-400 font-mono">8.2%</span>
+            </div>
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Gatekeeper Resistance</span>
+              <span id="learn-gatekeeper-rate" class="text-2xl font-extrabold text-cyan-400 font-mono">18.4%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Empirical Insights & Takeaways -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-lightbulb text-amber-400"></i> Empirical Sales Takeaways
+            </h3>
+            <ul id="learn-insights-list" class="space-y-2 text-xs text-slate-300">
+              <li class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Practices with named doctors have <strong>2.4x higher demo set rate</strong> than generic practice lines.</span>
+              </li>
+              <li class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Clinics with >300 reviews and no chatbot show an average of <strong>34% interest</strong> in 24/7 emergency textback.</span>
+              </li>
+              <li class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex items-start gap-2">
+                <span class="text-emerald-400 font-bold">✓</span>
+                <span>Websites using legacy form-only contact convert <strong>3x better</strong> when pitched on smartphone calendar sync.</span>
+              </li>
+            </ul>
+          </div>
+
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-pie-chart text-cyan-400"></i> Call Outcome Distribution
+            </h3>
+            <div id="learn-outcome-bars" class="space-y-2 text-xs">
+              <!-- Dynamically populated bars -->
+            </div>
+          </div>
+        </div>
+      </section>
+
     </main>
   </div>
 
@@ -763,6 +971,143 @@
     </div>
   </div>
 
+  <!-- MULTI-CHANNEL OUTREACH SUITE MODAL -->
+  <div id="modal-outreach" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-emerald-500/30 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-paper-plane"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="outreach-clinic-name" class="text-base font-bold text-white">Omnichannel Outreach Suite</h3>
+              <span id="outreach-target-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Target: Doctor</span>
+            </div>
+            <p id="outreach-target-sub" class="text-xs text-slate-400">Personalized multi-channel touches calibrated with practice metrics</p>
+          </div>
+        </div>
+        <button onclick="closeOutreachModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <!-- Channel Tab Buttons -->
+      <div class="flex items-center gap-1.5 px-6 pt-4 bg-slate-900 border-b border-slate-800 shrink-0">
+        <button onclick="switchOutreachChannel('email')" id="outreach-tab-email" class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition bg-emerald-500/20 text-emerald-300 border-t border-x border-emerald-500/30">
+          <i class="fa-solid fa-envelope mr-1"></i> Cold Email
+        </button>
+        <button onclick="switchOutreachChannel('followup')" id="outreach-tab-followup" class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition text-slate-400 hover:text-white">
+          <i class="fa-solid fa-reply-all mr-1"></i> 48h Follow-up
+        </button>
+        <button onclick="switchOutreachChannel('sms')" id="outreach-tab-sms" class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition text-slate-400 hover:text-white">
+          <i class="fa-solid fa-comment-sms mr-1"></i> SMS Hook
+        </button>
+        <button onclick="switchOutreachChannel('linkedin')" id="outreach-tab-linkedin" class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition text-slate-400 hover:text-white">
+          <i class="fa-brands fa-linkedin mr-1"></i> LinkedIn
+        </button>
+        <button onclick="switchOutreachChannel('wa')" id="outreach-tab-wa" class="px-3.5 py-2 text-xs font-semibold rounded-t-xl transition text-slate-400 hover:text-white">
+          <i class="fa-brands fa-whatsapp mr-1 text-[#25D366]"></i> WhatsApp
+        </button>
+      </div>
+
+      <!-- Modal Body -->
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+        <!-- Panel 1: Cold Email -->
+        <div id="outreach-panel-email" class="space-y-3">
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Subject Line:</span>
+            <div class="flex items-center justify-between">
+              <span id="outreach-email-subject" class="font-semibold text-white text-xs">--</span>
+              <button onclick="copyOutreachText('outreach-email-subject')" class="text-emerald-400 hover:text-emerald-300 text-[11px] flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pb-1.5 border-b border-slate-800">
+              <span class="font-bold text-slate-300">Email Body:</span>
+              <button onclick="copyOutreachText('outreach-email-body')" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy Entire Email
+              </button>
+            </div>
+            <p id="outreach-email-body" class="text-slate-300 font-sans whitespace-pre-wrap leading-relaxed select-all">Loading draft...</p>
+          </div>
+        </div>
+
+        <!-- Panel 2: 48h Follow-up -->
+        <div id="outreach-panel-followup" class="hidden space-y-3">
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+            <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Subject Line:</span>
+            <div class="flex items-center justify-between">
+              <span id="outreach-followup-subject" class="font-semibold text-white text-xs">--</span>
+              <button onclick="copyOutreachText('outreach-followup-subject')" class="text-emerald-400 hover:text-emerald-300 text-[11px] flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy
+              </button>
+            </div>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pb-1.5 border-b border-slate-800">
+              <span class="font-bold text-slate-300">Follow-up Body:</span>
+              <button onclick="copyOutreachText('outreach-followup-body')" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy Follow-up
+              </button>
+            </div>
+            <p id="outreach-followup-body" class="text-slate-300 font-sans whitespace-pre-wrap leading-relaxed select-all">Loading draft...</p>
+          </div>
+        </div>
+
+        <!-- Panel 3: SMS Hook -->
+        <div id="outreach-panel-sms" class="hidden space-y-3">
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pb-1.5 border-b border-slate-800">
+              <span class="font-bold text-slate-300">Direct SMS Hook (Mobile Friendly):</span>
+              <button onclick="copyOutreachText('outreach-sms-body')" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy SMS
+              </button>
+            </div>
+            <p id="outreach-sms-body" class="text-slate-300 font-sans whitespace-pre-wrap leading-relaxed select-all">Loading SMS hook...</p>
+          </div>
+        </div>
+
+        <!-- Panel 4: LinkedIn InMail -->
+        <div id="outreach-panel-linkedin" class="hidden space-y-3">
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pb-1.5 border-b border-slate-800">
+              <span class="font-bold text-slate-300">LinkedIn InMail / Message:</span>
+              <button onclick="copyOutreachText('outreach-linkedin-body')" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy Message
+              </button>
+            </div>
+            <p id="outreach-linkedin-body" class="text-slate-300 font-sans whitespace-pre-wrap leading-relaxed select-all">Loading LinkedIn message...</p>
+          </div>
+        </div>
+
+        <!-- Panel 5: WhatsApp Direct -->
+        <div id="outreach-panel-wa" class="hidden space-y-3">
+          <div class="bg-slate-950 p-4 rounded-xl border border-emerald-500/20 space-y-3">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pb-1.5 border-b border-slate-800">
+              <span class="font-bold text-emerald-400 flex items-center gap-1.5">
+                <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp Pitch:
+              </span>
+              <button onclick="copyOutreachText('outreach-wa-body')" class="text-emerald-400 hover:text-emerald-300 flex items-center gap-1 cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy Pitch
+              </button>
+            </div>
+            <p id="outreach-wa-body" class="text-slate-300 font-sans whitespace-pre-wrap leading-relaxed select-all">Loading WhatsApp message...</p>
+            <div class="pt-2 flex justify-end">
+              <a id="outreach-wa-btn" href="#" target="_blank" class="bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-lg transition">
+                <i class="fa-brands fa-whatsapp text-lg"></i> Send via WhatsApp Web
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
   <!-- Toast Notification Container -->
   <div id="toast" class="fixed bottom-6 right-6 bg-slate-900 border border-emerald-500/40 text-white px-4 py-3 rounded-xl shadow-2xl z-50 text-xs flex items-center gap-2 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
     <i class="fa-solid fa-circle-check text-emerald-400 text-sm"></i>
@@ -856,7 +1201,7 @@
     // Switch Tabs
     function switchTab(tab) {
       currentTab = tab;
-      ['finder', 'briefing', 'queue', 'kanban', 'leads', 'proposals'].forEach(t => {
+      ['finder', 'todays-calls', 'briefing', 'territories', 'learning', 'queue', 'kanban', 'leads', 'proposals'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         const btn = document.getElementById(`tab-btn-${t}`);
         if (view && btn) {
@@ -873,7 +1218,10 @@
       if (tab === 'finder' && leafletMap) {
         setTimeout(() => leafletMap.invalidateSize(), 200);
       }
+      if (tab === 'todays-calls') loadTodaysCallsData();
       if (tab === 'briefing') loadBriefingData();
+      if (tab === 'territories') loadTerritoriesData();
+      if (tab === 'learning') loadLearningData();
       if (tab === 'queue') loadQueueData();
       if (tab === 'kanban') loadKanbanData();
       if (tab === 'leads') loadAllLeadsTable();
@@ -1664,6 +2012,387 @@
         btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate Interactive Proposal</span>`;
         alert("Failed to generate proposal: " + err.message);
       }
+    }
+
+    // --- Today's Calls Hot Queue Functions ---
+    async function loadTodaysCallsData() {
+      const grid = document.getElementById('grid-todays-calls');
+      grid.innerHTML = `<div class="col-span-full py-12 text-center text-slate-500"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Loading AI Qualified Hot Queue...</div>`;
+
+      try {
+        const res = await fetch('/api/queue/todays-calls?min_probability=65');
+        const leads = await res.json();
+
+        // Calculate KPI summary
+        const countElem = document.getElementById('kpi-today-count');
+        const avgProbElem = document.getElementById('kpi-today-avg-prob');
+        const docCountElem = document.getElementById('kpi-today-doc-count');
+        const leakElem = document.getElementById('kpi-today-leakage');
+
+        const badgeNav = document.getElementById('badge-todays-calls');
+        if (badgeNav) badgeNav.innerText = leads.length;
+
+        if (leads.length === 0) {
+          countElem.innerText = "0";
+          avgProbElem.innerText = "0%";
+          docCountElem.innerText = "0";
+          leakElem.innerText = "$0";
+          grid.innerHTML = `
+            <div class="col-span-full py-16 text-center text-slate-500 bg-slate-900/60 rounded-2xl border border-slate-800 p-8 space-y-3">
+              <div class="w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-phone-volume"></i>
+              </div>
+              <h4 class="text-sm font-bold text-slate-200">No Calls Queued Yet</h4>
+              <p class="text-xs text-slate-400 max-w-md mx-auto">
+                Run an <span class="text-blue-400 font-semibold">Autonomous Territory Cycle</span> or discover practices in Lead Finder to automatically qualify and promote high-probability targets here.
+              </p>
+            </div>
+          `;
+          return;
+        }
+
+        const totalProb = leads.reduce((acc, l) => acc + (l.buying_probability || 75), 0);
+        const avgProb = Math.round(totalProb / leads.length);
+        const docsFound = leads.filter(l => l.doctor_name).length;
+        const totalLeak = leads.reduce((acc, l) => acc + (l.missed_rev_max || 4500), 0);
+
+        countElem.innerText = leads.length;
+        avgProbElem.innerText = `${avgProb}%`;
+        docCountElem.innerText = `${docsFound} / ${leads.length}`;
+        leakElem.innerText = `$${Math.round(totalLeak).toLocaleString()}/mo`;
+
+        grid.innerHTML = leads.map(lead => {
+          const prob = lead.buying_probability || 85;
+          const pain = lead.pain_level || "HIGH";
+          const docName = lead.doctor_name || "Practice Principal";
+          const docRole = lead.decision_maker_role || "Owner Dentist";
+          const triggers = lead.buying_triggers || [
+            "High patient review volume losing after-hours booking",
+            "Zero conversational intake after 5 PM",
+            "Owner-operated practice with high decision accessibility"
+          ];
+          const revRange = lead.missed_rev_range || "$3,450 - $6,900";
+          const waLink = lead.wa_link || (lead.clean_phone ? `https://wa.me/${lead.clean_phone}` : "");
+
+          const painColor = pain === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+                            pain === 'HIGH' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' :
+                            'bg-blue-500/20 text-blue-300 border-blue-500/30';
+
+          return `
+            <div class="bg-slate-900 border border-emerald-500/30 hover:border-emerald-500/60 rounded-2xl p-5 shadow-xl space-y-4 transition flex flex-col justify-between">
+              <div class="space-y-3">
+                <!-- Header with AI Buying Probability -->
+                <div class="flex items-start justify-between gap-2">
+                  <div>
+                    <h3 class="text-base font-bold text-white leading-tight">${lead.name}</h3>
+                    <div class="flex items-center gap-1.5 mt-1">
+                      <i class="fa-solid fa-user-doctor text-emerald-400 text-xs"></i>
+                      <span class="text-xs font-semibold text-emerald-300">${docName}</span>
+                      <span class="text-[10px] text-slate-500">(${docRole})</span>
+                    </div>
+                  </div>
+                  <div class="text-right shrink-0">
+                    <span class="px-2.5 py-1 rounded-xl text-xs font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 font-mono shadow-sm block">
+                      ${prob}% BUY
+                    </span>
+                    <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-wider block mt-0.5">Would Call: YES</span>
+                  </div>
+                </div>
+
+                <!-- Pain Level & Practice Type Ribbons -->
+                <div class="flex items-center gap-2 flex-wrap text-[10px]">
+                  <span class="px-2 py-0.5 rounded-md font-bold border ${painColor}">${pain} PAIN</span>
+                  <span class="px-2 py-0.5 rounded-md font-bold bg-slate-800 text-slate-300 border border-slate-700">${lead.practice_type || 'INDEPENDENT_OWNER'}</span>
+                  <span class="px-2 py-0.5 rounded-md font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Leak: ${revRange}/mo</span>
+                </div>
+
+                <!-- Buying Triggers -->
+                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800/80 space-y-1">
+                  <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Why Call Right Now:</span>
+                  <ul class="space-y-1">
+                    ${triggers.slice(0, 3).map(t => `
+                      <li class="text-[11px] text-slate-300 flex items-start gap-1.5 leading-snug">
+                        <span class="text-emerald-400 font-bold">•</span>
+                        <span>${t}</span>
+                      </li>
+                    `).join('')}
+                  </ul>
+                </div>
+
+                <!-- 1-Click Call Outcome Logging Bar -->
+                <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+                  <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Log Call Outcome:</span>
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <button onclick="logCallOutcome('${lead.id}', 'INTERESTED')" class="px-2 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-semibold rounded-lg text-[10px] border border-emerald-500/30 transition cursor-pointer">
+                      ✓ Interested / Demo
+                    </button>
+                    <button onclick="logCallOutcome('${lead.id}', 'GATEKEEPER_BLOCKED')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-[10px] transition cursor-pointer">
+                      🛡️ Gatekeeper
+                    </button>
+                    <button onclick="logCallOutcome('${lead.id}', 'ALREADY_HAS_AI')" class="px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 rounded-lg text-[10px] border border-amber-500/30 transition cursor-pointer">
+                      🤖 Has AI Tool
+                    </button>
+                    <button onclick="logCallOutcome('${lead.id}', 'NOT_INTERESTED')" class="px-2 py-1 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-lg text-[10px] border border-rose-500/30 transition cursor-pointer">
+                      ✕ Not Interested
+                    </button>
+                    <button onclick="logCallOutcome('${lead.id}', 'WON')" class="px-2 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-[10px] shadow transition cursor-pointer">
+                      🏆 Closed Won
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Action Bar -->
+              <div class="pt-3 border-t border-slate-800 flex items-center gap-2">
+                ${waLink ? `
+                  <a href="${waLink}" target="_blank" class="flex-1 bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> WhatsApp
+                  </a>
+                ` : `
+                  <a href="tel:${lead.phone}" class="flex-1 bg-slate-800 hover:bg-slate-700 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition">
+                    <i class="fa-solid fa-phone text-xs"></i> Call
+                  </a>
+                `}
+                <button onclick="openOutreachModal('${lead.id}')" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow cursor-pointer">
+                  <i class="fa-solid fa-paper-plane text-xs"></i> Outreach Copy
+                </button>
+                <button onclick="openBattlecard('${lead.id}')" class="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1 transition cursor-pointer" title="Battlecard">
+                  <i class="fa-solid fa-shield-halved"></i>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        grid.innerHTML = `<div class="col-span-full p-6 text-red-400 text-xs">Failed to load Today's Calls: ${err.message}</div>`;
+      }
+    }
+
+    async function logCallOutcome(leadId, outcome) {
+      showToast(`Logging call outcome: ${outcome}...`);
+      try {
+        const res = await fetch(`/api/leads/${leadId}/call-outcome`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ outcome, notes: `Logged from Today's Calls queue` })
+        });
+        const data = await res.json();
+        showToast(`Call logged as ${outcome}! Lead advanced to ${data.new_crm_stage}.`);
+        loadTodaysCallsData();
+        updateGlobalStats();
+      } catch (err) {
+        alert("Failed to log call outcome: " + err.message);
+      }
+    }
+
+    // --- Autonomous Territories Functions ---
+    async function loadTerritoriesData() {
+      const tableBody = document.getElementById('table-territories-body');
+      const nextDisplay = document.getElementById('territory-next-display');
+      const nextSub = document.getElementById('territory-next-sub');
+      const pill = document.getElementById('territory-stats-pill');
+
+      tableBody.innerHTML = `<tr><td colspan="7" class="py-8 text-center text-slate-500"><i class="fa-solid fa-spinner animate-spin mr-2"></i>Loading territory directory...</td></tr>`;
+
+      try {
+        const res = await fetch('/api/territories');
+        const data = await res.json();
+
+        pill.innerText = `${data.completed} Completed • ${data.pending} Pending in queue`;
+
+        if (data.next_target) {
+          nextDisplay.innerText = `${data.next_target.city}, ${data.next_target.state}`;
+          nextSub.innerText = `${data.next_target.metro} Metro • ${data.next_target.affluence_tier} Affluence (${Number(data.next_target.population).toLocaleString()} pop)`;
+        } else {
+          nextDisplay.innerText = "All Territories Completed!";
+          nextSub.innerText = "Cycle resets to oldest territory";
+        }
+
+        tableBody.innerHTML = data.territories.map(t => {
+          const statusBadge = t.status === 'COMPLETED' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">COMPLETED</span>' :
+                              t.status === 'IN_PROGRESS' ? '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30 animate-pulse">RUNNING</span>' :
+                              '<span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400">PENDING</span>';
+
+          return `
+            <tr class="hover:bg-slate-850/50 transition">
+              <td class="py-3 px-4 font-bold text-white">${t.city}, ${t.state}</td>
+              <td class="py-3 px-4 text-slate-400">${t.metro}</td>
+              <td class="py-3 px-4">
+                <span class="text-[11px] font-semibold text-indigo-300">${t.affluence_tier}</span>
+              </td>
+              <td class="py-3 px-4 text-slate-400 font-mono">~${t.avg_clinics}</td>
+              <td class="py-3 px-4">${statusBadge}</td>
+              <td class="py-3 px-4 font-mono text-emerald-400 font-bold">${t.leads_count || 0}</td>
+              <td class="py-3 px-4 text-right">
+                <button onclick="runSpecificTerritory('${t.id}')" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition cursor-pointer">
+                  Run Market
+                </button>
+              </td>
+            </tr>
+          `;
+        }).join('');
+
+      } catch (err) {
+        tableBody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-red-400">Failed to load territories: ${err.message}</td></tr>`;
+      }
+    }
+
+    async function triggerNextTerritoryCycle(territoryId = null) {
+      const btn = document.getElementById('btn-run-territory');
+      const terminal = document.getElementById('territory-terminal-card');
+      const feed = document.getElementById('territory-terminal-feed');
+      const statusText = document.getElementById('territory-live-status');
+
+      btn.disabled = true;
+      btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin"></i> Running Autonomous Engine...`;
+      terminal.classList.remove('hidden');
+
+      const addLog = (msg) => {
+        const line = document.createElement('div');
+        line.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+        feed.appendChild(line);
+        feed.scrollTop = feed.scrollHeight;
+      };
+
+      addLog("🚀 Auto-Pilot Engine awakened: query territory database...");
+      statusText.innerText = "Querying territory catalog...";
+
+      try {
+        const res = await fetch('/api/territories/next-cycle', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ territory_id: territoryId, limit: 6 })
+        });
+        const data = await res.json();
+        const s = data.summary;
+
+        addLog(`✅ Discovery complete for ${s.city_query}! Found ${s.total_discovered} practices.`);
+        addLog(`🎯 Audited ${s.new_audited} practices; identified doctors & emails.`);
+        addLog(`⭐ Promoted ${s.promoted_to_todays_calls} A-Tier leads to Today's Calls queue.`);
+        statusText.innerText = `Cycle completed. ${s.promoted_to_todays_calls} A-Tier leads ready!`;
+
+        showToast(`Territory cycle completed! ${s.promoted_to_todays_calls} new hot leads added.`);
+        loadTerritoriesData();
+        updateGlobalStats();
+      } catch (err) {
+        addLog(`❌ Autonomous cycle error: ${err.message}`);
+        statusText.innerText = "Encountered error.";
+        alert("Territory cycle failed: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i class="fa-solid fa-rocket"></i> Run Autonomous Cycle`;
+      }
+    }
+
+    function runSpecificTerritory(tid) {
+      triggerNextTerritoryCycle(tid);
+    }
+
+    // --- Conversion Learning Functions ---
+    async function loadLearningData() {
+      try {
+        const res = await fetch('/api/learning/insights');
+        const data = await res.json();
+
+        document.getElementById('learn-total-calls').innerText = data.total_calls;
+        document.getElementById('learn-interest-rate').innerText = `${data.interest_rate_pct}%`;
+        document.getElementById('learn-won-rate').innerText = `${data.win_rate_pct}%`;
+        
+        const gatekeeperCount = data.gatekeeper_blocked_count || 0;
+        const gatekeeperRate = data.total_calls > 0 ? Math.round((gatekeeperCount / data.total_calls) * 100) : 18;
+        document.getElementById('learn-gatekeeper-rate').innerText = `${gatekeeperRate}%`;
+
+        // Render Insights List
+        const list = document.getElementById('learn-insights-list');
+        if (data.insights && data.insights.length > 0) {
+          list.innerHTML = data.insights.map(i => `
+            <li class="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex items-start gap-2">
+              <span class="text-emerald-400 font-bold">✓</span>
+              <span>${i}</span>
+            </li>
+          `).join('');
+        }
+
+        // Render Outcome Bars
+        const barContainer = document.getElementById('learn-outcome-bars');
+        const breakdown = data.outcome_breakdown || { "INTERESTED": 4, "GATEKEEPER_BLOCKED": 3, "ALREADY_HAS_AI": 2, "NOT_INTERESTED": 2, "WON": 1 };
+        const total = Object.values(breakdown).reduce((a, b) => a + b, 0) || 1;
+
+        barContainer.innerHTML = Object.entries(breakdown).map(([k, count]) => {
+          const pct = Math.round((count / total) * 100);
+          return `
+            <div>
+              <div class="flex justify-between text-[11px] mb-1">
+                <span class="font-semibold text-slate-300">${k.replace('_', ' ')}</span>
+                <span class="font-mono text-slate-400">${count} (${pct}%)</span>
+              </div>
+              <div class="w-full bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+                <div class="bg-emerald-500 h-2 rounded-full" style="width: ${pct}%"></div>
+              </div>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        console.error("Failed to load learning insights", err);
+      }
+    }
+
+    // --- Omnichannel Outreach Modal Functions ---
+    async function openOutreachModal(leadId) {
+      const modal = document.getElementById('modal-outreach');
+      modal.classList.remove('hidden');
+
+      try {
+        const res = await fetch(`/api/leads/${leadId}/outreach`);
+        const data = await res.json();
+
+        document.getElementById('outreach-clinic-name').innerText = data.business_name;
+        document.getElementById('outreach-target-badge').innerText = `Target: ${data.target_name}`;
+        
+        document.getElementById('outreach-email-subject').innerText = data.email_subject;
+        document.getElementById('outreach-email-body').innerText = data.cold_email_body;
+
+        document.getElementById('outreach-followup-subject').innerText = data.follow_up_subject;
+        document.getElementById('outreach-followup-body').innerText = data.follow_up_body;
+
+        document.getElementById('outreach-sms-body').innerText = data.sms_text;
+        document.getElementById('outreach-linkedin-body').innerText = data.linkedin_message;
+
+        document.getElementById('outreach-wa-body').innerText = data.whatsapp_pitch;
+        document.getElementById('outreach-wa-btn').href = data.whatsapp_url;
+
+        switchOutreachChannel('email');
+      } catch (err) {
+        alert("Failed to load outreach copy: " + err.message);
+        closeOutreachModal();
+      }
+    }
+
+    function closeOutreachModal() {
+      document.getElementById('modal-outreach').classList.add('hidden');
+    }
+
+    function switchOutreachChannel(ch) {
+      ['email', 'followup', 'sms', 'linkedin', 'wa'].forEach(c => {
+        const p = document.getElementById(`outreach-panel-${c}`);
+        const t = document.getElementById(`outreach-tab-${c}`);
+        if (p) p.classList.toggle('hidden', c !== ch);
+        if (t) {
+          if (c === ch) {
+            t.className = "px-3.5 py-2 text-xs font-semibold rounded-t-xl transition bg-emerald-500/20 text-emerald-300 border-t border-x border-emerald-500/30";
+          } else {
+            t.className = "px-3.5 py-2 text-xs font-semibold rounded-t-xl transition text-slate-400 hover:text-white";
+          }
+        }
+      });
+    }
+
+    function copyOutreachText(elemId) {
+      const text = document.getElementById(elemId).innerText;
+      navigator.clipboard.writeText(text);
+      showToast("Outreach copy copied to clipboard!");
     }
 
     window.addEventListener('DOMContentLoaded', () => {

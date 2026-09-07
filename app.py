@@ -26,6 +26,9 @@ from lead_finder import GoogleMapsLeadFinder
 from explainer import ScoreExplainer
 from battlecard import SalesBattlecardGenerator
 from scheduler import AutonomousScheduler
+from territory_manager import TerritoryManager
+from ai_qualifier import AIQualifier
+from outreach_generator import OutreachGenerator
 
 # Setup directories
 BASE_DIR = Path(__file__).resolve().parent
@@ -109,6 +112,15 @@ class ProposalRequest(BaseModel):
     lead_id: Optional[str] = None
     url: Optional[str] = None
     name: Optional[str] = None
+
+class CallOutcomeRequest(BaseModel):
+    outcome: str  # INTERESTED, NOT_INTERESTED, ALREADY_HAS_AI, GATEKEEPER_BLOCKED, WON, LOST, CALLBACK_REQUESTED
+    notes: Optional[str] = None
+    duration_sec: int = 0
+
+class NextTerritoryRequest(BaseModel):
+    territory_id: Optional[str] = None
+    limit: int = 8
 
 # --- Helper Functions ---
 
@@ -505,6 +517,100 @@ async def run_morning_harvest(city: Optional[str] = "Austin, TX", limit: int = 5
         db=db
     )
     return {"status": "completed", "summary": result}
+
+# --- Autonomous Territory & Sales Employee Endpoints ---
+
+@app.get("/api/territories")
+async def get_territories():
+    TerritoryManager.initialize_territories(db)
+    territories = db.get_all_territories()
+    pending = sum(1 for t in territories if t.get("status") == "PENDING")
+    in_progress = sum(1 for t in territories if t.get("status") == "IN_PROGRESS")
+    completed = sum(1 for t in territories if t.get("status") == "COMPLETED")
+    next_target = TerritoryManager.get_next_target_territory(db)
+    return {
+        "total_territories": len(territories),
+        "pending": pending,
+        "in_progress": in_progress,
+        "completed": completed,
+        "next_target": next_target,
+        "territories": territories
+    }
+
+@app.post("/api/territories/next-cycle")
+async def trigger_next_territory_cycle(req: NextTerritoryRequest, background_tasks: BackgroundTasks):
+    summary = await AutonomousScheduler.run_autonomous_cycle(
+        territory_id=req.territory_id,
+        limit=req.limit,
+        headless=True,
+        db=db
+    )
+    return {"status": "completed", "summary": summary}
+
+@app.get("/api/queue/todays-calls")
+async def get_todays_calls(min_probability: int = 70):
+    leads = db.get_todays_calls(min_probability=min_probability)
+    results = []
+    for l in leads:
+        wa_data = generate_wa_pitch_and_link(l)
+        l_copy = dict(l)
+        l_copy["clean_phone"] = wa_data["clean_phone"]
+        l_copy["wa_link"] = wa_data["wa_link"]
+
+        rev_min = l.get("missed_rev_min") or l.get("audit_missed_rev_min") or 3450
+        rev_max = l.get("missed_rev_max") or l.get("audit_missed_rev_max") or 6900
+        l_copy["missed_rev_range"] = f"${rev_min:,.0f} - ${rev_max:,.0f}"
+
+        shot_path = l.get("screenshot_path")
+        lead_id = l.get("id")
+        if shot_path and Path(shot_path).exists():
+            l_copy["screenshot_url"] = f"/output/screenshots/{Path(shot_path).name}"
+        elif lead_id and (OUTPUT_DIR / "screenshots" / f"{lead_id}.jpg").exists():
+            l_copy["screenshot_url"] = f"/output/screenshots/{lead_id}.jpg"
+        else:
+            l_copy["screenshot_url"] = None
+
+        results.append(l_copy)
+    return results
+
+@app.post("/api/leads/{lead_id}/call-outcome")
+async def log_call_outcome(lead_id: str, req: CallOutcomeRequest):
+    log_id = db.log_call_outcome(
+        lead_id=lead_id,
+        outcome=req.outcome,
+        rep_notes=req.notes,
+        duration_sec=req.duration_sec
+    )
+    lead = db.get_lead(lead_id)
+    return {
+        "status": "success",
+        "log_id": log_id,
+        "lead_id": lead_id,
+        "recorded_outcome": req.outcome,
+        "new_crm_stage": lead.get("stage") if lead else "UNKNOWN"
+    }
+
+@app.get("/api/leads/{lead_id}/outreach")
+async def get_lead_outreach(lead_id: str):
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    rev_min = lead.get("missed_rev_min") or 3450
+    rev_max = lead.get("missed_rev_max") or 6900
+    monthly_leakage = (rev_min + rev_max) // 2
+
+    outreach = OutreachGenerator.generate(
+        lead_dict=dict(lead),
+        doctor_name=lead.get("doctor_name"),
+        monthly_leakage=monthly_leakage
+    )
+    return outreach.model_dump()
+
+@app.get("/api/learning/insights")
+async def get_learning_insights():
+    return db.get_conversion_intelligence()
+
 
 @app.post("/api/leads/{lead_id}/stage")
 async def update_lead_stage(lead_id: str, req: StageUpdateRequest):
