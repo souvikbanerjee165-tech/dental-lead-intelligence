@@ -76,8 +76,10 @@ def test_swarm_task_ledger_operations():
     assert "proposal_eligible" in counts
     assert "ready_to_call" in counts
 
-def test_master_orchestrator_directive_formulation():
+def test_master_orchestrator_directive_formulation(monkeypatch):
     """Verify SwarmMaster detects queue imbalances and formulates targeted directives."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
     test_db = DatabaseManager(db_path=TEST_SWARM_DB)
     master = SwarmMaster(db=test_db)
 

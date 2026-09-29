@@ -159,7 +159,7 @@ class ProposalGenerator:
         else:
             p1 = ProposalPackage(
                 tier=1,
-                name="Missed Call Recovery & WhatsApp Automation",
+                name="24/7 AI Patient Intake",
                 tagline="Instant missed-call auto-textback, WhatsApp patient intake & after-hours triage",
                 setup_fee=1500.0,
                 monthly_retainer=399.0,
