@@ -36,11 +36,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com https://fonts.googleapis.com; "
             "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; "
             "img-src 'self' data: blob: https:; "
+            "media-src 'self' data: blob:; "
             "connect-src 'self' https:; "
             "frame-ancestors 'self';"
         )
         response.headers["Content-Security-Policy"] = csp
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        response.headers["Permissions-Policy"] = "geolocation=(), camera=()"
         
         return response
 

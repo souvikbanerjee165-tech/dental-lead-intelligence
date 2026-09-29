@@ -19,6 +19,8 @@ storage.db
 output/*.csv
 output/*.xlsx
 output/*.json
+output/*.wav
+output/calls/*
 output/screenshots/*
 output/reports/*
 output/proposals/*
@@ -27,6 +29,9 @@ output/logs/*
 !output/screenshots/.gitkeep
 !output/reports/.gitkeep
 !output/proposals/.gitkeep
+
+# ML Model Weights (Exceeds GitHub 100MB limit)
+models/
 
 # Environment secrets
 .env

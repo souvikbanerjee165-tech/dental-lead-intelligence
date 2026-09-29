@@ -23,6 +23,10 @@ class TurnEvaluation(BaseModel):
     value_score: int = Field(default=7, ge=1, le=10)
     control_score: int = Field(default=7, ge=1, le=10)
     overall_score: int = Field(default=7, ge=1, le=10)
+    confidence_score: int = Field(default=8, ge=1, le=10)
+    pacing_score: int = Field(default=8, ge=1, le=10)
+    objection_score: int = Field(default=7, ge=1, le=10)
+    closing_score: int = Field(default=7, ge=1, le=10)
     tactical_feedback: str
     suggested_pivot: str
 
@@ -199,6 +203,10 @@ Respond strictly in valid JSON matching this schema:
                         value_score=int(data.get("value_score", 7)),
                         control_score=int(data.get("control_score", 7)),
                         overall_score=int(data.get("overall_score", 7)),
+                        confidence_score=int(data.get("confidence_score", 8)),
+                        pacing_score=int(data.get("pacing_score", 8)),
+                        objection_score=int(data.get("objection_score", 7)),
+                        closing_score=int(data.get("closing_score", 7)),
                         tactical_feedback=data.get("tactical_feedback", "State the specific financial gap earlier in the pitch."),
                         suggested_pivot=data.get("suggested_pivot", f"Dr. {doc_name}, most clinics lose 3-5 weekend implant inquiries because nobody answers at 8 PM. Does your front desk capture those today?")
                     )
@@ -208,6 +216,17 @@ Respond strictly in valid JSON matching this schema:
 
         # Deterministic Sparring Engine (High Quality Fallback)
         return cls._deterministic_turn(lead_dict, persona_key, user_pitch)
+
+    @classmethod
+    def _fallback_evaluate(
+        cls,
+        user_pitch: str,
+        persona_key: str = "GATEKEEPER_RECEPTIONIST",
+        lead_dict: Optional[Dict[str, Any]] = None
+    ) -> TurnEvaluation:
+        """Helper to return TurnEvaluation directly for offline grading/sparring tests."""
+        turn_resp = cls._deterministic_turn(lead_dict or {}, persona_key, user_pitch)
+        return turn_resp.evaluation
 
     @classmethod
     def _deterministic_turn(
@@ -284,6 +303,10 @@ Respond strictly in valid JSON matching this schema:
                 value_score=value_score,
                 control_score=control_score,
                 overall_score=overall_score,
+                confidence_score=min(10, max(1, hook_score + 1)),
+                pacing_score=min(10, max(1, value_score)),
+                objection_score=min(10, max(1, control_score)),
+                closing_score=min(10, max(1, overall_score)),
                 tactical_feedback=feedback,
                 suggested_pivot=pivot
             )

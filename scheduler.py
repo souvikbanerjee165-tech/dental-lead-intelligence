@@ -149,7 +149,9 @@ class AutonomousScheduler:
                 decision_accessibility=qualification.decision_accessibility,
                 buying_triggers=qualification.buying_triggers,
                 sales_verdict=qualification.sales_manager_verdict,
-                territory_id=target_territory["id"]
+                territory_id=target_territory["id"],
+                win_probability_pct=qualification.win_probability_pct,
+                win_probability_reasons=qualification.win_probability_reasons
             )
 
             if doc_name:
@@ -317,4 +319,63 @@ class AutonomousScheduler:
             }
         total_summary["finished_at"] = datetime.now().isoformat()
         return total_summary
+
+    # ==================== 6:00 AM Auto Prospecting Scheduler ====================
+
+    _morning_harvest_enabled: bool = True
+    _morning_harvest_time: str = "06:00"
+    _morning_target_metros: List[str] = ["Dallas, TX", "Chicago, IL", "Miami, FL", "Houston, TX", "Austin, TX"]
+    _morning_limit_per_metro: int = 100
+    _last_morning_harvest: Optional[str] = None
+
+    @classmethod
+    def configure_morning_harvest(
+        cls,
+        enabled: bool = True,
+        target_metros: Optional[List[str]] = None,
+        harvest_time: str = "06:00",
+        limit_per_metro: int = 100
+    ) -> Dict[str, Any]:
+        """Configures the automatic 6:00 AM multi-metro prospecting harvester."""
+        cls._morning_harvest_enabled = enabled
+        if target_metros:
+            cls._morning_target_metros = target_metros
+        cls._morning_harvest_time = harvest_time
+        cls._morning_limit_per_metro = limit_per_metro
+        return cls.get_morning_harvest_status()
+
+    @classmethod
+    def get_morning_harvest_status(cls) -> Dict[str, Any]:
+        """Returns status of the 6:00 AM autonomous prospecting scheduler."""
+        return {
+            "enabled": cls._morning_harvest_enabled,
+            "scheduled_time": cls._morning_harvest_time,
+            "target_metros": cls._morning_target_metros,
+            "limit_per_metro": cls._morning_limit_per_metro,
+            "total_daily_leads_target": len(cls._morning_target_metros) * cls._morning_limit_per_metro,
+            "last_harvest": cls._last_morning_harvest,
+            "status": "ARMED_FOR_0600" if cls._morning_harvest_enabled else "PAUSED"
+        }
+
+    @classmethod
+    async def trigger_morning_harvest(
+        cls,
+        metros: Optional[List[str]] = None,
+        limit_per_metro: Optional[int] = None,
+        headless: bool = True,
+        db: Optional[DatabaseManager] = None
+    ) -> Dict[str, Any]:
+        """Manually or cron-triggered execution of the multi-metro morning harvest."""
+        db = db or DatabaseManager()
+        target_metros = metros or cls._morning_target_metros
+        limit = limit_per_metro or min(cls._morning_limit_per_metro, 10)
+        cls._last_morning_harvest = datetime.now().isoformat()
+        return await cls.run_morning_cycle(
+            cities=target_metros,
+            category="Dentists",
+            limit_per_city=limit,
+            headless=headless,
+            db=db
+        )
+
 

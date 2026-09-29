@@ -17,6 +17,20 @@ class OpportunityReportGenerator:
         raw = lead.raw_lead
         audit = lead.audit
         maturity = lead.maturity
+        if not maturity or maturity.overall_score == 0:
+            from models import DigitalMaturityScore
+            base_s = 60
+            if audit.has_online_booking: base_s += 15
+            if audit.has_ai_chatbot: base_s += 15
+            if not audit.has_ssl: base_s -= 15
+            maturity = DigitalMaturityScore(
+                overall_score=min(95, max(35, base_s)),
+                website_quality=70,
+                patient_experience=base_s,
+                automation_score=80 if audit.has_ai_chatbot else 35,
+                conversion_score=75 if audit.has_online_booking else 40
+            )
+            lead.maturity = maturity
         date_str = datetime.now().strftime("%B %d, %Y")
 
         status_class = "badge-urgent" if maturity.overall_score < 65 else "badge-moderate"

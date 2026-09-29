@@ -40,7 +40,11 @@ DEFAULT_SETTINGS = {
     "auto_backup_enabled": True,
     "agency_name": "Apex Practice Growth Partners",
     "require_auth_pin": False,
-    "auth_pin": ""
+    "auth_pin": "",
+    "llm_provider": "OPENAI",
+    "openai_model": "gpt-4o-mini",
+    "deepseek_model": "deepseek-chat",
+    "gemini_model": "gemini-2.5-flash"
 }
 
 
