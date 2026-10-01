@@ -26,9 +26,11 @@ output/reports/*
 output/proposals/*
 output/backups/*
 output/logs/*
+output/stings/*
 !output/screenshots/.gitkeep
 !output/reports/.gitkeep
 !output/proposals/.gitkeep
+!output/stings/.gitkeep
 
 # ML Model Weights (Exceeds GitHub 100MB limit)
 models/

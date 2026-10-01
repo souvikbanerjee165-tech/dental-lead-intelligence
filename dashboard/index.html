@@ -2135,6 +2135,117 @@
               </button>
             </div>
           </div>
+
+          <!-- Lethal Sales Engine Suite: Executive Pitch Portal & Fast Outreach Weapons -->
+          <div class="space-y-3 pt-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black uppercase tracking-wider text-rose-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-fire text-amber-400"></i> Lethal Sales Engine & Pitch Arsenal
+              </span>
+              <span class="text-[10px] text-amber-300 font-mono font-bold">1-Click Closing Weapons</span>
+            </div>
+
+            <!-- Weapon 1: Executive Practice Teardown Pitch Portal -->
+            <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950/40 p-4 rounded-xl border border-rose-500/50 space-y-2.5 shadow-lg">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-rose-300 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-laptop-code text-sm"></i> Executive Teardown Pitch Portal
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                  Public URL /pitch/{id}
+                </span>
+              </div>
+              <p class="text-xs text-slate-300">
+                Personalized executive audit page with practice revenue leakage teardown, embedded patient simulator, and $1,500 turnkey break-even guarantee. Includes real-time view tracking beacon.
+              </p>
+              <div class="flex items-center gap-2 flex-wrap pt-1">
+                <button onclick="openExecutivePitchPortal(currentSelectedLeadId)" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-rose-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-xs flex items-center gap-2 shadow-lg transition cursor-pointer">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i> Open Live Pitch Portal
+                </button>
+                <button onclick="copyExecutivePitchUrl(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition cursor-pointer">
+                  <i class="fa-solid fa-link"></i> Copy Pitch Link
+                </button>
+              </div>
+            </div>
+
+            <!-- Weapon 2: Voicemail Sting Auditory Proof -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-amber-500/40 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-300 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-volume-high text-sm"></i> "Voicemail Sting" Auditory Proof
+                </span>
+                <span id="modal-sting-status-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Dual Telecom Rings + Beep + AI
+                </span>
+              </div>
+              <p class="text-xs text-slate-300">
+                Stitches 440Hz/480Hz telecom ringing + pickup click + 1000Hz voicemail tone + customized doctor revenue loss voiceover. Irrefutable evidence on cold calls.
+              </p>
+              <div class="flex items-center gap-3 pt-1">
+                <button onclick="playVoicemailSting(currentSelectedLeadId)" id="btn-play-voicemail-sting" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer">
+                  <i class="fa-solid fa-circle-play text-sm"></i> <span>Play Voicemail Sting Audio</span>
+                </button>
+                <audio id="audio-voicemail-sting" class="hidden"></audio>
+                <span id="modal-sting-duration" class="text-[11px] font-mono text-slate-400">Duration: ~20s</span>
+              </div>
+            </div>
+
+            <!-- Weapon 3: Local Competitor "Patient Steal" Radar -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-cyan-500/40 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-cyan-300 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-radar text-sm"></i> Local Competitor "Patient Steal" Radar
+                </span>
+                <span id="modal-competitor-count-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  3-Mile Proximity Scan
+                </span>
+              </div>
+              <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 text-[11px] space-y-1">
+                <div class="text-slate-300 font-semibold flex items-center justify-between">
+                  <span>Top Local Rival Capturing Weekend Emergencies:</span>
+                  <span id="modal-top-competitor-name" class="font-bold text-cyan-400">Scanning rivals...</span>
+                </div>
+                <p id="modal-top-competitor-stats" class="text-[10px] text-slate-400">
+                  Review standing & after-hours capture comparison.
+                </p>
+              </div>
+              <div class="bg-cyan-950/30 p-2.5 rounded-lg border border-cyan-500/20 text-[11px] text-cyan-200">
+                <div class="font-bold flex items-center justify-between mb-1">
+                  <span>Competitive FOMO Hook (Say on call):</span>
+                  <button onclick="copyElementText('modal-competitor-fomo-quote')" class="text-slate-400 hover:text-white text-[10px]">
+                    <i class="fa-solid fa-copy"></i> Copy
+                  </button>
+                </div>
+                <p id="modal-competitor-fomo-quote" class="italic select-all">Scanning nearby dental landscape...</p>
+              </div>
+            </div>
+
+            <!-- Weapon 5: 1-Click Direct SMS & WhatsApp Dispatcher -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-emerald-500/40 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-paper-plane text-sm"></i> 1-Click Direct SMS & WhatsApp Dispatcher
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  Native OS Deep-Links
+                </span>
+              </div>
+              <p class="text-xs text-slate-300">
+                Launches your phone's native SMS app or WhatsApp Web pre-loaded with the confidential teardown link and tracks the dispatch in CRM timeline.
+              </p>
+              <div class="flex items-center gap-2 flex-wrap pt-1">
+                <button onclick="dispatchNativeSMS(currentSelectedLeadId)" class="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer">
+                  <i class="fa-solid fa-comment-sms"></i> 1-Click SMS Dispatch
+                </button>
+                <button onclick="dispatchDirectWhatsApp(currentSelectedLeadId)" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer">
+                  <i class="fa-brands fa-whatsapp text-sm"></i> 1-Click WhatsApp Dispatch
+                </button>
+                <button onclick="copySMSDispatchText(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition cursor-pointer">
+                  <i class="fa-solid fa-copy"></i> Copy Text
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Stage Progression Selector -->
@@ -3811,6 +3922,55 @@
             </div>
           </div>
 
+          <!-- TACTICAL COUNTER-PUNCH SOUNDBOARD & HOTKEY HUD (5 LETHAL REBUTTALS) -->
+          <div class="bg-slate-950 p-3.5 rounded-xl border border-indigo-500/40 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="font-extrabold text-indigo-300 text-xs flex items-center gap-2">
+                <i class="fa-solid fa-bolt-lightning text-amber-400"></i> Tactical Soundboard & Hotkey HUD
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono">
+                Press Keys <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-white font-bold">1</kbd> - <kbd class="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-white font-bold">5</kbd> or click to flash counter-punch
+              </span>
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+              <button onclick="triggerTacticalRebuttal(1)" class="p-2 rounded-lg bg-slate-900 hover:bg-indigo-950/80 active:bg-indigo-900 border border-slate-800 hover:border-indigo-500/50 text-left transition cursor-pointer group">
+                <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 group-hover:text-indigo-300">
+                  <span>Dentrix/EHR</span>
+                  <span class="px-1 py-0.2 bg-slate-800 rounded text-[9px] text-slate-300 font-mono">Key 1</span>
+                </div>
+                <p class="text-[11px] text-slate-200 font-semibold truncate mt-0.5">Coexistence</p>
+              </button>
+              <button onclick="triggerTacticalRebuttal(2)" class="p-2 rounded-lg bg-slate-900 hover:bg-indigo-950/80 active:bg-indigo-900 border border-slate-800 hover:border-indigo-500/50 text-left transition cursor-pointer group">
+                <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 group-hover:text-indigo-300">
+                  <span>Email Push</span>
+                  <span class="px-1 py-0.2 bg-slate-800 rounded text-[9px] text-slate-300 font-mono">Key 2</span>
+                </div>
+                <p class="text-[11px] text-slate-200 font-semibold truncate mt-0.5">Gatekeeper Bypass</p>
+              </button>
+              <button onclick="triggerTacticalRebuttal(3)" class="p-2 rounded-lg bg-slate-900 hover:bg-indigo-950/80 active:bg-indigo-900 border border-slate-800 hover:border-indigo-500/50 text-left transition cursor-pointer group">
+                <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 group-hover:text-indigo-300">
+                  <span>In Surgery</span>
+                  <span class="px-1 py-0.2 bg-slate-800 rounded text-[9px] text-slate-300 font-mono">Key 3</span>
+                </div>
+                <p class="text-[11px] text-slate-200 font-semibold truncate mt-0.5">Hands-Busy Disarm</p>
+              </button>
+              <button onclick="triggerTacticalRebuttal(4)" class="p-2 rounded-lg bg-slate-900 hover:bg-indigo-950/80 active:bg-indigo-900 border border-slate-800 hover:border-indigo-500/50 text-left transition cursor-pointer group">
+                <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 group-hover:text-indigo-300">
+                  <span>Price / Retainer</span>
+                  <span class="px-1 py-0.2 bg-slate-800 rounded text-[9px] text-slate-300 font-mono">Key 4</span>
+                </div>
+                <p class="text-[11px] text-slate-200 font-semibold truncate mt-0.5">1 Patient Break-Even</p>
+              </button>
+              <button onclick="triggerTacticalRebuttal(5)" class="p-2 rounded-lg bg-slate-900 hover:bg-indigo-950/80 active:bg-indigo-900 border border-slate-800 hover:border-indigo-500/50 text-left transition cursor-pointer group">
+                <div class="flex items-center justify-between text-[10px] font-bold text-slate-400 group-hover:text-indigo-300">
+                  <span>Close The Call</span>
+                  <span class="px-1 py-0.2 bg-slate-800 rounded text-[9px] text-slate-300 font-mono">Key 5</span>
+                </div>
+                <p class="text-[11px] text-slate-200 font-semibold truncate mt-0.5">Thursday 11 AM Anchor</p>
+              </button>
+            </div>
+          </div>
+
           <!-- Active Call Footer Actions -->
           <div class="flex items-center justify-between pt-2 border-t border-slate-800">
             <button onclick="toggleDialerMute()" id="btn-mdialer-mute" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition flex items-center gap-2 cursor-pointer">
@@ -4781,6 +4941,8 @@
       // Precision Pillars Initialization
       loadLeadMysteryAudit(leadId);
       loadLeadCadence(leadId);
+      loadLeadCompetitorRadar(leadId);
+      loadLeadVoicemailSting(leadId);
       if (lead.detected_ehr || lead.npi_number) {
         const ehrElem = document.getElementById('modal-detected-ehr');
         if (ehrElem && lead.detected_ehr) ehrElem.innerHTML = `<i class="fa-solid fa-laptop-medical"></i> ${lead.detected_ehr}`;
@@ -7251,6 +7413,241 @@
         showToast("Error advancing cadence: " + e.message);
       }
     }
+
+    // --- Lethal Sales Engine Weapons (Pitch Portal, Sting, Radar, SMS Dispatch, Hotkeys) ---
+
+    let currentDispatchData = null;
+
+    function openExecutivePitchPortal(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      window.open(`/pitch/${id}`, '_blank');
+    }
+
+    function copyExecutivePitchUrl(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      const url = `${window.location.origin}/pitch/${id}`;
+      navigator.clipboard.writeText(url).then(() => {
+        showToast("🔥 Copied Executive Pitch Portal link to clipboard!");
+      });
+    }
+
+    async function loadLeadVoicemailSting(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      const badge = document.getElementById('modal-sting-status-badge');
+      const dur = document.getElementById('modal-sting-duration');
+      if (badge) badge.innerText = "Audio Ready (Telecom Rings + AI)";
+      if (dur) dur.innerText = "Duration: ~20s";
+    }
+
+    async function playVoicemailSting(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      const btn = document.getElementById('btn-play-voicemail-sting');
+      const audioElem = document.getElementById('audio-voicemail-sting');
+      const badge = document.getElementById('modal-sting-status-badge');
+      const dur = document.getElementById('modal-sting-duration');
+
+      if (audioElem && !audioElem.paused) {
+        audioElem.pause();
+        audioElem.currentTime = 0;
+        if (btn) btn.innerHTML = `<i class="fa-solid fa-circle-play text-sm"></i> <span>Play Voicemail Sting Audio</span>`;
+        if (badge) badge.innerText = "Audio Stopped";
+        return;
+      }
+
+      if (btn) btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin text-sm"></i> <span>Synthesizing Telecom Audio...</span>`;
+      if (badge) badge.innerText = "Synthesizing Ringers & AI Voiceover...";
+
+      try {
+        const res = await fetch(`/api/leads/${id}/voicemail-sting`);
+        if (!res.ok) throw new Error("Failed to generate voicemail sting");
+        const data = await res.json();
+
+        if (audioElem && data.audio_url) {
+          audioElem.src = data.audio_url;
+          audioElem.play();
+          if (btn) btn.innerHTML = `<i class="fa-solid fa-circle-stop text-sm text-rose-500"></i> <span>Stop Voicemail Audio</span>`;
+          if (badge) badge.innerText = "🔊 Playing Telephony Ring + Beep + AI Teardown";
+          if (dur) dur.innerText = `Duration: ${data.duration_sec}s (${data.engine})`;
+
+          audioElem.onended = () => {
+            if (btn) btn.innerHTML = `<i class="fa-solid fa-circle-play text-sm"></i> <span>Replay Voicemail Sting</span>`;
+            if (badge) badge.innerText = "Audio Finished (Click Replay)";
+          };
+        }
+      } catch (err) {
+        if (btn) btn.innerHTML = `<i class="fa-solid fa-triangle-exclamation text-sm text-amber-400"></i> <span>Failed to Play</span>`;
+        if (badge) badge.innerText = "Sting Generation Error: " + err.message;
+        showToast("Error generating voicemail sting: " + err.message);
+      }
+    }
+
+    async function loadLeadCompetitorRadar(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/leads/${id}/competitor-radar`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const badge = document.getElementById('modal-competitor-count-badge');
+        const rivalName = document.getElementById('modal-top-competitor-name');
+        const rivalStats = document.getElementById('modal-top-competitor-stats');
+        const fomoQuote = document.getElementById('modal-competitor-fomo-quote');
+
+        if (badge) badge.innerText = `${data.competitors_analyzed_count} Nearby Rivals Analyzed`;
+        if (rivalName && data.primary_threat) {
+          rivalName.innerText = `${data.primary_threat.name} (~${data.primary_threat.distance_miles} mi)`;
+        }
+        if (rivalStats && data.primary_threat) {
+          rivalStats.innerText = `${data.primary_threat.rating}★ (${data.primary_threat.review_count} reviews) • Captures after-hours searches`;
+        }
+        if (fomoQuote) {
+          fomoQuote.innerText = `"${data.sales_fomo_quote}"`;
+        }
+      } catch (e) {}
+    }
+
+    async function getLeadDispatchData(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return null;
+      try {
+        const res = await fetch(`/api/leads/${id}/sms-dispatch`);
+        if (!res.ok) return null;
+        currentDispatchData = await res.json();
+        return currentDispatchData;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    async function dispatchNativeSMS(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      showToast("Launching Native SMS App pre-loaded with Teardown Link...");
+      const data = await getLeadDispatchData(id);
+      if (data && data.native_sms_url) {
+        fetch(`/api/leads/${id}/sms-dispatch/record`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel: 'SMS' })
+        }).catch(() => {});
+        window.location.href = data.native_sms_url;
+        showToast("📱 Opened SMS Composer! Touch recorded in CRM.");
+        loadLeadTimeline(id);
+      }
+    }
+
+    async function dispatchDirectWhatsApp(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      showToast("Opening WhatsApp Web / App with Teardown Pitch Link...");
+      const data = await getLeadDispatchData(id);
+      if (data && data.whatsapp_url) {
+        fetch(`/api/leads/${id}/sms-dispatch/record`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ channel: 'WHATSAPP' })
+        }).catch(() => {});
+        window.open(data.whatsapp_url, '_blank');
+        showToast("💬 Dispatched to WhatsApp! Touch logged.");
+        loadLeadTimeline(id);
+      }
+    }
+
+    async function copySMSDispatchText(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      const data = await getLeadDispatchData(id);
+      if (data && data.sms_text) {
+        navigator.clipboard.writeText(data.sms_text).then(() => {
+          showToast("📋 Copied high-impact SMS message to clipboard!");
+        });
+      }
+    }
+
+    // --- Tactical Counter-Punch Soundboard & Hotkeys ---
+
+    const TACTICAL_COUNTER_PUNCHES = {
+      1: {
+        category: "Dentrix / Practice Management Coexistence",
+        badge: "Dentrix / Eaglesoft Defense Disarmed",
+        script: "We do NOT replace Dentrix or your front-office software. We sit outside office hours—when the office is dark, Friday 6 PM to Monday 8 AM—so you capture the weekend toothache inquiries Dentrix can't touch.",
+        suggested: "Who handles after-hours emergency texts when your front desk goes home at 5 PM?"
+      },
+      2: {
+        category: "Gatekeeper Email Bypass",
+        badge: "Gatekeeper Info@ Bypass",
+        script: "Understood! Before I send it to info@ where it gets lost with supply catalogs, we built a 10-second interactive prototype specifically for Dr. [Name]. Is the clinic cell or Dr.'s line best for a 1-tap text preview?",
+        suggested: "Can I text the 10-second prototype link directly to the office cell so Dr. sees the live demo?"
+      },
+      3: {
+        category: "Doctor In Surgery / Busy Hands Disarm",
+        badge: "Surgery Disarm Active",
+        script: "Completely understand Dr. [Name] is chairside in surgery right now—I never interrupt clinical care. I'm texting a 10-second silent video prototype to the office line now so the doctor can review between patients with zero phone tag.",
+        suggested: "I'll text the confidential prototype link right now; what's the best direct number?"
+      },
+      4: {
+        category: "Pricing & Retainer Defense ($1,500 + $399/mo)",
+        badge: "1-Patient Break-Even Math",
+        script: "The entire turnkey installation is $1,500 setup and $399/month. In Texas, a single emergency root canal or crown is $1,250. Recovering just one patient on a Sunday morning pays for three months of service. Everything else is pure practice profit.",
+        suggested: "If this captures just 2 after-hours patients next month, that's $2,500 in new revenue against a $399 fee. Does that make sense?"
+      },
+      5: {
+        category: "Thursday 11 AM Micro-Anchor (Close)",
+        badge: "Micro-Commitment Anchor",
+        script: "Would Thursday at 11 AM or Friday at 2 PM work for a quick 7-minute Zoom to verify how it links to your existing practice calendar with zero disruption?",
+        suggested: "Let's pencil in Thursday at 11 AM for 7 minutes—if you hate it, kick us to the curb."
+      }
+    };
+
+    function triggerTacticalRebuttal(keyNumber) {
+      const rebuttal = TACTICAL_COUNTER_PUNCHES[keyNumber];
+      if (!rebuttal) return;
+
+      const objBadge = document.getElementById('mdialer-hud-obj-badge');
+      const counterPunchElem = document.getElementById('mdialer-hud-counter-punch');
+      const suggestedLineElem = document.getElementById('mdialer-hud-suggested-line');
+
+      if (objBadge) {
+        objBadge.innerText = rebuttal.badge;
+        objBadge.className = "px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-500/40 animate-pulse";
+      }
+      if (counterPunchElem) {
+        counterPunchElem.innerText = `"${rebuttal.script}"`;
+        counterPunchElem.className = "text-amber-200 text-xs font-semibold leading-snug select-all bg-indigo-950/40 p-2 rounded-lg border border-indigo-500/30";
+      }
+      if (suggestedLineElem) {
+        suggestedLineElem.innerText = `"${rebuttal.suggested}"`;
+      }
+
+      // Copy rebuttal script to clipboard for instant pasting or reading
+      navigator.clipboard.writeText(rebuttal.script).then(() => {
+        showToast(`⚡ Fired Rebuttal #${keyNumber}: Copied script!`);
+      }).catch(() => {
+        showToast(`⚡ Fired Rebuttal #${keyNumber}: Flashed to HUD!`);
+      });
+    }
+
+    // Global Hotkey Listener for Keys 1-5 while in active dialer
+    window.addEventListener('keydown', (e) => {
+      const dialerModal = document.getElementById('modal-manual-dialer');
+      const activeView = document.getElementById('mdialer-active-view');
+      if (!dialerModal || dialerModal.classList.contains('hidden')) return;
+      if (!activeView || activeView.classList.contains('hidden')) return;
+
+      // Do not intercept if user is typing in input or textarea
+      const tag = document.activeElement ? document.activeElement.tagName.toLowerCase() : '';
+      if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+      if (['1', '2', '3', '4', '5'].includes(e.key)) {
+        e.preventDefault();
+        triggerTacticalRebuttal(parseInt(e.key));
+      }
+    });
 
     // --- Omnichannel Outreach Modal Functions ---
     async function openOutreachModal(leadId) {

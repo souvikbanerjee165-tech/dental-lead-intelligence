@@ -54,6 +54,10 @@ from whatsapp_demo_engine import WhatsAppDemoEngine
 from mystery_shopper import MysteryShopperAuditor
 from sales_cadence import SalesCadenceEngine
 from objection_analytics import ObjectionAnalyticsEngine
+from pitch_portal import PitchPortalEngine
+from voicemail_sting import VoicemailStingGenerator
+from competitor_radar import CompetitorRadarEngine
+from sms_dispatcher import SMSDispatcherEngine
 import logging
 logging.getLogger().addFilter(SecretMaskingLogFilter())
 logger = logging.getLogger("app")
@@ -70,6 +74,7 @@ OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 (OUTPUT_DIR / "reports").mkdir(exist_ok=True, parents=True)
 (OUTPUT_DIR / "proposals").mkdir(exist_ok=True, parents=True)
 (OUTPUT_DIR / "screenshots").mkdir(exist_ok=True, parents=True)
+(OUTPUT_DIR / "stings").mkdir(exist_ok=True, parents=True)
 
 def capture_screenshot_sync(url: str, save_path: Path) -> bool:
     target_url = url if (url.startswith("http://") or url.startswith("https://")) else f"https://{url}"
@@ -3075,6 +3080,118 @@ async def get_objection_analytics_report():
     """
     return ObjectionAnalyticsEngine.get_objection_report(db)
 
+
+# -------------------------------------------------------------
+# Lethal Sales Engine Weapons (Pitch Portal, Sting, Radar, SMS)
+# -------------------------------------------------------------
+
+class SMSDispatchRecordRequest(BaseModel):
+    channel: str = "SMS"
+
+
+@app.get("/pitch/{lead_id}", response_class=HTMLResponse)
+async def render_executive_pitch_portal(lead_id: str, request: Request):
+    """
+    Renders hyper-personalized executive teardown landing page for the clinic owner.
+    """
+    lead = None
+    if lead_id and lead_id != "preview":
+        lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {
+            "id": lead_id or "preview",
+            "name": "Apex Dental Studio",
+            "doctor_name": "Dr. Sarah Jenkins",
+            "address": "Austin, TX",
+            "phone": "+1 (512) 555-0199",
+            "rating": 4.9,
+            "review_count": 85,
+            "missed_rev_min": 3500,
+            "missed_rev_max": 7200,
+            "detected_ehr": "Dentrix",
+            "npi_number": "1841295830"
+        }
+    base_url = str(request.base_url).rstrip("/")
+    html_content = PitchPortalEngine.render_pitch_page_html(lead, base_app_url=base_url)
+    return HTMLResponse(content=html_content, status_code=200)
+
+
+@app.post("/api/pitch/{lead_id}/viewed")
+async def record_pitch_portal_view(lead_id: str):
+    """
+    Records high-intent prospect viewing of their confidential pitch teardown portal.
+    """
+    return SMSDispatcherEngine.record_pitch_view(lead_id=lead_id, db=db)
+
+
+@app.get("/api/leads/{lead_id}/voicemail-sting")
+async def generate_lead_voicemail_sting(
+    lead_id: str,
+    voice_engine: str = "auto-fast",
+    voice_name: str = "af_sarah"
+):
+    """
+    Generates an empirical 20-second auditory proof file stitching telecom rings + voicemail beep + doctor teardown.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {
+            "id": lead_id,
+            "name": "Apex Dental Studio",
+            "doctor_name": "Dr. Sarah Jenkins",
+            "address": "Austin, TX",
+            "phone": "+1 (512) 555-0199"
+        }
+    return VoicemailStingGenerator.generate_voicemail_sting(
+        lead_dict=lead,
+        voice_engine=voice_engine,
+        voice_name=voice_name
+    )
+
+
+@app.get("/api/leads/{lead_id}/competitor-radar")
+async def get_lead_competitor_radar(lead_id: str):
+    """
+    Scans competing clinics in a 3-mile radius capturing after-hours patients to build lethal FOMO.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {
+            "id": lead_id,
+            "name": "Apex Dental Studio",
+            "doctor_name": "Dr. Sarah Jenkins",
+            "address": "Austin, TX",
+            "phone": "+1 (512) 555-0199"
+        }
+    return CompetitorRadarEngine.scan_competitors(lead, db=db)
+
+
+@app.get("/api/leads/{lead_id}/sms-dispatch")
+async def get_sms_dispatch_payload(lead_id: str, request: Request):
+    """
+    Generates 1-click SMS & WhatsApp dispatch payload with deep-links and tracking URL.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {
+            "id": lead_id,
+            "name": "Apex Dental Studio",
+            "doctor_name": "Dr. Sarah Jenkins",
+            "address": "Austin, TX",
+            "phone": "+1 (512) 555-0199"
+        }
+    base_url = str(request.base_url).rstrip("/")
+    return SMSDispatcherEngine.generate_dispatch_payload(lead, base_app_url=base_url)
+
+
+@app.post("/api/leads/{lead_id}/sms-dispatch/record")
+async def record_sms_dispatch_sent(lead_id: str, req: Optional[SMSDispatchRecordRequest] = None):
+    """
+    Logs 1-click SMS or WhatsApp dispatch touchpoint in CRM touches table and opportunity timeline.
+    """
+    channel = req.channel if req else "SMS"
+    success = SMSDispatcherEngine.record_dispatch(lead_id=lead_id, channel=channel, db=db)
+    return {"status": "success" if success else "error", "lead_id": lead_id, "channel": channel}
 
 
 if __name__ == "__main__":
