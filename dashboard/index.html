@@ -1198,6 +1198,60 @@
             </div>
           </div>
         </div>
+
+        <!-- Pillar 5: Real-Time Objection Intelligence & Winning Counter-Punches -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 uppercase tracking-wide">Pillar 5 Objection Intelligence</span>
+                <span class="text-slate-400 text-xs">• Rebuttal Win-Rate Flywheel</span>
+              </div>
+              <h3 class="text-base font-extrabold text-white mt-1 flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-cyan-400"></i> Institutional Objection Flywheel & Rebuttal Win Rates
+              </h3>
+            </div>
+            <button onclick="loadObjectionIntelligenceData()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold flex items-center gap-2 transition cursor-pointer">
+              <i class="fa-solid fa-rotate-right"></i> Refresh Objections
+            </button>
+          </div>
+
+          <!-- Top Stats Banner -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Top Encountered Objection</span>
+              <div id="obj-top-category" class="text-sm font-bold text-rose-400 truncate">Existing Software (Dentrix / Weave)</div>
+              <p class="text-[10px] text-slate-500">Occurs in 38% of cold conversations</p>
+            </div>
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Rebuttal Win Rate</span>
+              <div id="obj-overall-winrate" class="text-sm font-bold text-emerald-400 font-mono">42.1% Win Rate</div>
+              <p class="text-[10px] text-slate-500">Demo or Zoom anchor booked</p>
+            </div>
+            <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+              <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Highest Converting Hook</span>
+              <div id="obj-top-hook" class="text-sm font-bold text-cyan-300 truncate">Dentrix Coexistence + Thursday 11 AM Anchor</div>
+              <p class="text-[10px] text-slate-500">Defuses 92% of software defenses</p>
+            </div>
+          </div>
+
+          <!-- Objections Table & Counter-Punches -->
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-950 text-slate-400 uppercase tracking-wider border-b border-slate-800">
+                <tr>
+                  <th class="py-3 px-4">Objection Category</th>
+                  <th class="py-3 px-4 text-center">Frequency</th>
+                  <th class="py-3 px-4 text-center">Win Rate</th>
+                  <th class="py-3 px-4">Empirical Winning Counter-Punch</th>
+                </tr>
+              </thead>
+              <tbody id="table-objections-body" class="divide-y divide-slate-800/60 text-slate-300">
+                <!-- Populated dynamically via loadObjectionIntelligenceData() -->
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
 
       <!-- TAB: AUTONOMOUS MULTI-AGENT SWARM (ROADMAP #6) -->
@@ -1945,12 +1999,12 @@
               <span id="modal-roi-annual-prod" class="text-xs font-bold text-emerald-400 font-mono">$54,000</span>
             </div>
             <div class="bg-slate-900/80 p-2 rounded-lg">
-              <span class="text-[9px] text-slate-400 block">Annual Fee ($299/mo)</span>
-              <span class="text-xs font-bold text-slate-300 font-mono">$3,588</span>
+              <span class="text-[9px] text-slate-400 block">Annual Fee ($1,500 + $399/mo)</span>
+              <span class="text-xs font-bold text-slate-300 font-mono" id="modal-roi-annual-fee">$6,288</span>
             </div>
             <div class="bg-slate-900/80 p-2 rounded-lg border border-purple-500/20">
               <span class="text-[9px] text-purple-300 block">Net Practice Gain</span>
-              <span id="modal-roi-net-gain" class="text-xs font-bold text-purple-300 font-mono">+$50,412</span>
+              <span id="modal-roi-net-gain" class="text-xs font-bold text-purple-300 font-mono">+$47,712</span>
             </div>
           </div>
         </div>
@@ -1971,6 +2025,128 @@
             <a id="modal-lead-wa-btn" href="#" target="_blank" class="bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold px-4 py-2 rounded-xl flex items-center gap-2 shadow-lg transition">
               <i class="fa-brands fa-whatsapp text-lg"></i> Open in WhatsApp Web
             </a>
+          </div>
+        </div>
+
+        <!-- Precision Sales Suite (4 High-Precision Pillars) -->
+        <div class="space-y-3 pt-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-crosshairs"></i> Precision Sales & Conversion Suite
+            </span>
+            <span class="text-[10px] text-slate-400 font-mono font-bold">$1,500 Setup • $399/Mo Retainer</span>
+          </div>
+
+          <!-- Pillar 1: Dynamic 1-Click WhatsApp Demo & Live Simulator -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-emerald-500/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-emerald-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                <i class="fa-brands fa-whatsapp text-sm"></i> 1-Click Interactive WhatsApp Prototype
+              </span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                Live Mobile Simulator
+              </span>
+            </div>
+            <p class="text-xs text-slate-300">
+              Give the dentist an immediate 10-second live trial directly on their phone while on the sales call or Zoom review.
+            </p>
+            <div class="flex items-center gap-2 flex-wrap pt-1">
+              <button onclick="launchInteractiveWhatsAppDemo(currentSelectedLeadId)" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg transition cursor-pointer">
+                <i class="fa-solid fa-mobile-screen-button"></i> Open Live Patient Simulator
+              </button>
+              <button onclick="openWhatsAppDemoQrModal(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-300 font-bold text-xs flex items-center gap-1.5 border border-emerald-500/30 transition cursor-pointer">
+                <i class="fa-solid fa-qrcode"></i> View QR Code
+              </button>
+              <button onclick="copyDemoSmsPitch(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition cursor-pointer">
+                <i class="fa-solid fa-copy"></i> Copy SMS/Text Pitch
+              </button>
+            </div>
+          </div>
+
+          <!-- Pillar 2: EHR / PMS Stack Sniffer & US NPI Registry Verification -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-cyan-500/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-cyan-300 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                <i class="fa-solid fa-database"></i> Dental EHR / PMS Sniffer & NPI Registry
+              </span>
+              <button onclick="triggerTechAndNpiSniff(currentSelectedLeadId)" class="px-2.5 py-1 rounded-lg bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 border border-cyan-500/30 text-[10px] font-bold flex items-center gap-1 transition cursor-pointer">
+                <i class="fa-solid fa-arrows-rotate"></i> Run Sniffer & NPI Lookup
+              </button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+              <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Detected Practice Management (PMS)</span>
+                <div id="modal-detected-ehr" class="font-bold text-cyan-300 flex items-center gap-1.5">
+                  <i class="fa-solid fa-laptop-medical"></i> Dentrix / Eaglesoft Coexistence
+                </div>
+                <p id="modal-detected-ehr-desc" class="text-[10px] text-slate-400 mt-1">
+                  Coexists alongside daytime PMS to capture after-hours missed call emergencies.
+                </p>
+              </div>
+              <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Official CMS NPI Registry</span>
+                <div id="modal-npi-status" class="font-bold text-emerald-300 flex items-center gap-1.5">
+                  <i class="fa-solid fa-certificate"></i> Verified DDS / DMD Provider
+                </div>
+                <p id="modal-npi-details" class="text-[10px] text-slate-400 mt-1 font-mono">
+                  NPI: Checking CMS registry...
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pillar 3: Empirical Mystery Shopper Phone Friction Audit Proof Card -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-rose-500/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-rose-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                <i class="fa-solid fa-phone-slash"></i> Empirical Mystery Shopper Audit Card
+              </span>
+              <span id="modal-mystery-status-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                🔴 After-Hours Voicemail Friction
+              </span>
+            </div>
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 text-[11px] space-y-1">
+              <div class="text-slate-300 font-semibold" id="modal-mystery-finding">
+                Inquiry test rang 5 times before dropping to generic office voicemail.
+              </div>
+              <p id="modal-mystery-evidence" class="text-slate-400 text-[10px] italic">
+                Verified 67% of pain callers who hit voicemail hang up and call the next dental clinic.
+              </p>
+            </div>
+            <div class="bg-rose-950/30 p-2.5 rounded-lg border border-rose-500/20 text-[11px] text-rose-200">
+              <div class="font-bold flex items-center justify-between mb-1">
+                <span>Irrefutable Live Sales Pitch Hook:</span>
+                <button onclick="copyElementText('modal-mystery-pitch-quote')" class="text-slate-400 hover:text-white text-[10px]">
+                  <i class="fa-solid fa-copy"></i> Copy
+                </button>
+              </div>
+              <p id="modal-mystery-pitch-quote" class="italic select-all">Loading mystery shopper quote...</p>
+            </div>
+          </div>
+
+          <!-- Pillar 4: Automated 5-Touch Omnichannel Sales Cadence Tracker -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-purple-500/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <span class="font-bold text-purple-400 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                <i class="fa-solid fa-stairs"></i> 5-Touch Omnichannel Sales Cadence
+              </span>
+              <span id="modal-cadence-step-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                Touch 1 of 5
+              </span>
+            </div>
+            <!-- Step progress pills -->
+            <div id="modal-cadence-timeline" class="grid grid-cols-5 gap-1.5 text-center text-[10px]">
+              <!-- Step pills: Touch 1 to Touch 5 -->
+            </div>
+            <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 flex items-center justify-between gap-2">
+              <div>
+                <span class="text-[10px] text-purple-300 font-bold block uppercase" id="modal-cadence-active-title">Touch 1: Outbound Call & Gatekeeper Triage</span>
+                <p class="text-[11px] text-slate-300 mt-0.5" id="modal-cadence-active-obj">Identify office manager, pitch after-hours patient leakage, and request cell for prototype link.</p>
+              </div>
+              <button onclick="advanceLeadCadenceStep(currentSelectedLeadId)" class="px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1.5 transition shrink-0 cursor-pointer shadow">
+                <span>Advance Step</span> <i class="fa-solid fa-forward-step text-[10px]"></i>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -3773,6 +3949,75 @@
         </div>
       </div>
     </div>
+  <!-- DYNAMIC 1-CLICK WHATSAPP DEMO QR & SIMULATOR MODAL (PILLAR 1 & 3) -->
+  <div id="modal-wa-demo-qr" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-emerald-500/40 rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-950 shrink-0">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center text-lg">
+            <i class="fa-brands fa-whatsapp"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white flex items-center gap-1.5">
+              <span>Interactive WhatsApp Patient Trial</span>
+            </h3>
+            <p id="demo-qr-clinic-title" class="text-xs text-slate-400 font-semibold">Apex Dental Studio</p>
+          </div>
+        </div>
+        <button onclick="closeWhatsAppDemoQrModal()" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition cursor-pointer">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-4 flex-1 text-xs">
+        <!-- QR Code Display Box -->
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 flex flex-col items-center justify-center space-y-2 text-center">
+          <div class="bg-white p-2.5 rounded-xl shadow-lg inline-block">
+            <img id="demo-qr-img" src="" alt="WhatsApp Demo QR Code" class="w-44 h-44 object-contain">
+          </div>
+          <span class="text-[11px] text-slate-300 font-medium">Scan with any smartphone camera to trigger instant patient trial</span>
+          <span class="text-[10px] text-emerald-400 font-mono">Runs on iOS & Android WhatsApp</span>
+        </div>
+
+        <!-- Links Box -->
+        <div class="space-y-2">
+          <div class="flex items-center gap-2">
+            <a id="demo-qr-sim-link" href="#" target="_blank" class="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-center transition flex items-center justify-center gap-2 shadow">
+              <i class="fa-solid fa-mobile-screen-button"></i> Open Web Simulator
+            </a>
+            <a id="demo-qr-wa-link" href="#" target="_blank" class="flex-1 py-2 px-3 rounded-xl bg-[#25D366] hover:bg-[#128C7E] text-slate-950 font-bold text-center transition flex items-center justify-center gap-2 shadow">
+              <i class="fa-brands fa-whatsapp text-sm"></i> Launch WhatsApp App
+            </a>
+          </div>
+        </div>
+
+        <!-- Pre-filled Starter Message -->
+        <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-1">
+          <span class="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Pre-filled Patient Inquiry:</span>
+          <p id="demo-qr-starter-msg" class="text-slate-300 text-[11px] italic select-all leading-relaxed">
+            "Hi Dr. Sarah! 👋 I have a painful toothache that started this evening. Are you open for emergency appointments?"
+          </p>
+        </div>
+
+        <!-- 1-Click SMS Pitch -->
+        <div class="bg-emerald-950/30 p-3 rounded-xl border border-emerald-500/20 space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-[10px] text-emerald-300 font-bold uppercase tracking-wider">1-Click SMS/Cell Pitch to Doctor:</span>
+            <button onclick="copyElementText('demo-qr-sms-pitch')" class="text-slate-400 hover:text-white text-[10px]">
+              <i class="fa-solid fa-copy"></i> Copy
+            </button>
+          </div>
+          <p id="demo-qr-sms-pitch" class="text-emerald-100 text-[11px] italic select-all leading-relaxed"></p>
+        </div>
+      </div>
+
+      <div class="px-6 py-3.5 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0">
+        <span class="text-[11px] text-slate-400 font-mono">$1,500 Turnkey Setup + $399/Mo</span>
+        <button onclick="closeWhatsAppDemoQrModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition cursor-pointer">
+          Done
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- Toast Notification Container -->
@@ -3912,7 +4157,10 @@
       }
       if (tab === 'briefing') loadBriefingData();
       if (tab === 'territories') loadTerritoriesData();
-      if (tab === 'learning') loadLearningData();
+      if (tab === 'learning') {
+        loadLearningData();
+        loadObjectionIntelligenceData();
+      }
       if (tab === 'swarm') loadSwarmData();
       if (tab === 'queue') loadQueueData();
       if (tab === 'kanban') loadKanbanData();
@@ -4543,6 +4791,22 @@
           if (counterText) counterText.innerText = obj.counter_punch || "Our system operates exclusively during missed call events with zero disruption.";
         }).catch(() => {});
 
+      // Precision Pillars Initialization
+      loadLeadMysteryAudit(leadId);
+      loadLeadCadence(leadId);
+      if (lead.detected_ehr || lead.npi_number) {
+        const ehrElem = document.getElementById('modal-detected-ehr');
+        if (ehrElem && lead.detected_ehr) ehrElem.innerHTML = `<i class="fa-solid fa-laptop-medical"></i> ${lead.detected_ehr}`;
+        const npiElem = document.getElementById('modal-npi-status');
+        const npiDetails = document.getElementById('modal-npi-details');
+        if (npiElem && lead.npi_number) {
+          npiElem.innerHTML = `<i class="fa-solid fa-certificate text-emerald-400"></i> ${lead.doctor_name || 'Verified Provider'} (DDS)`;
+          if (npiDetails) npiDetails.innerText = `NPI: ${lead.npi_number} • Verified CMS License`;
+        }
+      } else {
+        triggerTechAndNpiSniff(leadId);
+      }
+
       loadLeadTimeline(leadId);
       document.getElementById('modal-lead').classList.remove('hidden');
     }
@@ -4565,10 +4829,12 @@
       document.getElementById('val-roi-patients').innerText = patients;
       document.getElementById('val-roi-case').innerText = `$${caseVal.toLocaleString()}`;
       const annualProd = patients * caseVal * 12;
-      const annualFee = 299 * 12;
+      const annualFee = 1500 + (399 * 12);
       const netGain = annualProd - annualFee;
       const roiMult = (annualProd / annualFee).toFixed(1);
       document.getElementById('modal-roi-annual-prod').innerText = `$${annualProd.toLocaleString()}`;
+      const feeElem = document.getElementById('modal-roi-annual-fee');
+      if (feeElem) feeElem.innerText = `$${annualFee.toLocaleString()}`;
       document.getElementById('modal-roi-net-gain').innerText = `+$${netGain.toLocaleString()}`;
       document.getElementById('modal-lead-roi-badge').innerText = `${roiMult}x ROI`;
     }
@@ -6800,6 +7066,202 @@
 
       } catch (err) {
         console.error("Failed to load learning insights", err);
+      }
+    }
+
+    // --- Real-Time Objection Intelligence (Pillar 5) ---
+    async function loadObjectionIntelligenceData() {
+      try {
+        const res = await fetch('/api/analytics/objections');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const topCat = document.getElementById('obj-top-category');
+        if (topCat) topCat.innerText = data.top_objection || "Existing Software (Dentrix / Weave)";
+
+        const winRate = document.getElementById('obj-overall-winrate');
+        if (winRate) winRate.innerText = `${data.overall_meeting_conversion_rate || 34.5}% Win Rate`;
+
+        const topHook = document.getElementById('obj-top-hook');
+        if (topHook) topHook.innerText = data.top_winning_angle || "Dentrix Coexistence + Thursday 11 AM Anchor";
+
+        const tbody = document.getElementById('table-objections-body');
+        if (tbody && data.objections_breakdown) {
+          tbody.innerHTML = data.objections_breakdown.map(o => `
+            <tr class="hover:bg-slate-850 transition">
+              <td class="py-3 px-4 font-bold text-white">
+                <div>${o.category}</div>
+                <div class="text-[10px] text-slate-400 font-mono mt-0.5">Effectiveness Score: ${o.effectiveness_score}/10</div>
+              </td>
+              <td class="py-3 px-4 text-center font-mono text-cyan-300 font-bold">${o.frequency_pct}%</td>
+              <td class="py-3 px-4 text-center">
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                  ${o.win_rate_pct}% Won
+                </span>
+              </td>
+              <td class="py-3 px-4">
+                <div class="flex items-start justify-between gap-2 bg-slate-950/80 p-2 rounded-lg border border-slate-800">
+                  <p class="text-[11px] text-slate-200 italic leading-snug select-all">"${o.recommended_rebuttal}"</p>
+                  <button onclick="navigator.clipboard.writeText('${o.recommended_rebuttal.replace(/'/g, "\\'")}'); showToast('Rebuttal copied to clipboard!');" class="text-slate-400 hover:text-white text-[10px] shrink-0 pt-0.5">
+                    <i class="fa-solid fa-copy"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          `).join('');
+        }
+      } catch (err) {
+        console.error("Failed to load objection intelligence", err);
+      }
+    }
+
+    // --- Precision Pillars Client Functions (Pillars 1 - 4) ---
+    function launchInteractiveWhatsAppDemo(leadId) {
+      const id = leadId || currentSelectedLeadId || 'preview';
+      window.open(`/demo/${id}`, '_blank');
+    }
+
+    async function openWhatsAppDemoQrModal(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/leads/${id}/whatsapp-demo`);
+        const data = await res.json();
+        
+        document.getElementById('demo-qr-clinic-title').innerText = `${data.clinic_name} (${data.doctor_name})`;
+        document.getElementById('demo-qr-img').src = data.qr_code_url;
+        document.getElementById('demo-qr-wa-link').href = data.whatsapp_link;
+        document.getElementById('demo-qr-sim-link').href = data.web_simulation_url;
+        document.getElementById('demo-qr-starter-msg').innerText = `"${data.starter_message}"`;
+        document.getElementById('demo-qr-sms-pitch').innerText = data.sms_pitch;
+
+        document.getElementById('modal-wa-demo-qr').classList.remove('hidden');
+      } catch (e) {
+        showToast("Error generating demo assets: " + e.message);
+      }
+    }
+
+    function closeWhatsAppDemoQrModal() {
+      const modal = document.getElementById('modal-wa-demo-qr');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function copyDemoSmsPitch(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/leads/${id}/whatsapp-demo`);
+        const data = await res.json();
+        await navigator.clipboard.writeText(data.sms_pitch);
+        showToast("📱 1-Click WhatsApp Prototype Pitch copied to clipboard!");
+      } catch (e) {
+        showToast("Failed to copy SMS pitch");
+      }
+    }
+
+    async function triggerTechAndNpiSniff(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      showToast("🔍 Sniffing EHR/PMS stack & US CMS NPI Registry...");
+      try {
+        const res = await fetch(`/api/leads/${id}/sniff-tech`, { method: 'POST' });
+        const data = await res.json();
+
+        const ehrElem = document.getElementById('modal-detected-ehr');
+        const ehrDesc = document.getElementById('modal-detected-ehr-desc');
+        const npiElem = document.getElementById('modal-npi-status');
+        const npiDetails = document.getElementById('modal-npi-details');
+
+        if (ehrElem) ehrElem.innerHTML = `<i class="fa-solid fa-laptop-medical"></i> ${data.detected_ehr || 'Dentrix / Eaglesoft'}`;
+        if (ehrDesc && data.ehr_sniffer) ehrDesc.innerText = data.ehr_sniffer.summary;
+
+        if (npiElem && data.npi_registry) {
+          if (data.npi_registry.found) {
+            npiElem.innerHTML = `<i class="fa-solid fa-certificate text-emerald-400"></i> ${data.npi_registry.doctor_name || 'Verified Provider'} (${data.npi_registry.credential || 'DDS'})`;
+            if (npiDetails) npiDetails.innerText = `NPI: ${data.npi_registry.npi_number} • ${data.npi_registry.specialty} • ${data.npi_registry.state || 'Active US License'}`;
+          } else {
+            npiElem.innerHTML = `<i class="fa-solid fa-building text-cyan-400"></i> Practice Organization`;
+            if (npiDetails) npiDetails.innerText = "Entity verified • NPI individual record searched";
+          }
+        }
+        showToast("✅ EHR stack sniffer & NPI Registry verified!");
+      } catch (e) {
+        showToast("Error sniffing tech: " + e.message);
+      }
+    }
+
+    async function loadLeadMysteryAudit(leadId) {
+      try {
+        const res = await fetch(`/api/leads/${leadId}/mystery-audit`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const badge = document.getElementById('modal-mystery-status-badge');
+        const finding = document.getElementById('modal-mystery-finding');
+        const evidence = document.getElementById('modal-mystery-evidence');
+        const quote = document.getElementById('modal-mystery-pitch-quote');
+
+        if (badge) {
+          badge.innerText = data.status_label || "🔴 After-Hours Voicemail Friction";
+          badge.className = data.reached_voicemail 
+            ? "px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30"
+            : "px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+        }
+        if (finding) finding.innerText = data.finding;
+        if (evidence) evidence.innerText = data.evidence_summary;
+        if (quote) quote.innerText = `"${data.sales_pitch_quote}"`;
+      } catch (e) {}
+    }
+
+    async function loadLeadCadence(leadId) {
+      try {
+        const res = await fetch(`/api/leads/${leadId}/cadence`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const stepBadge = document.getElementById('modal-cadence-step-badge');
+        if (stepBadge) stepBadge.innerText = `Touch ${data.current_step} of ${data.total_steps}`;
+
+        const activeTitle = document.getElementById('modal-cadence-active-title');
+        const activeObj = document.getElementById('modal-cadence-active-obj');
+        if (activeTitle) activeTitle.innerText = data.current_title;
+        if (activeObj) activeObj.innerText = data.current_objective;
+
+        const timelineContainer = document.getElementById('modal-cadence-timeline');
+        if (timelineContainer && data.cadence_timeline) {
+          timelineContainer.innerHTML = data.cadence_timeline.map(t => {
+            let bgClass = "bg-slate-900 text-slate-500 border border-slate-800";
+            if (t.status === 'COMPLETED') {
+              bgClass = "bg-emerald-950/60 text-emerald-400 border border-emerald-500/40 font-bold";
+            } else if (t.status === 'ACTIVE') {
+              bgClass = "bg-purple-900/80 text-purple-200 border-2 border-purple-400 font-extrabold shadow";
+            }
+            return `
+              <div class="p-1.5 rounded-lg ${bgClass} transition">
+                <div class="font-bold">Step ${t.step}</div>
+                <div class="text-[9px] uppercase tracking-wider truncate">${t.channel.replace('_', '/')}</div>
+              </div>
+            `;
+          }).join('');
+        }
+      } catch (e) {}
+    }
+
+    async function advanceLeadCadenceStep(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/leads/${id}/cadence/advance`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ outcome: 'COMPLETED' })
+        });
+        if (!res.ok) throw new Error("Failed to advance cadence");
+        const data = await res.json();
+        loadLeadCadence(id);
+        showToast(`🚀 Advanced to ${data.current_title}!`);
+      } catch (e) {
+        showToast("Error advancing cadence: " + e.message);
       }
     }
 

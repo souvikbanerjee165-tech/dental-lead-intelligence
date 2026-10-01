@@ -315,6 +315,20 @@ class DatabaseManager:
                 cursor.execute("ALTER TABLE leads ADD COLUMN gatekeeper_notes TEXT;")
             if "best_call_time" not in existing_lead_cols:
                 cursor.execute("ALTER TABLE leads ADD COLUMN best_call_time TEXT;")
+            if "detected_ehr" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN detected_ehr TEXT;")
+            if "npi_number" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN npi_number TEXT;")
+            if "npi_data" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN npi_data TEXT;")
+            if "cadence_step" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN cadence_step INTEGER DEFAULT 1;")
+            if "cadence_status" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN cadence_status TEXT DEFAULT 'ACTIVE';")
+            if "cadence_updated_at" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN cadence_updated_at TEXT;")
+            if "mystery_audit_json" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN mystery_audit_json TEXT;")
 
             cursor.execute("PRAGMA table_info(audits);")
             existing_audit_cols = {row["name"] for row in cursor.fetchall()}
@@ -1317,6 +1331,18 @@ class DatabaseManager:
         else:
             d["win_probability_pct"] = int(d["win_probability_pct"])
 
+        # Decode npi_data and mystery_audit_json if present
+        if "npi_data" in d and isinstance(d["npi_data"], str) and d["npi_data"]:
+            try:
+                d["npi_data"] = json.loads(d["npi_data"])
+            except Exception:
+                pass
+        if "mystery_audit_json" in d and isinstance(d["mystery_audit_json"], str) and d["mystery_audit_json"]:
+            try:
+                d["mystery_audit_json"] = json.loads(d["mystery_audit_json"])
+            except Exception:
+                pass
+
         return d
 
     def get_lead(self, lead_id: str) -> Optional[Dict[str, Any]]:
@@ -1498,6 +1524,57 @@ class DatabaseManager:
 
             conn.commit()
             return True
+
+    def update_lead_ehr_and_npi(
+        self,
+        lead_id: str,
+        detected_ehr: Optional[str] = None,
+        npi_number: Optional[str] = None,
+        npi_data: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Updates detected EHR / PMS and NPI verified provider data for a lead."""
+        now_str = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            updates = ["last_updated = ?"]
+            params: List[Any] = [now_str]
+            if detected_ehr is not None:
+                updates.append("detected_ehr = ?")
+                params.append(detected_ehr)
+            if npi_number is not None:
+                updates.append("npi_number = ?")
+                params.append(npi_number)
+            if npi_data is not None:
+                updates.append("npi_data = ?")
+                params.append(json.dumps(npi_data) if isinstance(npi_data, (dict, list)) else str(npi_data))
+            params.append(lead_id)
+            cursor.execute(f"UPDATE leads SET {', '.join(updates)} WHERE id = ?", tuple(params))
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def update_lead_cadence(self, lead_id: str, step: int, status: str = "ACTIVE") -> bool:
+        """Updates lead's 5-touch omnichannel sales cadence state."""
+        now_str = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE leads SET cadence_step = ?, cadence_status = ?, cadence_updated_at = ?, last_updated = ? WHERE id = ?",
+                (step, status, now_str, now_str, lead_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+
+    def update_lead_mystery_audit(self, lead_id: str, audit_data: Dict[str, Any]) -> bool:
+        """Stores empirical mystery shopper audit proof card for a lead."""
+        now_str = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "UPDATE leads SET mystery_audit_json = ?, last_updated = ? WHERE id = ?",
+                (json.dumps(audit_data), now_str, lead_id)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
 
     def add_lead_note(self, lead_id: str, note_text: str, author: str = "Sales Rep") -> int:
         now_str = datetime.now().isoformat()

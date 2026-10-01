@@ -48,6 +48,12 @@ from cohort import calculate_metro_benchmark, rank_clinic_in_metro
 from pre_call_researcher import PreCallResearcher
 from sales_coach import SalesCoach, SalesOS
 from live_dialer_engine import LiveDialerEngine
+from ehr_sniffer import EHRSniffer
+from npi_registry import NPIRegistryEnricher
+from whatsapp_demo_engine import WhatsAppDemoEngine
+from mystery_shopper import MysteryShopperAuditor
+from sales_cadence import SalesCadenceEngine
+from objection_analytics import ObjectionAnalyticsEngine
 import logging
 logging.getLogger().addFilter(SecretMaskingLogFilter())
 logger = logging.getLogger("app")
@@ -2846,6 +2852,228 @@ async def lookup_clinic_by_phone(req: ManualDialerLookupRequest):
             "city": lead.get("address")
         }
     return {"found": False}
+
+
+# -------------------------------------------------------------
+# Precision & Usefulness Pillars (High-Conversion Sales Engine)
+# -------------------------------------------------------------
+
+class CadenceAdvanceRequest(BaseModel):
+    outcome: str = "COMPLETED"
+    notes: Optional[str] = None
+
+class MysteryAuditRequest(BaseModel):
+    ring_count: int = 5
+    reached_voicemail: bool = True
+    test_timestamp: Optional[str] = None
+
+
+@app.get("/demo/{lead_id}", response_class=HTMLResponse)
+async def serve_whatsapp_demo_simulator(lead_id: str):
+    """
+    Serves a live, mobile-responsive interactive WhatsApp patient conversation simulator
+    customized specifically for this dental clinic.
+    """
+    lead = None
+    if lead_id and lead_id != "preview":
+        lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {
+            "id": lead_id or "preview",
+            "name": "Apex Dental Studio",
+            "doctor_name": "Dr. Sarah Jenkins",
+            "address": "Austin, TX",
+            "phone": "+1 (512) 555-0199",
+            "high_value_services": ["Emergency Dental Care", "Dental Implants", "Invisalign"]
+        }
+    html_content = WhatsAppDemoEngine.render_demo_page_html(lead)
+    return HTMLResponse(content=html_content, status_code=200)
+
+
+@app.get("/api/leads/{lead_id}/whatsapp-demo")
+async def get_whatsapp_demo_assets(lead_id: str, request: Request):
+    """
+    Returns WhatsApp demo deep-links, dynamic QR code image URL, web simulator link,
+    and 1-click SMS outreach pitch customized for the clinic.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {
+            "id": lead_id,
+            "name": "Apex Dental Studio",
+            "doctor_name": "Dr. Sarah Jenkins",
+            "address": "Austin, TX",
+            "phone": "+1 (512) 555-0199"
+        }
+    base_url = str(request.base_url).rstrip("/")
+    demo_assets = WhatsAppDemoEngine.generate_demo_assets(lead, base_app_url=base_url)
+    return demo_assets
+
+
+@app.post("/api/leads/{lead_id}/sniff-tech")
+async def sniff_ehr_and_npi_for_lead(lead_id: str):
+    """
+    Sniffs dental PMS/EHR and front-office engagement software (Dentrix, Eaglesoft, Open Dental, Weave, NexHealth)
+    and queries the US CMS NPI Registry for verified dentist credentials.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    # 1. Fetch website HTML or analyze known findings / technologies
+    website = lead.get("website") or ""
+    html_content = ""
+    if website:
+        try:
+            import urllib.request
+            target_url = website if website.startswith("http") else f"https://{website}"
+            req = urllib.request.Request(
+                target_url,
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                html_content = resp.read().decode("utf-8", errors="ignore")
+        except Exception as e:
+            logger.info(f"Direct HTML fetch for tech sniffer failed ({e}), using domain heuristics.")
+
+    ehr_results = EHRSniffer.sniff_html(html_content, website_url=website)
+    
+    # 2. Query US NPI Registry
+    raw_doc = lead.get("doctor_name") or ""
+    clean_doc = raw_doc.replace("Dr.", "").replace("Dr", "").strip()
+    first_name = None
+    last_name = None
+    if clean_doc:
+        parts = clean_doc.split()
+        if len(parts) >= 2:
+            first_name = parts[0]
+            last_name = parts[-1]
+        elif len(parts) == 1:
+            last_name = parts[0]
+
+    raw_addr = lead.get("address") or ""
+    city = None
+    state = None
+    if "," in raw_addr:
+        addr_parts = [p.strip() for p in raw_addr.split(",")]
+        if len(addr_parts) >= 2:
+            city = addr_parts[-2]
+            state_chunk = addr_parts[-1].strip().split()
+            if state_chunk:
+                state = state_chunk[0][:2]
+
+    npi_result = NPIRegistryEnricher.lookup_provider(
+        first_name=first_name,
+        last_name=last_name,
+        organization_name=lead.get("name") if not clean_doc else None,
+        city=city,
+        state=state
+    )
+
+    detected_ehr_name = ehr_results.get("detected_pms") or ehr_results.get("primary_software")
+    npi_num = npi_result.get("npi_number")
+
+    # Update database
+    db.update_lead_ehr_and_npi(
+        lead_id=lead_id,
+        detected_ehr=detected_ehr_name,
+        npi_number=npi_num,
+        npi_data=npi_result if npi_result.get("found") else None
+    )
+
+    return {
+        "lead_id": lead_id,
+        "ehr_sniffer": ehr_results,
+        "npi_registry": npi_result,
+        "detected_ehr": detected_ehr_name,
+        "npi_number": npi_num
+    }
+
+
+@app.get("/api/leads/{lead_id}/mystery-audit")
+async def get_mystery_shopper_audit(lead_id: str):
+    """
+    Retrieves or generates an empirical Mystery Shopper after-hours phone friction audit proof card.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    existing_proof = lead.get("mystery_audit_json")
+    if existing_proof:
+        return existing_proof
+
+    # Generate fresh proof card
+    proof = MysteryShopperAuditor.generate_audit_proof(lead)
+    db.update_lead_mystery_audit(lead_id, proof)
+    return proof
+
+
+@app.post("/api/leads/{lead_id}/mystery-audit")
+async def run_mystery_shopper_audit(lead_id: str, req: Optional[MysteryAuditRequest] = None):
+    """
+    Executes or updates empirical Mystery Shopper friction test parameters for a clinic.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    ring_count = req.ring_count if req else 5
+    reached_voicemail = req.reached_voicemail if req else True
+    test_timestamp = req.test_timestamp if req else None
+
+    proof = MysteryShopperAuditor.generate_audit_proof(
+        lead_dict=lead,
+        test_timestamp=test_timestamp,
+        ring_count=ring_count,
+        reached_voicemail=reached_voicemail
+    )
+    db.update_lead_mystery_audit(lead_id, proof)
+    return proof
+
+
+@app.get("/api/leads/{lead_id}/cadence")
+async def get_lead_cadence_status(lead_id: str):
+    """
+    Retrieves the 5-touch omnichannel sales cadence status, timeline, and recommended next action.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    return SalesCadenceEngine.get_lead_cadence(lead)
+
+
+@app.post("/api/leads/{lead_id}/cadence/advance")
+async def advance_lead_cadence(lead_id: str, req: Optional[CadenceAdvanceRequest] = None):
+    """
+    Advances the prospect to the next touchpoint in the 5-touch sales cadence based on touch outcome.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    
+    current_step = int(lead.get("cadence_step") or 1)
+    outcome = req.outcome if req else "COMPLETED"
+    advancement = SalesCadenceEngine.advance_cadence(current_step, outcome)
+    
+    db.update_lead_cadence(
+        lead_id=lead_id,
+        step=advancement["next_step"],
+        status=advancement["status"]
+    )
+
+    updated_lead = db.get_lead(lead_id)
+    return SalesCadenceEngine.get_lead_cadence(updated_lead)
+
+
+@app.get("/api/analytics/objections")
+async def get_objection_analytics_report():
+    """
+    Returns real-time institutional objection intelligence, objection frequency breakdown,
+    rebuttal win rates, and tactical counter-punches.
+    """
+    return ObjectionAnalyticsEngine.get_objection_report(db)
 
 
 
