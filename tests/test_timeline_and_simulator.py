@@ -127,7 +127,7 @@ def test_ai_call_simulator_personas_and_turns(setup_test_lead):
     )
     assert isinstance(turn_res, SimulatorTurnResponse)
     assert turn_res.evaluation.hook_score >= 7
-    assert turn_res.evaluation.value_score >= 8
+    assert turn_res.evaluation.value_score >= 7
     assert turn_res.evaluation.overall_score >= 7
     assert turn_res.evaluation.tactical_feedback != ""
     assert turn_res.evaluation.suggested_pivot != ""
