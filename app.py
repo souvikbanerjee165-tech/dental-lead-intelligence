@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
@@ -1215,6 +1215,37 @@ async def simulate_call_turn(lead_id: str, req: CallSimulationTurnRequest):
 async def get_voice_carrier_status():
     """Returns telecommunications status (Telnyx vs Sandbox mode, estimated costs, API readiness)."""
     return VoiceDialerEngine.get_carrier_status()
+
+@app.get("/api/voice/providers/health")
+async def get_voice_providers_health():
+    """Returns multi-project Gemini circuit breakers, OpenAI status, and error telemetry."""
+    from llm_router import LLMRouter
+    return LLMRouter.get_provider_status()
+
+@app.get("/api/voice/benchmark/summary")
+async def get_voice_benchmark_summary():
+    """Returns cost-per-qualified-demo and conversion analytics across all tested voice models."""
+    return db.get_model_performance_summary()
+
+@app.post("/api/voice/benchmark/run")
+async def run_voice_model_benchmark_test(payload: Dict[str, Any] = Body(default={})):
+    """Runs automated A/B benchmark calls comparing Gemini Live, OpenAI, and Kokoro."""
+    from llm_router import VoiceModelBenchmark
+    total_calls = payload.get("total_calls", 10)
+    lead_id = payload.get("lead_id")
+    lead_dict = db.get_lead(lead_id) if lead_id else None
+    if not lead_dict:
+        lead_dict = {
+            "id": "bench_default_lead",
+            "name": "Benchmark Dental Group",
+            "doctor_name": "Dr. Miller",
+            "phone": "+15125550188"
+        }
+    return VoiceModelBenchmark.run_benchmark_cycle(
+        lead_dict=lead_dict,
+        total_calls=total_calls,
+        db=db
+    )
 
 @app.get("/api/voice/queue")
 async def get_voice_approval_queue(min_probability: int = 70, limit: int = 30):

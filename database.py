@@ -549,8 +549,28 @@ class DatabaseManager:
             );
             """)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_rec_phone ON call_recordings(phone_number);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_rec_lead ON call_recordings(lead_id);")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_call_rec_created ON call_recordings(created_at);")
+            # 27. Model Performance & Cost-Per-Qualified-Demo Telemetry
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS model_performance (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                call_id TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                model TEXT NOT NULL,
+                architecture TEXT NOT NULL DEFAULT 'NATIVE_LIVE',
+                call_duration_sec INTEGER DEFAULT 0,
+                tokens_used INTEGER DEFAULT 0,
+                latency_p50_ms INTEGER DEFAULT 0,
+                interruptions INTEGER DEFAULT 0,
+                objection_category TEXT,
+                demo_booked INTEGER DEFAULT 0,
+                state_errors INTEGER DEFAULT 0,
+                cost_estimate_usd REAL DEFAULT 0.0,
+                created_at TEXT NOT NULL
+            );
+            """)
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_model_perf_prov ON model_performance(provider);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_model_perf_booked ON model_performance(demo_booked);")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_model_perf_arch ON model_performance(architecture);")
 
             # Production Query Performance Indexes (v1.0 Hardening)
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_phone ON leads(phone);")
@@ -1946,6 +1966,103 @@ class DatabaseManager:
                     f"Top objection is front-desk bandwidth; best rebuttal is 5-second instant missed-call textback."
                 ]
             }
+
+    # --- Model Performance & Cost-Per-Qualified-Demo Benchmarking ---
+
+    def log_model_performance(
+        self,
+        call_id: str,
+        provider: str,
+        model: str,
+        architecture: str = "NATIVE_LIVE",
+        call_duration_sec: int = 0,
+        tokens_used: int = 0,
+        latency_p50_ms: int = 0,
+        interruptions: int = 0,
+        objection_category: Optional[str] = None,
+        demo_booked: bool = False,
+        state_errors: int = 0,
+        cost_estimate_usd: float = 0.0
+    ) -> int:
+        """Persists granular per-call benchmark metrics for comparative model ROI evaluation."""
+        now_str = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO model_performance (
+                call_id, provider, model, architecture, call_duration_sec,
+                tokens_used, latency_p50_ms, interruptions, objection_category,
+                demo_booked, state_errors, cost_estimate_usd, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                call_id, provider.upper(), model, architecture, call_duration_sec,
+                tokens_used, latency_p50_ms, interruptions, objection_category or "None",
+                1 if demo_booked else 0, state_errors, cost_estimate_usd, now_str
+            ))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_model_performance_summary(self) -> Dict[str, Any]:
+        """
+        Aggregates benchmark telemetry across providers to determine:
+        'Which model/architecture produces the lowest cost per qualified demo booked?'
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT 
+                provider,
+                model,
+                architecture,
+                COUNT(*) as total_calls,
+                SUM(demo_booked) as total_demos_booked,
+                AVG(call_duration_sec) as avg_duration_sec,
+                AVG(latency_p50_ms) as avg_latency_ms,
+                AVG(state_errors) as avg_state_errors,
+                SUM(cost_estimate_usd) as total_cost_usd,
+                SUM(tokens_used) as total_tokens
+            FROM model_performance
+            GROUP BY provider, model, architecture
+            ORDER BY total_demos_booked DESC, total_cost_usd ASC
+            """)
+            rows = cursor.fetchall()
+
+        summary_by_model = []
+        best_cost_per_demo = None
+        best_provider = None
+
+        for r in rows:
+            calls = r["total_calls"]
+            demos = r["total_demos_booked"] or 0
+            cost = r["total_cost_usd"] or 0.0
+            conv_rate = round((demos / calls * 100), 1) if calls > 0 else 0.0
+            cost_per_demo = round((cost / demos), 2) if demos > 0 else 0.0
+
+            item = {
+                "provider": r["provider"],
+                "model": r["model"],
+                "architecture": r["architecture"],
+                "total_calls": calls,
+                "demos_booked": demos,
+                "conversion_rate_pct": conv_rate,
+                "avg_duration_sec": round(r["avg_duration_sec"] or 0, 1),
+                "avg_latency_ms": int(r["avg_latency_ms"] or 0),
+                "avg_state_errors": round(r["avg_state_errors"] or 0, 2),
+                "total_cost_usd": round(cost, 4),
+                "cost_per_booked_demo_usd": cost_per_demo
+            }
+            summary_by_model.append(item)
+
+            if demos > 0 and (best_cost_per_demo is None or cost_per_demo < best_cost_per_demo):
+                best_cost_per_demo = cost_per_demo
+                best_provider = f"{r['provider']} ({r['model']})"
+
+        return {
+            "models": summary_by_model,
+            "best_value_provider": best_provider or "Insufficient benchmark calls",
+            "lowest_cost_per_demo_usd": best_cost_per_demo or 0.0,
+            "total_benchmark_calls_recorded": sum(m["total_calls"] for m in summary_by_model)
+        }
 
     def log_trigger_event(
         self,
