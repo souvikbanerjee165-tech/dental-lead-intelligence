@@ -329,6 +329,16 @@ class DatabaseManager:
                 cursor.execute("ALTER TABLE leads ADD COLUMN cadence_updated_at TEXT;")
             if "mystery_audit_json" not in existing_lead_cols:
                 cursor.execute("ALTER TABLE leads ADD COLUMN mystery_audit_json TEXT;")
+            if "territory_locked" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN territory_locked INTEGER DEFAULT 0;")
+            if "deposit_paid" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN deposit_paid REAL DEFAULT 0.0;")
+            if "deposit_paid_at" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN deposit_paid_at TEXT;")
+            if "last_pitch_viewed_at" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN last_pitch_viewed_at TEXT;")
+            if "pitch_view_count" not in existing_lead_cols:
+                cursor.execute("ALTER TABLE leads ADD COLUMN pitch_view_count INTEGER DEFAULT 0;")
 
             cursor.execute("PRAGMA table_info(audits);")
             existing_audit_cols = {row["name"] for row in cursor.fetchall()}

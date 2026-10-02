@@ -325,6 +325,32 @@
     <!-- Main Content Area -->
     <main class="flex-1 overflow-y-auto bg-slate-950 p-6">
 
+      <!-- LIVE PROSPECT RADAR INTERCEPT BANNER (WEAPON 1) -->
+      <div id="banner-live-radar-intercept" class="hidden mb-6 max-w-6xl mx-auto bg-gradient-to-r from-rose-950 via-slate-900 to-amber-950 border-2 border-rose-500 rounded-2xl p-4 shadow-2xl shadow-rose-950/50 flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse">
+        <div class="flex items-center gap-3.5">
+          <div class="w-12 h-12 rounded-xl bg-rose-500/20 text-rose-400 border border-rose-500/40 flex items-center justify-center text-xl shrink-0">
+            <i class="fa-solid fa-radar animate-spin"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded text-[10px] font-black bg-rose-500 text-white uppercase tracking-wider">🚨 Live Prospect On Proposal</span>
+              <span id="radar-viewer-time" class="text-xs font-mono text-amber-300">Active 12s ago</span>
+            </div>
+            <h4 id="radar-viewer-title" class="text-sm font-extrabold text-white mt-0.5">Dr. Marcus Vance at Barton Springs Dental is viewing their teardown portal right now!</h4>
+            <p id="radar-viewer-hook" class="text-xs text-rose-200/90 italic mt-0.5">"Hey Dr. Vance, I noticed you were just reviewing the after-hours breakdown..."</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5 w-full md:w-auto shrink-0">
+          <button onclick="interceptActiveViewerNow()" class="flex-1 md:flex-none px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/30 transition flex items-center justify-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-phone-flip text-sm"></i>
+            <span>⚡ Intercept Call Now (Speed-to-Lead)</span>
+          </button>
+          <button onclick="dismissRadarViewer()" class="px-3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs transition cursor-pointer" title="Dismiss Alert">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+      </div>
+
       <!-- TAB 1: LEAD FINDER -->
       <section id="view-finder" class="space-y-6 max-w-6xl mx-auto">
         <!-- Search Controls Card -->
@@ -2243,6 +2269,87 @@
                 <button onclick="copySMSDispatchText(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition cursor-pointer">
                   <i class="fa-solid fa-copy"></i> Copy Text
                 </button>
+              </div>
+            </div>
+
+            <!-- Weapon 6: Deposit Lock & 3-Mile Territory Exclusivity Checkout ($1,500 Setup) -->
+            <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/40 p-4 rounded-xl border border-emerald-500/50 space-y-2.5 shadow-lg">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-emerald-300 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-lock text-sm"></i> 3-Mile Territory Deposit Lock ($1,500 Setup)
+                </span>
+                <span id="modal-territory-status-badge" class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  Territory Available
+                </span>
+              </div>
+              <p class="text-xs text-slate-300">
+                Secures exclusive practice rights in a 3-mile radius. Guarantees zero local dental competitors can deploy this system. Automatically advances stage to <strong>WON</strong> and activates $399/mo maintenance.
+              </p>
+              <div class="flex items-center gap-2 flex-wrap pt-1">
+                <button onclick="lockLeadTerritoryDeposit(currentSelectedLeadId)" id="btn-modal-deposit-lock" class="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 hover:from-emerald-400 hover:to-teal-300 text-slate-950 font-black text-xs flex items-center gap-2 shadow-lg transition cursor-pointer">
+                  <i class="fa-solid fa-check-double"></i> <span>Lock Territory & Record $1,500 Deposit</span>
+                </button>
+                <button onclick="viewLeadSLA(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition cursor-pointer">
+                  <i class="fa-solid fa-file-contract text-emerald-400"></i> View Formal SLA Agreement
+                </button>
+              </div>
+            </div>
+
+            <!-- Weapon 7: AI Video Teardown Player & Loom Card -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-rose-500/40 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-rose-300 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-video text-sm"></i> 60-Second Video Teardown Player
+                </span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  Cinema Dark Landing Page
+                </span>
+              </div>
+              <p class="text-xs text-slate-300">
+                Presents the practice audit as a full-screen motion video with synchronized telecom ring tones, voicemail audio, and 1-click territory lock CTA.
+              </p>
+              <div class="flex items-center gap-2 flex-wrap pt-1">
+                <button onclick="openLeadVideoTeardown(currentSelectedLeadId)" class="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs flex items-center gap-2 shadow-md transition cursor-pointer">
+                  <i class="fa-solid fa-circle-play"></i> Open 60s Video Player
+                </button>
+                <button onclick="copyLeadVideoTeaser(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs flex items-center gap-1.5 border border-slate-700 transition cursor-pointer">
+                  <i class="fa-solid fa-copy"></i> Copy Video Link & Teaser
+                </button>
+              </div>
+            </div>
+
+            <!-- Weapon 8: Dormant Hygiene Chart Recall & Cash Injection Calculator -->
+            <div class="bg-slate-950 p-4 rounded-xl border border-indigo-500/40 space-y-2.5">
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-indigo-300 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                  <i class="fa-solid fa-tooth text-sm"></i> Dormant Hygiene Recall Calculator (Month 1 Proof)
+                </span>
+                <span id="modal-hygiene-roi-badge" class="px-2 py-0.5 rounded text-[10px] font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  18.2x Month 1 ROI
+                </span>
+              </div>
+              <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">Overdue Charts</span>
+                  <span id="modal-hygiene-charts" class="font-bold text-white font-mono text-xs">850 Pts</span>
+                </div>
+                <div class="bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                  <span class="text-[9px] text-slate-400 uppercase font-bold block">Trapped Value</span>
+                  <span id="modal-hygiene-trapped" class="font-bold text-slate-300 font-mono text-xs">$187,000</span>
+                </div>
+                <div class="bg-indigo-950/50 p-2 rounded-lg border border-indigo-500/30">
+                  <span class="text-[9px] text-indigo-300 uppercase font-bold block">Month 1 Cash</span>
+                  <span id="modal-hygiene-cash" class="font-black text-indigo-300 font-mono text-xs">+$27,500</span>
+                </div>
+              </div>
+              <div class="bg-indigo-950/30 p-2 rounded-lg border border-indigo-500/20 text-[11px] text-indigo-200">
+                <div class="font-bold flex items-center justify-between mb-0.5">
+                  <span>Irrefutable Cash Flow Pitch Hook:</span>
+                  <button onclick="copyElementText('modal-hygiene-pitch-quote')" class="text-slate-400 hover:text-white text-[10px]">
+                    <i class="fa-solid fa-copy"></i> Copy
+                  </button>
+                </div>
+                <p id="modal-hygiene-pitch-quote" class="italic select-all">Calculating dormant hygiene potential...</p>
               </div>
             </div>
           </div>
@@ -4943,6 +5050,8 @@
       loadLeadCadence(leadId);
       loadLeadCompetitorRadar(leadId);
       loadLeadVoicemailSting(leadId);
+      loadLeadHygieneRecall(leadId);
+      loadLeadTerritoryStatus(leadId);
       if (lead.detected_ehr || lead.npi_number) {
         const ehrElem = document.getElementById('modal-detected-ehr');
         if (ehrElem && lead.detected_ehr) ehrElem.innerHTML = `<i class="fa-solid fa-laptop-medical"></i> ${lead.detected_ehr}`;
@@ -7569,6 +7678,220 @@
       }
     }
 
+    // =========================================================================
+    // --- LETHAL SALES WEAPONS ENGINES ---
+    // =========================================================================
+
+    // --- Weapon 1: Live Prospect Radar Intercept System ---
+    let activeRadarLead = null;
+    let radarAudioCtx = null;
+    let radarAlertDismissedUntil = 0;
+
+    function playRadarAlertChime() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        if (!radarAudioCtx) {
+          radarAudioCtx = new AudioContext();
+        }
+        if (radarAudioCtx.state === 'suspended') {
+          radarAudioCtx.resume();
+        }
+        const osc = radarAudioCtx.createOscillator();
+        const gain = radarAudioCtx.createGain();
+        osc.type = 'sine';
+        
+        // Two-tone chime: 587Hz (D5) -> 880Hz (A5)
+        const now = radarAudioCtx.currentTime;
+        osc.frequency.setValueAtTime(587.33, now);
+        osc.frequency.setValueAtTime(880.0, now + 0.15);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.exponentialRampToValueAtTime(0.2, now + 0.05);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+
+        osc.connect(gain);
+        gain.connect(radarAudioCtx.destination);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      } catch (e) {
+        // Audio will activate after first user gesture
+      }
+    }
+
+    async function pollActiveRadarViewers() {
+      try {
+        const res = await fetch('/api/radar/active-viewers');
+        if (!res.ok) return;
+        const data = await res.json();
+        const viewers = data.active_viewers || [];
+        const banner = document.getElementById('banner-live-radar-intercept');
+        if (!banner) return;
+
+        if (viewers.length > 0) {
+          const top = viewers[0];
+          // If dismissed recently, don't re-show immediately
+          if (Date.now() < radarAlertDismissedUntil && activeRadarLead && activeRadarLead.id === top.id) {
+            return;
+          }
+
+          const isNewViewer = !activeRadarLead || activeRadarLead.id !== top.id;
+          activeRadarLead = top;
+
+          const timeElem = document.getElementById('radar-viewer-time');
+          const titleElem = document.getElementById('radar-viewer-title');
+          const hookElem = document.getElementById('radar-viewer-hook');
+
+          if (timeElem) timeElem.innerText = `Active ${top.viewed_ago_str || 'just now'}`;
+          if (titleElem) titleElem.innerText = `${top.doctor_name || 'Dr.'} at ${top.name} is viewing proposal portal right now!`;
+          if (hookElem) hookElem.innerText = `"${top.recommended_hook || top.conversational_hook || 'Hey Dr., I noticed you were just reviewing the audit...'}"`;
+
+          banner.classList.remove('hidden');
+
+          if (isNewViewer) {
+            playRadarAlertChime();
+          }
+        } else {
+          banner.classList.add('hidden');
+          activeRadarLead = null;
+        }
+      } catch (e) {}
+    }
+
+    function startLiveRadarPolling() {
+      pollActiveRadarViewers();
+      setInterval(pollActiveRadarViewers, 10000);
+    }
+
+    function interceptActiveViewerNow() {
+      if (!activeRadarLead) return;
+      showToast(`⚡ Speed-to-Lead Intercept: Launching dialer for ${activeRadarLead.name}!`);
+      openManualDialerModal(activeRadarLead.phone || '', activeRadarLead.name || '', activeRadarLead.id);
+    }
+
+    async function dismissRadarViewer() {
+      const banner = document.getElementById('banner-live-radar-intercept');
+      if (banner) banner.classList.add('hidden');
+      if (activeRadarLead) {
+        radarAlertDismissedUntil = Date.now() + 60000;
+        fetch(`/api/radar/dismiss/${activeRadarLead.id}`, { method: 'POST' }).catch(() => {});
+      }
+    }
+
+    // --- Weapon 2: 3-Mile Territory Exclusivity & Deposit Lock ($1,500 Setup) ---
+    async function loadLeadTerritoryStatus(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/leads/${id}/territory-status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = document.getElementById('modal-territory-status-badge');
+        const lockBtn = document.getElementById('btn-modal-deposit-lock');
+        if (data.is_locked) {
+          if (badge) {
+            badge.innerText = `🔒 Territory Locked (${data.deposit_status || 'Deposit Paid'})`;
+            badge.className = "px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500 text-slate-950 border border-emerald-400";
+          }
+          if (lockBtn) {
+            lockBtn.innerHTML = `<i class="fa-solid fa-lock"></i> <span>Territory Exclusively Locked ($1,500 Paid)</span>`;
+            lockBtn.classList.add('opacity-75', 'cursor-not-allowed');
+            lockBtn.disabled = true;
+          }
+        } else {
+          if (badge) {
+            badge.innerText = data.can_lock ? "Territory Available (3-Mile Radius)" : "Territory Blocked";
+            badge.className = data.can_lock
+              ? "px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+              : "px-2 py-0.5 rounded text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40";
+          }
+          if (lockBtn) {
+            lockBtn.innerHTML = `<i class="fa-solid fa-check-double"></i> <span>Lock Territory & Record $1,500 Deposit</span>`;
+            lockBtn.classList.remove('opacity-75', 'cursor-not-allowed');
+            lockBtn.disabled = false;
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function lockLeadTerritoryDeposit(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      const conf = confirm("Lock 3-mile exclusive territory for $1,500 turnkey setup deposit? This marks the lead as WON and binds the single-patient break-even SLA.");
+      if (!conf) return;
+
+      try {
+        const res = await fetch(`/api/leads/${id}/checkout/lock-deposit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_ref: 'CARD_CONFIRMED_' + Date.now(), source: 'dashboard_modal' })
+        });
+        const data = await res.json();
+        if (data.status === 'LOCKED' || data.success) {
+          showToast("🎯 Territory Exclusively Locked! $1,500 setup deposit recorded & lead marked WON!");
+          loadLeadTerritoryStatus(id);
+          openLeadModal(id);
+          updateGlobalStats();
+          if (currentTab === 'kanban') loadKanbanData();
+        } else {
+          showToast("Territory reservation error: " + (data.message || 'Could not lock'));
+        }
+      } catch (err) {
+        showToast("Error locking territory: " + err.message);
+      }
+    }
+
+    function viewLeadSLA(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      window.open(`/agreement/${id}`, '_blank');
+    }
+
+    // --- Weapon 3: AI Video Teardown Generator & Player ---
+    function openLeadVideoTeardown(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      window.open(`/video/${id}`, '_blank');
+    }
+
+    async function copyLeadVideoTeaser(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/leads/${id}/video-teardown`);
+        if (!res.ok) throw new Error("Failed to load video teardown");
+        const data = await res.json();
+        const text = data.teaser_sms || `Dr. ${data.doctor_name || ''}, here is the 60s video teardown for ${data.clinic_name}: ${window.location.origin}/video/${id}`;
+        await navigator.clipboard.writeText(text);
+        showToast("🎬 Copied 60-Second Video Teaser & Link to clipboard!");
+      } catch (err) {
+        showToast("Error copying video teaser: " + err.message);
+      }
+    }
+
+    // --- Weapon 4: Dormant Hygiene Chart Recall Calculator ---
+    async function loadLeadHygieneRecall(leadId) {
+      const id = leadId || currentSelectedLeadId;
+      if (!id) return;
+      try {
+        const res = await fetch(`/api/leads/${id}/hygiene-recall`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const badge = document.getElementById('modal-hygiene-roi-badge');
+        const charts = document.getElementById('modal-hygiene-charts');
+        const trapped = document.getElementById('modal-hygiene-trapped');
+        const cash = document.getElementById('modal-hygiene-cash');
+        const quote = document.getElementById('modal-hygiene-pitch-quote');
+
+        if (badge) badge.innerText = `${data.month1_roi_multiple}x Month 1 ROI`;
+        if (charts) charts.innerText = `${(data.dormant_charts_count || 0).toLocaleString()} Pts`;
+        if (trapped) trapped.innerText = `$${(data.trapped_preventative_arr || 0).toLocaleString()}`;
+        if (cash) cash.innerText = `+$${(data.projected_month1_cash || 0).toLocaleString()}`;
+        if (quote) quote.innerText = `"${data.sales_pitch_quote || ''}"`;
+      } catch (e) {}
+    }
+
     // --- Tactical Counter-Punch Soundboard & Hotkeys ---
 
     const TACTICAL_COUNTER_PUNCHES = {
@@ -9909,6 +10232,7 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
       checkDueRemindersBadge();
       checkHarvesterStatusBadge();
       calculateInteractiveRoi();
+      startLiveRadarPolling();
       setInterval(checkDueRemindersBadge, 30000);
       // Load recent leads on initial view
       fetch('/api/leads?limit=12')

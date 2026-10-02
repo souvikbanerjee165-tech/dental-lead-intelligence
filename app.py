@@ -58,6 +58,10 @@ from pitch_portal import PitchPortalEngine
 from voicemail_sting import VoicemailStingGenerator
 from competitor_radar import CompetitorRadarEngine
 from sms_dispatcher import SMSDispatcherEngine
+from live_intercept import LiveInterceptRadar
+from territory_checkout import TerritoryCheckoutEngine
+from video_teardown import VideoTeardownEngine
+from hygiene_recall_calculator import HygieneRecallCalculator
 import logging
 logging.getLogger().addFilter(SecretMaskingLogFilter())
 logger = logging.getLogger("app")
@@ -3117,10 +3121,14 @@ async def render_executive_pitch_portal(lead_id: str, request: Request):
 
 
 @app.post("/api/pitch/{lead_id}/viewed")
-async def record_pitch_portal_view(lead_id: str):
+async def record_pitch_portal_view(lead_id: str, request: Request):
     """
-    Records high-intent prospect viewing of their confidential pitch teardown portal.
+    Records high-intent prospect viewing of their confidential pitch teardown portal
+    and registers real-time speed-to-lead Live Intercept Radar.
     """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = request.headers.get("user-agent")
+    LiveInterceptRadar.record_view(lead_id=lead_id, client_ip=client_ip, user_agent=user_agent, db=db)
     return SMSDispatcherEngine.record_pitch_view(lead_id=lead_id, db=db)
 
 
@@ -3192,6 +3200,119 @@ async def record_sms_dispatch_sent(lead_id: str, req: Optional[SMSDispatchRecord
     channel = req.channel if req else "SMS"
     success = SMSDispatcherEngine.record_dispatch(lead_id=lead_id, channel=channel, db=db)
     return {"status": "success" if success else "error", "lead_id": lead_id, "channel": channel}
+
+
+# -------------------------------------------------------------
+# Lethal Closing Weapons: Radar Intercept, Deposit Lock, Video Teardown, Hygiene Recall
+# -------------------------------------------------------------
+
+class DepositLockRequest(BaseModel):
+    payment_ref: Optional[str] = None
+
+
+# --- Weapon 1: Live Radar Intercept Endpoints ---
+
+@app.get("/api/radar/active-viewers")
+async def get_active_pitch_viewers():
+    """
+    Returns live dental prospects actively viewing their confidential teardown portal.
+    """
+    return LiveInterceptRadar.get_active_viewers(max_age_seconds=1800, db=db)
+
+
+@app.post("/api/radar/dismiss/{lead_id}")
+async def dismiss_radar_active_viewer(lead_id: str):
+    """
+    Clears prospect from active intercept banner once rep calls them.
+    """
+    LiveInterceptRadar.clear_active_viewer(lead_id)
+    return {"status": "dismissed", "lead_id": lead_id}
+
+
+# --- Weapon 2: Deposit Lock & Territory Exclusivity Checkout Endpoints ---
+
+@app.get("/api/leads/{lead_id}/territory-status")
+async def get_lead_territory_status(lead_id: str):
+    """
+    Checks if the 3-mile exclusivity radius around the clinic is available or locked.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Dental Practice", "address": "Austin, TX"}
+    return TerritoryCheckoutEngine.check_territory_availability(lead, db=db)
+
+
+@app.get("/api/leads/{lead_id}/checkout-intent")
+async def get_deposit_checkout_intent(lead_id: str, request: Request):
+    """
+    Generates $1,500 turnkey setup deposit parameters and territory certificate.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Dental Practice", "address": "Austin, TX"}
+    base_url = str(request.base_url).rstrip("/")
+    return TerritoryCheckoutEngine.create_checkout_payload(lead, base_app_url=base_url)
+
+
+@app.post("/api/leads/{lead_id}/checkout/lock-deposit")
+async def execute_deposit_lock(lead_id: str, req: Optional[DepositLockRequest] = None):
+    """
+    Locks the 3-mile territory, records the $1,500 turnkey deposit payment, and moves stage to WON.
+    """
+    payment_ref = req.payment_ref if req else None
+    return TerritoryCheckoutEngine.complete_deposit_lock(lead_id=lead_id, payment_ref=payment_ref, db=db)
+
+
+@app.get("/agreement/{lead_id}", response_class=HTMLResponse)
+async def view_service_level_agreement(lead_id: str):
+    """
+    Renders the formal Service Level Agreement with 3-mile exclusivity and break-even guarantee.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Apex Dental Studio", "address": "Austin, TX"}
+    html = TerritoryCheckoutEngine.render_sla_agreement_html(lead)
+    return HTMLResponse(content=html, status_code=200)
+
+
+# --- Weapon 3: AI Video Teardown Generator & Motion Player Endpoints ---
+
+@app.get("/api/leads/{lead_id}/video-teardown")
+async def get_video_teardown_meta(lead_id: str, request: Request):
+    """
+    Returns video teaser metadata and copyable SMS/Email teaser link.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Apex Dental Studio", "address": "Austin, TX"}
+    base_url = str(request.base_url).rstrip("/")
+    return VideoTeardownEngine.generate_video_metadata(lead, base_app_url=base_url)
+
+
+@app.get("/video/{lead_id}", response_class=HTMLResponse)
+async def serve_video_teardown_player(lead_id: str, request: Request):
+    """
+    Serves full-screen cinema video landing page with synchronized audio and territory CTA.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Apex Dental Studio", "address": "Austin, TX"}
+    base_url = str(request.base_url).rstrip("/")
+    html = VideoTeardownEngine.render_video_player_page_html(lead, base_app_url=base_url)
+    return HTMLResponse(content=html, status_code=200)
+
+
+# --- Weapon 4: Dormant Hygiene Recall & Cash Injection Endpoints ---
+
+@app.get("/api/leads/{lead_id}/hygiene-recall")
+async def calculate_hygiene_recall(lead_id: str, custom_charts: int = 0):
+    """
+    Calculates trapped dormant patient chart value and 3-touch WhatsApp broadcast recall ROI.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Apex Dental Studio", "address": "Austin, TX"}
+    return HygieneRecallCalculator.calculate_hygiene_leakage(lead, custom_dormant_charts=custom_charts)
 
 
 if __name__ == "__main__":

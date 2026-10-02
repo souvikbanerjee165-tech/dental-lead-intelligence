@@ -19,6 +19,10 @@ from pitch_portal import PitchPortalEngine
 from voicemail_sting import VoicemailStingGenerator, _generate_telecom_tones_pcm
 from competitor_radar import CompetitorRadarEngine
 from sms_dispatcher import SMSDispatcherEngine
+from live_intercept import LiveInterceptRadar
+from territory_checkout import TerritoryCheckoutEngine
+from video_teardown import VideoTeardownEngine
+from hygiene_recall_calculator import HygieneRecallCalculator
 
 
 @pytest.fixture
@@ -238,3 +242,188 @@ def test_post_sms_dispatch_record_endpoint(test_client, sample_lead):
     data = resp.json()
     assert data["status"] == "success"
     assert data["channel"] == "SMS"
+
+
+# -------------------------------------------------------------
+# 6. Live Radar Intercept Tests (Weapon 1)
+# -------------------------------------------------------------
+
+def test_live_intercept_radar_records_and_retrieves_viewers(sample_lead, db):
+    # Record view
+    record = LiveInterceptRadar.record_view(
+        lead_id=sample_lead["id"],
+        client_ip="192.168.1.100",
+        user_agent="Mozilla/5.0 Test",
+        db=db
+    )
+    assert record["lead_id"] == sample_lead["id"]
+    assert "Dr. Marcus Vance" in record["doctor_name"]
+    assert "recommended_hook" in record
+
+    # Retrieve active viewers
+    viewers = LiveInterceptRadar.get_active_viewers(ttl_seconds=90)
+    assert len(viewers) >= 1
+    found = [v for v in viewers if v["id"] == sample_lead["id"]]
+    assert len(found) == 1
+    top = found[0]
+    assert top["id"] == sample_lead["id"]
+    assert top["phone"] == sample_lead["phone"]
+
+    # Dismiss viewer
+    dismissed = LiveInterceptRadar.dismiss_viewer(sample_lead["id"])
+    assert dismissed is True
+    viewers_after = LiveInterceptRadar.get_active_viewers(ttl_seconds=90)
+    assert sample_lead["id"] not in [v["id"] for v in viewers_after]
+
+
+# -------------------------------------------------------------
+# 7. Deposit Lock & 3-Mile Territory Exclusivity Tests (Weapon 2)
+# -------------------------------------------------------------
+
+def test_territory_availability_and_deposit_lock(sample_lead, db):
+    # Check territory initially available
+    avail = TerritoryCheckoutEngine.check_territory_availability(sample_lead, db=db)
+    assert avail["is_available"] is True
+    assert avail["radius_miles"] == 3.0
+
+    # Create checkout payload
+    payload = TerritoryCheckoutEngine.create_checkout_payload(sample_lead)
+    assert payload["setup_fee_usd"] == 1500.0
+    assert payload["monthly_fee_usd"] == 399.0
+    assert "Single-Patient Break-Even Guarantee" in payload["break_even_guarantee_text"]
+
+    # Lock territory deposit
+    result = TerritoryCheckoutEngine.complete_deposit_lock(
+        lead_id=sample_lead["id"],
+        payment_ref="card_test_tok_9988",
+        db=db
+    )
+    assert result["status"] == "LOCKED"
+    assert result["setup_deposit_usd"] == 1500.0
+    assert result["monthly_maintenance_usd"] == 399.0
+    assert result["stage"] == "WON"
+
+    # Verify updated database record
+    updated = db.get_lead(sample_lead["id"])
+    assert updated["territory_locked"] == 1
+    assert updated["deposit_paid"] >= 1500.0
+    assert updated["stage"] == "WON"
+
+    # Verify formal digital SLA agreement HTML
+    sla_html = TerritoryCheckoutEngine.render_digital_sla_html(sample_lead)
+    assert "<!DOCTYPE html>" in sla_html
+    assert "Barton Springs Dental Studio" in sla_html
+    assert "$1,500" in sla_html
+    assert "$399" in sla_html
+    assert "Single-Patient Break-Even" in sla_html
+
+
+# -------------------------------------------------------------
+# 8. AI Video Teardown Generator & Player Tests (Weapon 3)
+# -------------------------------------------------------------
+
+def test_video_teardown_metadata_and_cinema_player(sample_lead):
+    meta = VideoTeardownEngine.generate_video_metadata(sample_lead)
+    assert meta["lead_id"] == sample_lead["id"]
+    assert "Barton Springs Dental Studio" in meta["clinic_name"]
+    assert meta["video_url"].endswith(f"/video/{sample_lead['id']}")
+    assert meta["duration_sec"] > 0
+    assert "60s Video Teardown" in meta["teaser_text"]
+
+    html = VideoTeardownEngine.render_video_player_page_html(sample_lead)
+    assert "<!DOCTYPE html>" in html
+    assert "Barton Springs Dental Studio" in html
+    assert "$1,500" in html
+    assert "/pitch/" in html
+    assert "/agreement/" in html
+
+
+# -------------------------------------------------------------
+# 9. Dormant Hygiene Recall Calculator Tests (Weapon 4)
+# -------------------------------------------------------------
+
+def test_dormant_hygiene_recall_calculator(sample_lead):
+    metrics = HygieneRecallCalculator.calculate_hygiene_leakage(sample_lead)
+    assert metrics["lead_id"] == sample_lead["id"]
+    assert metrics["dormant_hygiene_charts"] > 0
+    assert metrics["trapped_chart_value"] > 0
+    assert metrics["month1_cash_injection"] > 10000
+    assert metrics["setup_fee_usd"] == 1500.0
+    assert metrics["month1_roi_multiplier"] > 5.0
+    assert len(metrics["broadcast_scripts"]) == 3
+    assert "Dr. Marcus Vance" in metrics["sales_pitch_quote"]
+
+
+# -------------------------------------------------------------
+# 10. FastAPI New Endpoints Integration Tests
+# -------------------------------------------------------------
+
+def test_fastapi_live_radar_endpoints(test_client, sample_lead):
+    # View pitch to trigger radar
+    view_resp = test_client.post(f"/api/pitch/{sample_lead['id']}/viewed")
+    assert view_resp.status_code == 200
+
+    # Get active viewers
+    radar_resp = test_client.get("/api/radar/active-viewers")
+    assert radar_resp.status_code == 200
+    radar_data = radar_resp.json()
+    assert isinstance(radar_data, list)
+    assert len(radar_data) >= 1
+    assert any(v["lead_id"] == sample_lead["id"] for v in radar_data)
+
+    # Dismiss viewer
+    dismiss_resp = test_client.post(f"/api/radar/dismiss/{sample_lead['id']}")
+    assert dismiss_resp.status_code == 200
+
+
+def test_fastapi_territory_and_agreement_endpoints(test_client, sample_lead):
+    # Territory status
+    status_resp = test_client.get(f"/api/leads/{sample_lead['id']}/territory-status")
+    assert status_resp.status_code == 200
+    assert "is_locked" in status_resp.json()
+
+    # Checkout intent
+    intent_resp = test_client.get(f"/api/leads/{sample_lead['id']}/checkout-intent")
+    assert intent_resp.status_code == 200
+    intent_data = intent_resp.json()
+    assert intent_data["setup_fee_usd"] == 1500.0
+
+    # Digital SLA Agreement page
+    sla_resp = test_client.get(f"/agreement/{sample_lead['id']}")
+    assert sla_resp.status_code == 200
+    assert "text/html" in sla_resp.headers["content-type"]
+    assert "Barton Springs Dental Studio" in sla_resp.text
+    assert "$1,500" in sla_resp.text
+
+    # Lock deposit
+    lock_resp = test_client.post(
+        f"/api/leads/{sample_lead['id']}/checkout/lock-deposit",
+        json={"payment_ref": "stripe_ch_integration_test"}
+    )
+    assert lock_resp.status_code == 200
+    lock_data = lock_resp.json()
+    assert lock_data["status"] == "LOCKED"
+
+
+def test_fastapi_video_and_hygiene_endpoints(test_client, sample_lead):
+    # Video teardown metadata
+    video_meta_resp = test_client.get(f"/api/leads/{sample_lead['id']}/video-teardown")
+    assert video_meta_resp.status_code == 200
+    video_meta = video_meta_resp.json()
+    assert video_meta["lead_id"] == sample_lead["id"]
+    assert "teaser_sms" in video_meta
+
+    # Full cinema video player page
+    video_page_resp = test_client.get(f"/video/{sample_lead['id']}")
+    assert video_page_resp.status_code == 200
+    assert "text/html" in video_page_resp.headers["content-type"]
+    assert "Barton Springs Dental Studio" in video_page_resp.text
+
+    # Dormant hygiene recall metrics
+    hygiene_resp = test_client.get(f"/api/leads/{sample_lead['id']}/hygiene-recall")
+    assert hygiene_resp.status_code == 200
+    hygiene_data = hygiene_resp.json()
+    assert hygiene_data["dormant_charts_count"] > 0
+    assert hygiene_data["projected_month1_cash"] > 10000
+    assert hygiene_data["month1_roi_multiple"] > 5.0
+

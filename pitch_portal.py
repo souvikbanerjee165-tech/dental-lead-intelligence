@@ -64,6 +64,14 @@ class PitchPortalEngine:
         ring_count = mystery_data.get("ring_count", 5)
         test_time = mystery_data.get("test_timestamp", "Recent After-Hours Audit")
 
+        # Hygiene Reactivation Data
+        from hygiene_recall_calculator import HygieneRecallCalculator
+        hygiene_data = HygieneRecallCalculator.calculate_hygiene_leakage(lead_dict)
+        dormant_charts = hygiene_data["dormant_hygiene_charts"]
+        trapped_hygiene_rev = hygiene_data["trapped_chart_value"]
+        month1_hygiene_cash = hygiene_data["month1_cash_injection"]
+        hygiene_roi = hygiene_data["month1_roi_multiplier"]
+
         return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -97,6 +105,9 @@ class PitchPortalEngine:
         <span class="hidden sm:inline-block px-2.5 py-1 rounded-full text-[10px] font-black bg-cyan-500/10 text-cyan-300 border border-cyan-500/30">
           <i class="fa-solid fa-certificate"></i> {npi_number}
         </span>
+        <a href="/video/{lead_id}" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
+          <i class="fa-solid fa-circle-play text-rose-400"></i> Watch 60s Video
+        </a>
         <a href="#book-walkthrough" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition">
           Claim Practice Territory
         </a>
@@ -167,6 +178,49 @@ class PitchPortalEngine:
         <div class="p-3 rounded-lg bg-rose-950/40 border border-rose-500/20 text-rose-200 text-xs italic">
           "American Dental Association data proves 67% of acute toothache callers hang up on voicemail. When a patient is in pain on Sunday evening, they will not wait until Monday 8:00 AM—they book the first practice that replies on their phone."
         </div>
+      </div>
+    </div>
+
+    <!-- Dormant Hygiene Chart Reactivation Cash Injection Engine -->
+    <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 p-6 rounded-2xl border border-indigo-500/40 shadow-2xl space-y-4">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-lg">
+            <i class="fa-solid fa-chart-line"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Secondary Practice Revenue Bleed: Dormant Hygiene Charts</h3>
+            <span class="text-xs text-indigo-300">Overdue Recall Reactivation Analysis</span>
+          </div>
+        </div>
+        <span class="px-3 py-1 rounded-full text-xs font-black bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 font-mono">
+          {hygiene_roi}x Turnkey ROI in Month 1
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
+        <div class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+          <span class="text-[10px] text-slate-400 uppercase font-bold block">Estimated Overdue Charts (6+ Mo)</span>
+          <div class="text-xl font-bold text-white font-mono mt-1">{dormant_charts:,} Patients</div>
+          <span class="text-[10px] text-slate-500">~35% of patient database</span>
+        </div>
+        <div class="bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+          <span class="text-[10px] text-slate-400 uppercase font-bold block">Total Trapped Hygiene Revenue</span>
+          <div class="text-xl font-bold text-slate-300 font-mono mt-1">${trapped_hygiene_rev:,}</div>
+          <span class="text-[10px] text-slate-500">At $225 avg prophy + exam</span>
+        </div>
+        <div class="bg-indigo-950/40 p-3.5 rounded-xl border border-indigo-500/30">
+          <span class="text-[10px] text-indigo-300 uppercase font-bold block">Immediate Month 1 Cash Injection</span>
+          <div class="text-xl font-black text-indigo-300 font-mono mt-1">+${month1_hygiene_cash:,}</div>
+          <span class="text-[10px] text-emerald-400 font-bold">14.5% WhatsApp recall booking</span>
+        </div>
+      </div>
+
+      <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-slate-300 space-y-1">
+        <div class="font-bold text-indigo-300">Why WhatsApp Out-Performs Front-Desk Calling:</div>
+        <p class="text-[11px] text-slate-400 leading-relaxed">
+          Front-desk phone calls reach voicemail 82% of the time. Postcards are discarded. WhatsApp broadcast recall delivers a <strong>98% open rate</strong> with 1-tap chair self-scheduling. Recovering just 10% of your overdue hygiene charts covers our entire $1,500 turnkey installation within the first 14 days.
+        </p>
       </div>
     </div>
 
@@ -287,13 +341,23 @@ class PitchPortalEngine:
       </div>
 
       <!-- 1-Click Action Bar -->
-      <div class="text-center pt-4 space-y-3">
-        <a href="{calendar_link}" target="_blank" class="inline-flex items-center gap-2 px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/25 transition">
-          <i class="fa-solid fa-calendar-check"></i>
-          <span>Schedule 10-Minute Live Demo (Thursday 11:00 AM Anchor)</span>
-        </a>
-        <div class="text-xs text-slate-400">
-          Or direct inquiries: <a href="tel:{rep_phone}" class="text-emerald-400 font-bold hover:underline">{rep_phone}</a> • <a href="mailto:{rep_email}" class="text-emerald-400 font-bold hover:underline">{rep_email}</a>
+      <div class="text-center pt-4 space-y-4">
+        <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+          <button onclick="lockPracticeTerritoryDeposit()" id="btn-lock-territory-portal" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/25 transition cursor-pointer flex items-center justify-center gap-2">
+            <i class="fa-solid fa-lock"></i>
+            <span>Lock 3-Mile Exclusive Territory & Setup ($1,500)</span>
+          </button>
+          <a href="{calendar_link}" target="_blank" class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-2">
+            <i class="fa-solid fa-calendar-check"></i>
+            <span>Or Schedule 10-Min Demo (Thursday 11 AM)</span>
+          </a>
+        </div>
+        <div class="text-xs text-slate-400 pt-1 flex items-center justify-center gap-4 flex-wrap">
+          <a href="/agreement/{lead_id}" target="_blank" class="text-emerald-400 hover:underline font-bold flex items-center gap-1.5">
+            <i class="fa-solid fa-file-contract"></i> View Official SLA & 30-Day Break-Even Guarantee
+          </a>
+          <span>&bull;</span>
+          <span>Direct Rep: <a href="tel:{rep_phone}" class="text-slate-300 font-bold hover:underline">{rep_phone}</a></span>
         </div>
       </div>
     </div>
@@ -308,11 +372,39 @@ class PitchPortalEngine:
     </div>
   </footer>
 
-  <!-- Visitor Telemetry Beacon (Notifies Rep Instantly on View) -->
+  <!-- Visitor Telemetry Beacon & Instant Deposit Lock Handler -->
   <script>
     try {{
       fetch('/api/pitch/{lead_id}/viewed', {{ method: 'POST' }});
     }} catch(e) {{}}
+
+    async function lockPracticeTerritoryDeposit() {{
+      const btn = document.getElementById('btn-lock-territory-portal');
+      if (btn) {{
+        btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> Securing 3-Mile Territory...';
+        btn.disabled = true;
+      }}
+      try {{
+        const res = await fetch('/api/leads/{lead_id}/checkout/lock-deposit', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{ payment_ref: 'stripe_mock_' + Date.now() }})
+        }});
+        const data = await res.json();
+        if (data.status === 'success') {{
+          alert('🏆 Territory Secured! 3-mile exclusivity around {clinic_name} is now locked. Our concierge team will reach out within 15 minutes.');
+          window.location.href = '/agreement/{lead_id}';
+        }} else {{
+          alert('Notice: ' + (data.message || 'Unable to complete lock'));
+        }}
+      }} catch(e) {{
+        alert('Network error connecting to payment gateway.');
+      }} finally {{
+        if (btn) {{
+          btn.innerHTML = '<i class="fa-solid fa-check text-emerald-950"></i> Territory Locked (Status: WON)';
+        }}
+      }}
+    }}
   </script>
 
 </body>
