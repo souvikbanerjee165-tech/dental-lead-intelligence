@@ -31,7 +31,7 @@ def reset_to_zero():
         backup_path = BASE_DIR / f"storage.db.bak_{timestamp}"
         try:
             shutil.copyfile(DB_PATH, backup_path)
-            print(f" [✓] Created safety backup: {backup_path.name}")
+            print(f" [OK] Created safety backup: {backup_path.name}")
         except Exception as e:
             print(f" [!] Warning: Could not create backup: {e}")
 
@@ -63,9 +63,13 @@ def reset_to_zero():
                 except Exception:
                     pass
 
-            cursor.execute("VACUUM;")
             conn.commit()
-            print(" [✓] Truncated all lead, audit, timeline, and deals tables.")
+            print(" [OK] Truncated all lead, audit, timeline, and deals tables.")
+
+        # VACUUM in autocommit mode
+        raw_conn = sqlite3.connect(DB_PATH, isolation_level=None)
+        raw_conn.execute("VACUUM;")
+        raw_conn.close()
     except Exception as e:
         print(f" [!] Database reset error: {e}")
 
@@ -78,18 +82,18 @@ def reset_to_zero():
                 cleaned_stings += 1
             except Exception:
                 pass
-        print(f" [✓] Cleared {cleaned_stings} temporary audio sting files from output/stings/")
+        print(f" [OK] Cleared {cleaned_stings} temporary audio sting files from output/stings/")
 
     # 4. Reset Autopilot Checkpoint
     if STATE_FILE.exists():
         try:
             STATE_FILE.unlink()
-            print(" [✓] Reset autopilot_state.json to initial state.")
+            print(" [OK] Reset autopilot_state.json to initial state.")
         except Exception:
             pass
 
     print("-" * 65)
-    print(" 🚀 SUCCESS: System is 100% clean and ready to prospect from zero!")
+    print(" [OK] SUCCESS: System is 100% clean and ready to prospect from zero!")
     print("=" * 65 + "\n")
 
 

@@ -74,7 +74,15 @@ class GoogleMapsLeadFinder:
                     # Check if landed directly on a single place
                     single_lead = await self._extract_detail_panel(page)
                     if single_lead:
-                        is_dup = is_existing_fn and is_existing_fn(single_lead.name, single_lead.website, single_lead.phone)
+                        is_dup = False
+                        if is_existing_fn:
+                            try:
+                                is_dup = is_existing_fn(single_lead.name, single_lead.website, single_lead.phone)
+                            except TypeError:
+                                try:
+                                    is_dup = is_existing_fn(single_lead.name, single_lead.website)
+                                except Exception:
+                                    is_dup = False
                         if not is_dup:
                             results.append(single_lead)
                             if on_lead_found:
@@ -129,7 +137,17 @@ class GoogleMapsLeadFinder:
                                     card_web = self._clean_url(href)
 
                             # Early database check: If name or card website matches existing database lead, skip!
-                            if is_existing_fn and is_existing_fn(name, card_web, None):
+                            is_dup = False
+                            if is_existing_fn:
+                                try:
+                                    is_dup = is_existing_fn(name, card_web, None)
+                                except TypeError:
+                                    try:
+                                        is_dup = is_existing_fn(name, card_web)
+                                    except Exception:
+                                        is_dup = False
+
+                            if is_dup:
                                 if on_lead_skipped:
                                     try:
                                         if asyncio.iscoroutinefunction(on_lead_skipped):

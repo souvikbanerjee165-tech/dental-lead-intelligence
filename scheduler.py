@@ -86,7 +86,7 @@ class AutonomousScheduler:
             raw_leads = await finder.search(
                 query=search_query,
                 limit=limit,
-                is_existing_fn=lambda lead_name, website: db.is_lead_existing(name=lead_name, website=website)
+                is_existing_fn=lambda name, website=None, phone=None: db.is_lead_existing(name=name, website=website, phone=phone)
             )
         except TypeError:
             raw_leads = await finder.search(query=search_query, limit=limit)
