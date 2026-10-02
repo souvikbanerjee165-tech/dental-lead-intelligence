@@ -353,6 +353,72 @@
 
       <!-- TAB 1: LEAD FINDER -->
       <section id="view-finder" class="space-y-6 max-w-6xl mx-auto">
+
+        <!-- OVERNIGHT AUTONOMOUS HARVESTER & MORNING BRIEFING CARD -->
+        <div id="card-overnight-autopilot" class="bg-gradient-to-r from-slate-900 via-indigo-950/40 to-slate-900 border border-indigo-500/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div class="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div class="flex items-start gap-3.5">
+              <div class="w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center text-xl shrink-0 shadow-lg">
+                <i class="fa-solid fa-moon"></i>
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="font-extrabold text-white text-base">Overnight Autopilot Prospecting</span>
+                  <span id="autopilot-status-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-800 text-slate-300 border border-slate-700">IDLE</span>
+                  <span class="text-[11px] text-emerald-400 font-mono"><i class="fa-solid fa-shield-halved"></i> WAL Auto-Checkpointed</span>
+                </div>
+                <p class="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
+                  Scrapes Google Maps, inspects practice tech, sniffs doctor NPIs, and calculates revenue leakage while you sleep. Automatically checkpoints progress per lead so closing your laptop never loses work.
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 w-full md:w-auto shrink-0 flex-wrap">
+              <button id="btn-toggle-autopilot" onclick="toggleOvernightAutopilot()" class="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-lg transition flex items-center gap-2 cursor-pointer">
+                <i class="fa-solid fa-play" id="icon-autopilot-btn"></i>
+                <span id="txt-autopilot-btn">Start Overnight Prospecting</span>
+              </button>
+              <button onclick="resetAutopilotState()" class="px-3 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-xs border border-slate-700 transition cursor-pointer" title="Reset Autopilot State">
+                <i class="fa-solid fa-rotate-left"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Progress Strip -->
+          <div id="autopilot-progress-strip" class="mt-4 pt-4 border-t border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <span class="text-[10px] text-slate-400 uppercase font-bold block">Current Metro</span>
+              <span id="autopilot-current-metro" class="font-bold text-indigo-300 truncate block">Dallas, TX</span>
+            </div>
+            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <span class="text-[10px] text-slate-400 uppercase font-bold block">Progress Tonight</span>
+              <span id="autopilot-progress-counter" class="font-bold text-white font-mono block">0 / 50 Leads</span>
+            </div>
+            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <span class="text-[10px] text-slate-400 uppercase font-bold block">A-Tier Staged</span>
+              <span id="autopilot-a-tier-count" class="font-bold text-emerald-400 font-mono block">0 High-Fit</span>
+            </div>
+            <div class="bg-slate-950/80 p-2.5 rounded-xl border border-slate-800">
+              <span class="text-[10px] text-slate-400 uppercase font-bold block">Trapped Leakage</span>
+              <span id="autopilot-leakage-discovered" class="font-bold text-amber-400 font-mono block">$0/mo</span>
+            </div>
+          </div>
+
+          <!-- Morning Briefing Banner -->
+          <div id="autopilot-morning-banner" class="hidden mt-4 bg-emerald-950/40 border border-emerald-500/40 rounded-xl p-3.5 flex items-center justify-between gap-3 text-xs">
+            <div class="flex items-center gap-2.5">
+              <span class="text-xl">🌅</span>
+              <div>
+                <span id="autopilot-morning-headline" class="font-bold text-emerald-300 block">Morning Briefing: Ready!</span>
+                <span id="autopilot-morning-sub" class="text-slate-300 text-[11px]">High-converting prospects are staged in your Today's Calls queue.</span>
+              </div>
+            </div>
+            <button onclick="switchTab('kanban')" class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer">
+              Open Call Queue &rarr;
+            </button>
+          </div>
+        </div>
+
         <!-- Search Controls Card -->
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
           <div class="absolute -right-16 -top-16 w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none"></div>
@@ -7892,6 +7958,100 @@
       } catch (e) {}
     }
 
+    // --- Overnight Autopilot & Morning Briefing Engine ---
+    let autopilotPollingInterval = null;
+
+    async function pollAutopilotStatus() {
+      try {
+        const res = await fetch('/api/autopilot/status');
+        if (!res.ok) return;
+        const data = await res.json();
+
+        const badge = document.getElementById('autopilot-status-badge');
+        const metroElem = document.getElementById('autopilot-current-metro');
+        const counterElem = document.getElementById('autopilot-progress-counter');
+        const aTierElem = document.getElementById('autopilot-a-tier-count');
+        const leakageElem = document.getElementById('autopilot-leakage-discovered');
+        const btnTxt = document.getElementById('txt-autopilot-btn');
+        const btnIcon = document.getElementById('icon-autopilot-btn');
+        const toggleBtn = document.getElementById('btn-toggle-autopilot');
+        const morningBanner = document.getElementById('autopilot-morning-banner');
+
+        if (badge) {
+          badge.innerText = data.status || 'IDLE';
+          if (data.status === 'RUNNING') {
+            badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse";
+          } else if (data.status === 'COMPLETED_FOR_NIGHT') {
+            badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40";
+          } else {
+            badge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-black bg-slate-800 text-slate-300 border border-slate-700";
+          }
+        }
+
+        if (metroElem) metroElem.innerText = data.current_metro || 'Dallas, TX';
+        if (counterElem) counterElem.innerText = `${data.leads_discovered_tonight || 0} / ${data.target_leads_total || 50} Leads`;
+        if (aTierElem) aTierElem.innerText = `${data.a_tier_promoted_tonight || 0} High-Fit`;
+        if (leakageElem) leakageElem.innerText = `$${(data.total_trapped_leakage_monthly || 0).toLocaleString()}/mo`;
+
+        if (btnTxt && btnIcon && toggleBtn) {
+          if (data.status === 'RUNNING') {
+            btnTxt.innerText = "Pause Autopilot";
+            btnIcon.className = "fa-solid fa-pause";
+            toggleBtn.className = "px-5 py-3 rounded-xl bg-amber-600 hover:bg-amber-500 text-slate-950 font-black text-xs shadow-lg transition flex items-center gap-2 cursor-pointer";
+          } else {
+            btnTxt.innerText = "Start Overnight Prospecting";
+            btnIcon.className = "fa-solid fa-play";
+            toggleBtn.className = "px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-500 to-cyan-500 hover:from-indigo-400 hover:to-cyan-400 text-slate-950 font-black text-xs shadow-lg transition flex items-center gap-2 cursor-pointer";
+          }
+        }
+
+        // Show Morning Briefing if ready
+        if (morningBanner) {
+          if (data.morning_briefing) {
+            morningBanner.classList.remove('hidden');
+            const hLine = document.getElementById('autopilot-morning-headline');
+            const hSub = document.getElementById('autopilot-morning-sub');
+            if (hLine) hLine.innerText = data.morning_briefing.headline;
+            if (hSub) hSub.innerText = data.morning_briefing.call_queue_message;
+          } else {
+            morningBanner.classList.add('hidden');
+          }
+        }
+      } catch (e) {}
+    }
+
+    async function toggleOvernightAutopilot() {
+      try {
+        const statusRes = await fetch('/api/autopilot/status');
+        const data = await statusRes.json();
+        if (data.status === 'RUNNING') {
+          await fetch('/api/autopilot/stop', { method: 'POST' });
+          showToast("⏸️ Overnight Autopilot paused. State safely saved.");
+        } else {
+          showToast("🌙 Launching Overnight Autopilot! Progress will auto-checkpoint per lead.");
+          await fetch('/api/autopilot/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ target_leads_total: 50, batch_per_metro: 8 })
+          });
+        }
+        pollAutopilotStatus();
+      } catch (err) {
+        showToast("Error toggling autopilot: " + err.message);
+      }
+    }
+
+    async function resetAutopilotState() {
+      if (!confirm("Reset overnight autopilot progress back to 0?")) return;
+      try {
+        await fetch('/api/autopilot/reset', { method: 'POST' });
+        showToast("🔄 Autopilot state reset to clean zero.");
+        pollAutopilotStatus();
+      } catch (err) {
+        showToast("Reset failed: " + err.message);
+      }
+    }
+
     // --- Tactical Counter-Punch Soundboard & Hotkeys ---
 
     const TACTICAL_COUNTER_PUNCHES = {
@@ -10233,6 +10393,8 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
       checkHarvesterStatusBadge();
       calculateInteractiveRoi();
       startLiveRadarPolling();
+      pollAutopilotStatus();
+      setInterval(pollAutopilotStatus, 15000);
       setInterval(checkDueRemindersBadge, 30000);
       // Load recent leads on initial view
       fetch('/api/leads?limit=12')

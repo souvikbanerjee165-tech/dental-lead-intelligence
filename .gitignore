@@ -15,7 +15,9 @@ build/
 
 # Local databases & storage
 *.db
-storage.db
+*.db-shm
+*.db-wal
+storage.db*
 output/*.csv
 output/*.xlsx
 output/*.json

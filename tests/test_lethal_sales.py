@@ -23,6 +23,7 @@ from live_intercept import LiveInterceptRadar
 from territory_checkout import TerritoryCheckoutEngine
 from video_teardown import VideoTeardownEngine
 from hygiene_recall_calculator import HygieneRecallCalculator
+from overnight_autopilot import OvernightAutopilot
 
 
 @pytest.fixture
@@ -426,4 +427,45 @@ def test_fastapi_video_and_hygiene_endpoints(test_client, sample_lead):
     assert hygiene_data["dormant_charts_count"] > 0
     assert hygiene_data["projected_month1_cash"] > 10000
     assert hygiene_data["month1_roi_multiple"] > 5.0
+
+
+# -------------------------------------------------------------
+# 11. Overnight Autopilot & State Checkpointing Tests
+# -------------------------------------------------------------
+
+def test_overnight_autopilot_state_and_persistence():
+    # Reset to known clean state
+    state = OvernightAutopilot.reset_state()
+    assert state["status"] == "IDLE"
+    assert "target_metros" in state
+    assert len(state["target_metros"]) > 0
+
+    # Test status retrieval
+    status = OvernightAutopilot.get_status()
+    assert status["status"] == "IDLE"
+    assert status["leads_discovered_tonight"] == 0
+
+    # Stop safety test
+    stopped = OvernightAutopilot.stop()
+    assert stopped["status"] == "PAUSED"
+
+
+def test_fastapi_autopilot_endpoints(test_client):
+    # GET status
+    status_resp = test_client.get("/api/autopilot/status")
+    assert status_resp.status_code == 200
+    status_data = status_resp.json()
+    assert "status" in status_data
+    assert "target_metros" in status_data
+
+    # POST stop
+    stop_resp = test_client.post("/api/autopilot/stop")
+    assert stop_resp.status_code == 200
+    assert stop_resp.json()["status"] == "PAUSED"
+
+    # POST reset
+    reset_resp = test_client.post("/api/autopilot/reset")
+    assert reset_resp.status_code == 200
+    assert reset_resp.json()["status"] == "IDLE"
+
 

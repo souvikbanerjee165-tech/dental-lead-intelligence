@@ -3315,6 +3315,43 @@ async def calculate_hygiene_recall(lead_id: str, custom_charts: int = 0):
     return HygieneRecallCalculator.calculate_hygiene_leakage(lead, custom_dormant_charts=custom_charts)
 
 
+# --- Overnight Autonomous Prospecting & State Checkpointing Endpoints ---
+from overnight_autopilot import OvernightAutopilot
+
+class AutopilotStartRequest(BaseModel):
+    target_metros: Optional[List[str]] = None
+    target_leads_total: int = 50
+    batch_per_metro: int = 8
+
+@app.get("/api/autopilot/status")
+async def get_autopilot_status():
+    """Returns current status, active metro, progress metrics, and morning briefing."""
+    return OvernightAutopilot.get_status()
+
+@app.post("/api/autopilot/start")
+async def start_autopilot(req: Optional[AutopilotStartRequest] = None):
+    """Starts or resumes the unattended overnight prospecting loop."""
+    metros = req.target_metros if req else None
+    target = req.target_leads_total if req else 50
+    batch = req.batch_per_metro if req else 8
+    return await OvernightAutopilot.start(
+        target_metros=metros,
+        target_leads_total=target,
+        batch_per_metro=batch,
+        db=db
+    )
+
+@app.post("/api/autopilot/stop")
+async def stop_autopilot():
+    """Pauses overnight prospecting and saves checkpoint state."""
+    return OvernightAutopilot.stop()
+
+@app.post("/api/autopilot/reset")
+async def reset_autopilot():
+    """Resets overnight autopilot state to zero."""
+    return OvernightAutopilot.reset_state()
+
+
 if __name__ == "__main__":
     import webbrowser
     import uvicorn
