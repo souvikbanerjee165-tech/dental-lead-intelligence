@@ -3315,6 +3315,84 @@ async def calculate_hygiene_recall(lead_id: str, custom_charts: int = 0):
     return HygieneRecallCalculator.calculate_hygiene_leakage(lead, custom_dormant_charts=custom_charts)
 
 
+# --- 1-Page Missed Production Diagnostic & 1-Click Outreach Hub ---
+from missed_revenue_diagnostic import MissedRevenueDiagnosticEngine
+from pre_call_dossier import PreCallDossierCompiler
+from carrier_reputation_manager import CarrierReputationManager
+from http_scraper_shield import HttpScraperShield
+
+
+@app.get("/diagnostic/{lead_id}", response_class=HTMLResponse)
+async def view_public_diagnostic_page(lead_id: str):
+    """Renders the client-facing, mobile-responsive Missed Revenue Diagnostic report."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Dental Practice", "address": "Dallas, TX", "rating": 4.8, "review_count": 65}
+    html = MissedRevenueDiagnosticEngine.render_diagnostic_html(lead)
+    return HTMLResponse(content=html, status_code=200)
+
+
+@app.get("/api/leads/{lead_id}/diagnostic")
+async def get_lead_diagnostic_data(lead_id: str):
+    """Returns calculated after-hours leakage, review vulnerability, and findings."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Dental Practice", "address": "Dallas, TX"}
+    return MissedRevenueDiagnosticEngine.generate_diagnostic_data(lead, db=db)
+
+
+@app.get("/api/leads/{lead_id}/outreach-links")
+async def get_lead_outreach_links(lead_id: str, request: Request):
+    """Returns 1-click WhatsApp and Gmail deep links with pre-filled high-converting copy."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Dental Practice", "address": "Dallas, TX"}
+    base_url = str(request.base_url).rstrip("/")
+    return MissedRevenueDiagnosticEngine.generate_outreach_links(lead, base_url=base_url)
+
+
+@app.get("/api/leads/{lead_id}/dossier")
+async def get_lead_pre_call_dossier(lead_id: str):
+    """Returns the comprehensive 360-degree commercial intelligence dossier for dialing."""
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Dental Practice", "address": "Dallas, TX"}
+    dossier = PreCallDossierCompiler.compile_dossier(lead, db=db)
+    prompt_briefing = PreCallDossierCompiler.format_llm_prompt_briefing(dossier)
+    return {
+        "dossier": dossier,
+        "llm_prompt_briefing": prompt_briefing
+    }
+
+
+class FastScrapeRequest(BaseModel):
+    url: str
+    timeout: float = 8.0
+
+@app.post("/api/leads/fast-scrape")
+async def fast_scrape_clinic_endpoint(req: FastScrapeRequest):
+    """Fast-path HTTP scraper: pulls doctors, phones, emails, and booking widgets in <1s (low RAM)."""
+    return await HttpScraperShield.fast_scrape_clinic(req.url, timeout=req.timeout)
+
+
+class DncOptOutRequest(BaseModel):
+    phone: str
+    clinic_name: Optional[str] = ""
+    reason: Optional[str] = "PROSPECT_REQUESTED"
+
+@app.post("/api/dialer/opt-out")
+async def register_dnc_opt_out(req: DncOptOutRequest):
+    """Registers a phone number on the Do-Not-Call blacklist immediately."""
+    mgr = CarrierReputationManager(db=db)
+    return mgr.process_opt_out(destination_phone=req.phone, clinic_name=req.clinic_name or "", reason=req.reason or "PROSPECT_REQUESTED")
+
+
+@app.get("/api/dialer/dnc")
+async def get_dnc_blacklist():
+    """Returns the active Do-Not-Call blacklist for TCPA/carrier compliance."""
+    return {"dnc_records": db.get_dnc_records()}
+
+
 # --- Overnight Autonomous Prospecting & State Checkpointing Endpoints ---
 from overnight_autopilot import OvernightAutopilot
 

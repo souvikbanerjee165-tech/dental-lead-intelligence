@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 import shutil
 import sqlite3
 from urllib.parse import urlparse
@@ -235,6 +236,31 @@ class DatabaseManager:
                 reviewed_at TEXT,
                 review_notes TEXT,
                 FOREIGN KEY (lead_id) REFERENCES leads (id)
+            );
+            """)
+
+            # 14. Do Not Call (DNC) Blacklist Table
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS dnc_blacklist (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                phone TEXT UNIQUE NOT NULL,
+                clinic_name TEXT,
+                reason TEXT,
+                created_at TEXT NOT NULL
+            );
+            """)
+
+            # 15. Carrier Call Logs Table (Anti-Spam & Velocity Throttling)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS carrier_call_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                caller_phone TEXT NOT NULL,
+                destination_phone TEXT NOT NULL,
+                lead_id TEXT,
+                area_code TEXT,
+                duration_sec INTEGER DEFAULT 0,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL
             );
             """)
 
@@ -2672,6 +2698,80 @@ class DatabaseManager:
             """, (f"%{last_10}%", f"%{last_7}%", f"%{raw_phone}%"))
             row = cursor.fetchone()
             return dict(row) if row else None
+
+    # ================= DNC & Carrier Reputation Shield =================
+
+    def is_dnc_phone(self, raw_phone: str) -> bool:
+        """Checks if a phone number exists on the Do-Not-Call blacklist."""
+        digits = re.sub(r"\D", "", raw_phone)
+        if not digits or len(digits) < 7:
+            return False
+        last_10 = digits[-10:] if len(digits) >= 10 else digits
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT id FROM dnc_blacklist
+            WHERE phone LIKE ? OR phone = ?
+            LIMIT 1;
+            """, (f"%{last_10}%", raw_phone))
+            return cursor.fetchone() is not None
+
+    def add_to_dnc(self, phone: str, clinic_name: str = "", reason: str = "OPT_OUT") -> bool:
+        """Adds a phone number to the Do-Not-Call blacklist."""
+        now_str = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute("""
+                INSERT INTO dnc_blacklist (phone, clinic_name, reason, created_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(phone) DO UPDATE SET reason = excluded.reason;
+                """, (phone, clinic_name, reason, now_str))
+                conn.commit()
+                return True
+            except Exception as e:
+                logger.error(f"Failed to insert into DNC blacklist: {e}")
+                return False
+
+    def get_dnc_records(self) -> List[Dict[str, Any]]:
+        """Returns all entries in the DNC blacklist."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM dnc_blacklist ORDER BY created_at DESC;")
+            return [dict(r) for r in cursor.fetchall()]
+
+    def record_carrier_call(
+        self,
+        caller_phone: str,
+        destination_phone: str,
+        lead_id: Optional[str],
+        area_code: str,
+        status: str,
+        duration_sec: int = 0
+    ) -> int:
+        """Logs an outbound carrier call for velocity monitoring and STIR/SHAKEN health."""
+        now_str = datetime.now().isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            INSERT INTO carrier_call_logs 
+            (caller_phone, destination_phone, lead_id, area_code, duration_sec, status, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?);
+            """, (caller_phone, destination_phone, lead_id, area_code, duration_sec, status, now_str))
+            conn.commit()
+            return cursor.lastrowid
+
+    def get_hourly_call_count(self, caller_phone: str) -> int:
+        """Counts calls initiated on this caller phone in the last 60 minutes."""
+        one_hour_ago = datetime.fromtimestamp(time.time() - 3600).isoformat()
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+            SELECT COUNT(*) AS cnt FROM carrier_call_logs
+            WHERE caller_phone = ? AND created_at >= ?;
+            """, (caller_phone, one_hour_ago))
+            row = cursor.fetchone()
+            return row["cnt"] if row else 0
 
 
 

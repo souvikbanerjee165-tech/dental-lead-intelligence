@@ -21,6 +21,9 @@ from config import GOOGLE_API_KEY, GEMINI_API_KEY
 from dental_caller_persona import DentalCallerPersona
 from voice_dialer import clean_phone_e164, generate_speech_audio
 from database import DatabaseManager
+from pre_call_dossier import PreCallDossierCompiler
+from empathy_voice_prompts import EmpathyVoicePromptEngine
+from carrier_reputation_manager import CarrierReputationManager
 
 logger = logging.getLogger("live_dialer_engine")
 
@@ -72,6 +75,14 @@ class LiveDialerEngine:
         }
         script = DentalCallerPersona.build_call_script(lead_dict)
 
+        # 1. Carrier Reputation & DNC Permission Check
+        rep_mgr = CarrierReputationManager(db=db)
+        allowed, perm_reason, matched_caller = rep_mgr.check_dial_permission(clean_phone)
+
+        # 2. Compile Pre-Call Commercial Dossier
+        dossier = PreCallDossierCompiler.compile_dossier(lead_dict, db=db)
+        empathy_prompt = EmpathyVoicePromptEngine.build_voice_system_prompt(dossier)
+
         session = {
             "session_id": session_id,
             "lead_id": lead.get("id") if lead else None,
@@ -82,6 +93,13 @@ class LiveDialerEngine:
             "opportunity_score": opportunity_score,
             "monthly_leakage": f"${monthly_leakage:,}/mo" if isinstance(monthly_leakage, (int, float)) else str(monthly_leakage),
             "script": script,
+            "dossier": dossier,
+            "empathy_voice_prompt": empathy_prompt,
+            "dial_permission": {
+                "allowed": allowed,
+                "reason": perm_reason,
+                "matched_caller_id": matched_caller
+            },
             "current_mode": mode,  # 'HUMAN_FIRST' or 'AI_FIRST'
             "carrier_mode": carrier_mode,  # 'BROWSER' or 'TELNYX'
             "started_at": now_str,
@@ -523,28 +541,41 @@ class LiveDialerEngine:
                 last_prospect_text = turn.get("text", last_prospect_text)
                 break
 
-        # Multi-provider generation through LLMRouter (OpenAI / DeepSeek / Gemini)
+        # 1. DNC Opt-Out Shield Check
+        rep_mgr = CarrierReputationManager()
+        if rep_mgr.check_for_opt_out(last_prospect_text):
+            rep_mgr.process_opt_out(session.get("phone_number", ""), clinic_name=clinic_name, reason="LIVE_CALL_OPT_OUT")
+            return "Understood, I have removed your number from our contact list immediately. Have a wonderful day!"
+
+        # 2. Automated Empathy Bridge Objection Rebuttal (Instant zero-latency response)
+        obj_key = EmpathyVoicePromptEngine.detect_objection(last_prospect_text)
+        dossier = session.get("dossier") or {}
+        if obj_key and not user_hint:
+            rebuttal = EmpathyVoicePromptEngine.get_empathy_rebuttal(obj_key, dossier)
+            return EmpathyVoicePromptEngine.enforce_brevity(rebuttal)
+
+        # 3. Multi-provider generation through LLMRouter (OpenAI / DeepSeek / Gemini)
         try:
             from llm_router import LLMRouter
-            sys_prompt = f"""You are an elite, warm Dental AI Growth Specialist stepping in on a live call with '{clinic_name}'.
+            sys_prompt = session.get("empathy_voice_prompt") or f"""You are an elite, warm Dental AI Growth Specialist stepping in on a live call with '{clinic_name}'.
 Doctor: Dr. {doctor_name}
 Monthly Missed Revenue: {session.get('monthly_leakage', '$4,200/mo')}
 User instruction/hint: "{user_hint or 'Pivot smoothly and ask to verify weekend patient capture.'}"
 
-Generate EXACTLY ONE short spoken sentence (maximum 15 words).
-Rules:
+CRITICAL 12-SECOND BREVITY RULE:
+Generate EXACTLY ONE short spoken sentence (10 to 18 words maximum).
 - Sound conversational, calm, and consultative.
 - Acknowledge what they just said.
-- Propose a low-friction 10-minute preview or ask for the practice manager.
+- Propose a low-friction 60-second video preview or ask for the practice manager.
 - No markdown, no quotes, just plain spoken words.
 """
             txt = LLMRouter.generate_text(
                 prompt=f'The prospect just said: "{last_prospect_text}"',
                 system_prompt=sys_prompt,
-                max_tokens=60
+                max_tokens=50
             )
-            txt = txt.strip().replace('"', '').replace('\n', ' ')
-            if len(txt.split()) <= 25 and len(txt) > 5:
+            txt = EmpathyVoicePromptEngine.enforce_brevity(txt)
+            if len(txt.split()) <= 20 and len(txt) > 5:
                 return txt
         except Exception as e:
             logger.warning(f"LLMRouter takeover generation fallback: {e}")
