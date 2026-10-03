@@ -185,34 +185,94 @@ def generate_kokoro_speech_wav(text: str, filename: str, voice_name: str = "af_s
         return None
 
 
+def generate_google_cloud_tts_mp3(
+    text: str,
+    filename: str,
+    voice_name: str = "en-US-Journey-F",
+    speaking_rate: float = 1.05
+) -> Optional[Dict[str, str]]:
+    """
+    Synthesizes speech using official Google Cloud Text-to-Speech API with hyper-realistic Journey neural voices.
+    Billed against Google Cloud Free Trial credits.
+    """
+    key = os.getenv("GOOGLE_PLACES_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+    if not key or key.startswith("mock_"):
+        return None
+
+    import httpx
+    import base64
+    from pathlib import Path
+
+    clean_text = re.sub(r'[\*\#\_\[\]]', '', text).strip()
+    url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={key}"
+    payload = {
+        "input": {"text": clean_text},
+        "voice": {
+            "languageCode": "en-US",
+            "name": voice_name
+        },
+        "audioConfig": {
+            "audioEncoding": "MP3",
+            "speakingRate": speaking_rate
+        }
+    }
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            resp = client.post(url, json=payload)
+            if resp.status_code == 200:
+                data = resp.json()
+                audio_bytes = base64.b64decode(data["audioContent"])
+                out_dir = Path(__file__).resolve().parent / "output" / "calls"
+                out_dir.mkdir(exist_ok=True, parents=True)
+                out_file = out_dir / f"{filename}.mp3"
+                with open(out_file, "wb") as f:
+                    f.write(audio_bytes)
+                logger.info(f"Generated Google Cloud Journey TTS: {out_file.name} (voice={voice_name})")
+                return {
+                    "audio_url": f"/output/calls/{out_file.name}",
+                    "engine": f"Google Cloud Journey TTS ({voice_name})"
+                }
+            else:
+                logger.warning(f"Google Cloud TTS returned {resp.status_code}: {resp.text[:120]}")
+    except Exception as e:
+        logger.error(f"Google Cloud TTS call error: {e}")
+
+    return None
+
+
 def generate_speech_audio(
     text: str,
     filename: str,
     preferred_engine: str = "auto-fast",
-    voice_name: str = "af_sarah"
+    voice_name: str = "en-US-Journey-F"
 ) -> Dict[str, Any]:
     """
     High-reliability Multi-Model Voice Synthesis Pipeline:
-    1. 'auto-fast' / 'kokoro': Local Kokoro-82M ONNX on host PC (Fastest sub-2s natural cadence, $0 cost, zero cloud quota limits).
-    2. 'auto' / 'gemini-3.1': Gemini 3.1 Flash TTS Preview with instant Kokoro failover.
-    3. 'gemini-2.5': Gemini 2.5 Flash TTS with Kokoro failover.
+    1. Google Cloud Text-to-Speech (Journey Neural Voices - Human-Grade, GCP Credit).
+    2. Local Kokoro-82M ONNX (Ultra-Fast 0ms network latency fallback).
+    3. Gemini Flash TTS preview.
     """
     engine_req = preferred_engine.lower()
 
-    # Fast Natural Mode (Kokoro first for lowest latency and zero rate limits)
-    if engine_req in ("auto-fast", "fast", "kokoro", "local", "kokoro-82m"):
-        k_voice = voice_name if voice_name.startswith(("af_", "am_", "bf_", "bm_")) else "af_sarah"
-        audio_url = generate_kokoro_speech_wav(text=text, filename=filename, voice_name=k_voice, speed=1.15)
-        if audio_url:
-            return {"audio_url": audio_url, "engine": "Kokoro-82M (Local Ultra-Fast)"}
+    # 1. Try Google Cloud Journey Neural TTS first (Paid by GCP Credits)
+    g_voice = voice_name if "Journey" in voice_name or "Neural2" in voice_name else "en-US-Journey-F"
+    g_res = generate_google_cloud_tts_mp3(text=text, filename=filename, voice_name=g_voice)
+    if g_res:
+        return g_res
 
-        # Fallback to Gemini if Kokoro fails
-        logger.warning("Local Kokoro synthesis failed. Failing over to Gemini Flash TTS...")
-        res = generate_gemini_speech_wav(text=text, filename=filename, voice_name="Puck", target_model="gemini-3.1-flash-tts-preview")
-        if res:
-            return {"audio_url": res["audio_url"], "engine": "Gemini 3.1 Flash TTS (Fallback)"}
+    # 2. Local Kokoro-82M ONNX fallback
+    k_voice = "af_sarah" if not voice_name.startswith(("af_", "am_")) else voice_name
+    audio_url = generate_kokoro_speech_wav(text=text, filename=filename, voice_name=k_voice, speed=1.15)
+    if audio_url:
+        return {"audio_url": audio_url, "engine": "Kokoro-82M (Local Ultra-Fast)"}
 
-    elif engine_req in ("auto", "gemini", "gemini-3.1", "gemini-3.1-flash"):
+    # 3. Fallback to Gemini if other engines fail
+    res = generate_gemini_speech_wav(text=text, filename=filename, voice_name="Puck", target_model="gemini-3.1-flash-tts-preview")
+    if res:
+        return {"audio_url": res["audio_url"], "engine": "Gemini 3.1 Flash TTS (Fallback)"}
+
+    return {"audio_url": None, "engine": "NONE"}
         gemini_voice = voice_name if voice_name in ["Puck", "Charon", "Kore", "Fenrir", "Aoede"] else "Puck"
         res = generate_gemini_speech_wav(text=text, filename=filename, voice_name=gemini_voice, target_model="gemini-3.1-flash-tts-preview")
         if res:

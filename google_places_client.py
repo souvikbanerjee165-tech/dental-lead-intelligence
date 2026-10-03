@@ -10,7 +10,10 @@ import logging
 from typing import List, Dict, Any, Optional
 
 import httpx
+from dotenv import load_dotenv
 from models import RawLead
+
+load_dotenv()
 
 logger = logging.getLogger("google_places_client")
 
