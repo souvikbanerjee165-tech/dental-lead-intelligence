@@ -247,13 +247,16 @@ class LiveDialerEngine:
         # Formulate contextual response
         reply_text = cls._generate_takeover_response(session, user_prompt_override)
 
-        # Sub-second voice synthesis (Kokoro-82M local ONNX preferred)
+        # Sub-second voice synthesis (Google Cloud Journey Neural TTS preferred)
         filename = f"takeover_{int(time.time())}_{abs(hash(reply_text)) % 10000}"
+        from voice_dialer import get_instant_conversational_filler
+        filler_info = get_instant_conversational_filler()
+
         speech = generate_speech_audio(
             text=reply_text,
             filename=filename,
             preferred_engine="auto-fast",
-            voice_name="af_sarah"
+            voice_name="en-US-Journey-F"
         )
 
         ai_turn = {
@@ -277,6 +280,8 @@ class LiveDialerEngine:
             "current_mode": "AI_CONTROL",
             "reply_text": reply_text,
             "audio_url": speech.get("audio_url"),
+            "filler_audio_url": filler_info.get("audio_url"),
+            "filler_text": filler_info.get("text"),
             "voice_engine": speech.get("engine"),
             "handoff_event": handoff_entry,
             "transcript_turn": ai_turn,
@@ -527,12 +532,13 @@ class LiveDialerEngine:
 
     @classmethod
     def _generate_takeover_response(cls, session: Dict[str, Any], user_hint: Optional[str]) -> str:
-        """Uses Gemini Flash or high-speed deterministic rules to generate the next spoken AI line."""
+        """Uses multi-turn conversational context and anti-repetition matrix to generate the next spoken AI line."""
         key = GOOGLE_API_KEY or GEMINI_API_KEY
         clinic_name = session.get("clinic_name", "Dental Practice")
         doctor_name = session.get("doctor_name", "Doctor")
         script = session.get("script") or {}
         history = session.get("transcript") or []
+        used_rebuttals = session.setdefault("used_rebuttals", [])
 
         # Find the last turn from the prospect
         last_prospect_text = "How can I help you?"
@@ -547,14 +553,30 @@ class LiveDialerEngine:
             rep_mgr.process_opt_out(session.get("phone_number", ""), clinic_name=clinic_name, reason="LIVE_CALL_OPT_OUT")
             return "Understood, I have removed your number from our contact list immediately. Have a wonderful day!"
 
-        # 2. Automated Empathy Bridge Objection Rebuttal (Instant zero-latency response)
+        # 2. Automated Empathy Bridge Objection Rebuttal (Instant zero-latency response with anti-repetition)
         obj_key = EmpathyVoicePromptEngine.detect_objection(last_prospect_text)
         dossier = session.get("dossier") or {}
         if obj_key and not user_hint:
-            rebuttal = EmpathyVoicePromptEngine.get_empathy_rebuttal(obj_key, dossier)
+            rebuttal = EmpathyVoicePromptEngine.get_empathy_rebuttal(obj_key, dossier, used_phrases=used_rebuttals)
+            used_rebuttals.append(rebuttal)
             return EmpathyVoicePromptEngine.enforce_brevity(rebuttal)
 
-        # 3. Multi-provider generation through LLMRouter (OpenAI / DeepSeek / Gemini)
+        # 3. Multi-turn dialogue transcript extraction
+        transcript_lines = []
+        already_said = []
+        for t in history[-6:]:
+            spk = t.get("speaker") or ("Prospect" if t.get("role") in ("user", "prospect") else "AI Jordan")
+            txt = (t.get("text") or "").strip()
+            if txt:
+                transcript_lines.append(f"- {spk}: \"{txt}\"")
+            if t.get("role") in ("assistant", "system") or "AI" in str(spk):
+                already_said.append(txt)
+
+        history_block = "\n".join(transcript_lines) if transcript_lines else f'- Prospect: "{last_prospect_text}"'
+        recent_said_guard = "; ".join([f'"{p}"' for p in already_said[-3:]]) if already_said else ""
+        repetition_prompt = f"\nCRITICAL ANTI-REPETITION MANDATE:\nYou already stated earlier: [{recent_said_guard}].\nNEVER repeat, rehash, or rephrase any earlier statement, question, or pitch. Move forward!" if recent_said_guard else ""
+
+        # 4. Multi-provider generation through LLMRouter (OpenAI / DeepSeek / Gemini)
         try:
             from llm_router import LLMRouter
             sys_prompt = session.get("empathy_voice_prompt") or f"""You are an elite, warm Dental AI Growth Specialist stepping in on a live call with '{clinic_name}'.
@@ -562,34 +584,46 @@ Doctor: Dr. {doctor_name}
 Monthly Missed Revenue: {session.get('monthly_leakage', '$4,200/mo')}
 User instruction/hint: "{user_hint or 'Pivot smoothly and ask to verify weekend patient capture.'}"
 
-CRITICAL 12-SECOND BREVITY RULE:
-Generate EXACTLY ONE short spoken sentence (10 to 18 words maximum).
+{repetition_prompt}
+
+CRITICAL 12-SECOND BREVITY & CONVERSATIONAL RULES:
+- Generate EXACTLY ONE short spoken sentence (10 to 18 words maximum).
 - Sound conversational, calm, and consultative.
 - Acknowledge what they just said.
 - Propose a low-friction 60-second video preview or ask for the practice manager.
 - No markdown, no quotes, just plain spoken words.
 """
+            prompt_content = f"""RECENT CONVERSATION TRANSCRIPT:
+{history_block}
+
+The prospect just said: "{last_prospect_text}"
+Generate your next single spoken response (DO NOT REPEAT PREVIOUS STATEMENTS):"""
+
             txt = LLMRouter.generate_text(
-                prompt=f'The prospect just said: "{last_prospect_text}"',
+                prompt=prompt_content,
                 system_prompt=sys_prompt,
                 max_tokens=50
             )
             txt = EmpathyVoicePromptEngine.enforce_brevity(txt)
-            if len(txt.split()) <= 20 and len(txt) > 5:
+            if len(txt.split()) <= 24 and len(txt) > 5 and txt not in already_said:
+                used_rebuttals.append(txt)
                 return txt
         except Exception as e:
             logger.warning(f"LLMRouter takeover generation fallback: {e}")
 
-        # Deterministic instant fallback
+        # Dynamic fallback matching
         txt_lower = last_prospect_text.lower()
         if "weave" in txt_lower or "software" in txt_lower:
-            return f"We actually integrate right alongside Weave to capture high-value Sunday implant patients when your team is home."
+            cand = f"We actually integrate right alongside Weave to capture high-value Sunday implant patients when your team is home."
         elif "busy" in txt_lower or "surgery" in txt_lower:
-            return f"Totally understand Dr. {doctor_name} is with patients. Who manages the calendar so I can send a 60-second video?"
+            cand = f"Totally understand Dr. {doctor_name} is with patients. Who coordinates the calendar so I can send a 60-second video?"
         elif "email" in txt_lower:
-            return f"Happy to email it over. What is the direct email for your practice manager?"
+            cand = f"Happy to email it over! What is the direct email for your practice manager so it doesn't get lost?"
         else:
-            return f"Thanks for bearing with us. I was simply hoping to show Dr. {doctor_name} how to capture 3-4 extra Sunday appointments."
+            cand = f"Thanks for bearing with us. I was hoping to show Dr. {doctor_name}'s team how to capture 3 extra Sunday bookings."
+
+        used_rebuttals.append(cand)
+        return cand
 
     @classmethod
     def _calculate_talk_ratios(cls, session: Dict[str, Any]) -> Dict[str, Any]:

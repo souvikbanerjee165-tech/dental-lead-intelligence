@@ -359,16 +359,36 @@ class LLMRouter:
         provider: Optional[str] = None
     ) -> Dict[str, Any]:
         """Low-latency conversational reply generator bounded to phone dialogue."""
-        rules = """
+        history_str = ""
+        already_said = []
+        if history:
+            history_lines = []
+            for t in history[-6:]:
+                spk = t.get("speaker") or ("Prospect" if t.get("role") in ("user", "prospect") else "AI Jordan")
+                txt = (t.get("text") or "").strip()
+                if txt:
+                    history_lines.append(f"- {spk}: \"{txt}\"")
+                if t.get("role") in ("assistant", "system") or "AI" in spk:
+                    already_said.append(txt)
+            if history_lines:
+                history_str = "\n### RECENT CALL TRANSCRIPT:\n" + "\n".join(history_lines) + "\n"
+
+        repetition_guard = ""
+        if already_said:
+            recent_points = "; ".join([f'"{p}"' for p in already_said[-3:]])
+            repetition_guard = f"\nCRITICAL ANTI-REPETITION MANDATE:\nYou already stated earlier: [{recent_points}].\nDO NOT repeat, rehash, or rephrase any of those statements or arguments. Directly address what the prospect just said and move the conversation forward!\n"
+
+        rules = f"""
 CRITICAL CONVERSATIONAL RULES (LIVE PHONE CALL):
-1. Keep reply to EXACTLY 1 crisp sentence (10 to 15 words maximum).
+1. Keep reply to EXACTLY 1 crisp sentence (10 to 18 words maximum).
 2. Sound like a relaxed, consultative colleague, NOT a bot or telemarketer.
 3. If they give an objection: Empathize in 3 words and pivot to a 2-minute video prototype or ask for office manager.
 4. If they ask about price: Quote $1,500 setup and $399/mo, or anchor against 1 single implant case.
 5. If they are open to meeting or ask when: Confirm Thursday at 11:00 AM.
 6. Return JSON with keys: "reply", "is_meeting_booked" (boolean), "booked_slot" (string or null).
+{repetition_guard}
 """
-        full_system = f"{system_prompt}\n{rules}"
+        full_system = f"{system_prompt}\n{history_str}\n{rules}"
         prompt = f"Prospect just said: \"{user_message}\"\n\nGenerate the next spoken response in JSON:"
 
         json_res = cls.generate_json(prompt=prompt, system_prompt=full_system, provider=provider)

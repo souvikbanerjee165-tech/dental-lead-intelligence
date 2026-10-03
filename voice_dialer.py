@@ -159,7 +159,75 @@ def get_kokoro_model():
     return None
 
 
-def generate_kokoro_speech_wav(text: str, filename: str, voice_name: str = "af_sarah", speed: float = 1.15) -> Optional[str]:
+def normalize_speech_text_for_human_voice(text: str) -> str:
+    """
+    Transforms raw written text into natural spoken English for neural TTS engines.
+    Converts numbers, prices, hours, and acronyms into natural conversational speech.
+    """
+    if not text:
+        return ""
+    t = text.strip()
+    # Strip markdown and brackets
+    t = re.sub(r'[\*\#\_\[\]`\"]', '', t)
+
+    # Specific dental pricing phrases
+    t = re.sub(r'\$1,?500', 'fifteen hundred dollars', t)
+    t = re.sub(r'\$399\s*(/mo|/month|\s*a month)?', 'three ninety-nine a month', t)
+    t = re.sub(r'\$397\s*(/mo|/month|\s*a month)?', 'three ninety-seven a month', t)
+    t = re.sub(r'\$350\s*(/mo|/month|\s*a month)?', 'three fifty a month', t)
+    t = re.sub(r'\$4,?200\s*(/mo|/month|\s*a month)?', 'forty-two hundred dollars a month', t)
+    t = re.sub(r'\$4,?800\s*(/mo|/month|\s*a month)?', 'forty-eight hundred dollars a month', t)
+    t = re.sub(r'\$5,?200\s*(/mo|/month|\s*a month)?', 'fifty-two hundred dollars a month', t)
+    t = re.sub(r'\$([0-9]+),000', r'\1 thousand dollars', t)
+
+    # Honorifics and common clinic terms
+    t = re.sub(r'\bDr\.\s*', 'Doctor ', t)
+    t = re.sub(r'\binfo@', 'info at ', t)
+    t = re.sub(r'\bEHR\b', 'E-H-R', t)
+    t = re.sub(r'\bAI\b', 'A-I', t)
+    t = re.sub(r'\b11:00\s*AM\b', 'eleven A-M', t, flags=re.IGNORECASE)
+    t = re.sub(r'\b11\s*AM\b', 'eleven A-M', t, flags=re.IGNORECASE)
+    t = re.sub(r'\b6\s*PM\b', 'six P-M', t, flags=re.IGNORECASE)
+    t = re.sub(r'\b8\s*AM\b', 'eight A-M', t, flags=re.IGNORECASE)
+    t = re.sub(r'\b8\s*PM\b', 'eight P-M', t, flags=re.IGNORECASE)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
+
+
+INSTANT_FILLERS = [
+    {"text": "Totally get that.", "audio_url": "/output/calls/fillers/filler_totally_get_that.mp3"},
+    {"text": "Gotcha.", "audio_url": "/output/calls/fillers/filler_gotcha.mp3"},
+    {"text": "Yeah, makes complete sense.", "audio_url": "/output/calls/fillers/filler_makes_sense.mp3"},
+    {"text": "Fair enough.", "audio_url": "/output/calls/fillers/filler_fair_enough.mp3"},
+    {"text": "Right, yeah.", "audio_url": "/output/calls/fillers/filler_right.mp3"},
+    {"text": "Understood.", "audio_url": "/output/calls/fillers/filler_understood.mp3"}
+]
+
+
+def ensure_fillers_pregenerated():
+    """Ensures filler audio clips exist in output/calls/fillers, generating them once if missing."""
+    try:
+        from pathlib import Path
+        out_dir = Path(__file__).resolve().parent / "output" / "calls" / "fillers"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for f in INSTANT_FILLERS:
+            f_name = Path(f["audio_url"]).name
+            target = out_dir / f_name
+            if not target.exists():
+                stem = f_name.replace(".mp3", "")
+                generate_google_cloud_tts_mp3(f["text"], f"fillers/{stem}", voice_name="en-US-Journey-F", speaking_rate=1.0)
+    except Exception as e:
+        logger.warning(f"Could not auto-generate missing fillers: {e}")
+
+
+def get_instant_conversational_filler() -> Dict[str, str]:
+    """Returns a random pre-synthesized acoustic filler for zero-latency masked response."""
+    import random
+    ensure_fillers_pregenerated()
+    return random.choice(INSTANT_FILLERS)
+
+
+def generate_kokoro_speech_wav(text: str, filename: str, voice_name: str = "af_sarah", speed: float = 1.05) -> Optional[str]:
     """
     Synthesizes speech locally using Kokoro-82M ONNX model on the host PC (GPU/CPU)
     with 0 API costs, ultra-low latency, and natural human conversational pacing.
@@ -171,7 +239,7 @@ def generate_kokoro_speech_wav(text: str, filename: str, voice_name: str = "af_s
         import soundfile as sf
         from pathlib import Path
 
-        clean_text = re.sub(r'[\*\#\_\[\]]', '', text).strip()
+        clean_text = normalize_speech_text_for_human_voice(text)
         samples, sample_rate = kokoro.create(clean_text, voice=voice_name, speed=speed, lang="en-us")
         
         out_dir = Path(__file__).resolve().parent / "output" / "calls"
@@ -189,7 +257,7 @@ def generate_google_cloud_tts_mp3(
     text: str,
     filename: str,
     voice_name: str = "en-US-Journey-F",
-    speaking_rate: float = 1.05
+    speaking_rate: float = 1.02
 ) -> Optional[Dict[str, str]]:
     """
     Synthesizes speech using official Google Cloud Text-to-Speech API with hyper-realistic Journey neural voices.
@@ -203,7 +271,7 @@ def generate_google_cloud_tts_mp3(
     import base64
     from pathlib import Path
 
-    clean_text = re.sub(r'[\*\#\_\[\]]', '', text).strip()
+    clean_text = normalize_speech_text_for_human_voice(text)
     url = f"https://texttospeech.googleapis.com/v1/text:synthesize?key={key}"
     payload = {
         "input": {"text": clean_text},
@@ -256,14 +324,14 @@ def generate_speech_audio(
     engine_req = preferred_engine.lower()
 
     # 1. Try Google Cloud Journey Neural TTS first (Paid by GCP Credits)
-    g_voice = voice_name if "Journey" in voice_name or "Neural2" in voice_name else "en-US-Journey-F"
+    g_voice = voice_name if "Journey" in voice_name or "Neural2" in voice_name or "Studio" in voice_name else "en-US-Journey-F"
     g_res = generate_google_cloud_tts_mp3(text=text, filename=filename, voice_name=g_voice)
     if g_res:
         return g_res
 
     # 2. Local Kokoro-82M ONNX fallback
     k_voice = "af_sarah" if not voice_name.startswith(("af_", "am_")) else voice_name
-    audio_url = generate_kokoro_speech_wav(text=text, filename=filename, voice_name=k_voice, speed=1.15)
+    audio_url = generate_kokoro_speech_wav(text=text, filename=filename, voice_name=k_voice, speed=1.05)
     if audio_url:
         return {"audio_url": audio_url, "engine": "Kokoro-82M (Local Ultra-Fast)"}
 

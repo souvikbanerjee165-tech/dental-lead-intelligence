@@ -1535,8 +1535,11 @@ Return STRICTLY a JSON object with:
         text=reply_text,
         filename=filename,
         preferred_engine=req.engine or "auto-fast",
-        voice_name=req.voice_name or "af_sarah"
+        voice_name=req.voice_name or "en-US-Journey-F"
     )
+
+    from voice_dialer import get_instant_conversational_filler
+    filler_info = get_instant_conversational_filler()
     
     new_history = list(req.history)
     new_history.append({
@@ -1567,6 +1570,8 @@ Return STRICTLY a JSON object with:
         "status": "active",
         "reply": reply_text,
         "audio_url": speech.get("audio_url"),
+        "filler_audio_url": filler_info.get("audio_url"),
+        "filler_text": filler_info.get("text"),
         "engine_used": speech.get("engine"),
         "is_meeting_booked": is_booked,
         "booked_slot": booked_slot,
