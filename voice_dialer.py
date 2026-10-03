@@ -666,6 +666,10 @@ class VoiceDialerEngine:
                     err_msg = f"Telnyx error {err_json['telnyx_error'].get('error_code')}"
             except Exception:
                 pass
+
+            if "D60" in err_msg or "non-verified numbers" in err_msg:
+                err_msg = "Telnyx Trial Restriction (D60): Free trial accounts can only dial numbers verified in portal.telnyx.com. To call any clinic, upgrade your Telnyx account with a payment method, verify your personal number in Telnyx portal, or switch to 'Browser Live Mic' mode."
+
             logger.error(f"Telnyx API call failed: {err_msg}")
             return {
                 "status": "failed",

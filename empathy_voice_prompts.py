@@ -398,7 +398,7 @@ You adopt a calm, clinical cadence, deploy conversational disconfirmation, and s
             else:
                 break
 
-        if accum:
+        if accum and accum_words >= 6:
             return " ".join(accum).strip()
 
         trimmed = " ".join(words[:cls.BREVITY_MAX_WORDS])
