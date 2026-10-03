@@ -134,6 +134,21 @@ class PreCallDossierCompiler:
         if not competitors:
             competitors = [f"Top competitor in {city}", "Regional dental group"]
 
+        # 4. Dormant Hygiene Recall Calculator (from Master Clinical Training Architecture)
+        # N_charts benchmarked from review volume (1,200 to 4,500 charts, established default: 2,500)
+        n_charts = max(1200, min(5000, int(review_count * 28)))
+        if n_charts < 1800:
+            n_charts = 1200
+        elif n_charts > 3500:
+            n_charts = 4500
+        else:
+            n_charts = 2500
+        dormant_charts = int(n_charts * 0.35)
+        trapped_hygiene_val = dormant_charts * 225
+        month1_reactivations = int(dormant_charts * 0.14)
+        month1_cash_injection = month1_reactivations * 225
+        setup_roi_x = round((month1_cash_injection - 1500) / 1500, 1)
+
         dossier = {
             "lead_id": lead_id,
             "clinic_name": clinic_name,
@@ -147,6 +162,12 @@ class PreCallDossierCompiler:
             "review_count": review_count,
             "monthly_leakage": monthly_loss_str,
             "annual_leakage": annual_loss_str,
+            "n_charts": n_charts,
+            "dormant_charts": dormant_charts,
+            "trapped_hygiene_val_str": f"${trapped_hygiene_val:,.0f}",
+            "month1_cash_injection_str": f"${month1_cash_injection:,.0f}",
+            "month1_reactivations": month1_reactivations,
+            "setup_roi_x": f"{setup_roi_x}x",
             "detected_ehr": detected_ehr,
             "has_online_booking": has_booking,
             "intake_friction_points": intake_friction_points,

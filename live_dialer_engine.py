@@ -483,44 +483,61 @@ class LiveDialerEngine:
         counter_punch = None
         buying_signals = []
 
-        # 1. Objection Patterns & Counter-Punches
-        if any(w in txt_lower for w in ["weave", "podium", "nexhealth", "birdeye", "software", "already have", "system"]):
-            detected_objection = "Existing Software / Front-Desk Platform"
-            counter_punch = "We don't replace your daytime software — we integrate after-hours so weekend patients don't call your competitor."
-        elif any(w in txt_lower for w in ["receptionist", "front desk", "staff", "full time", "handles it"]):
-            detected_objection = "Staff Handles All Calls"
-            counter_punch = "Your front desk does an amazing job during office hours. Our AI only catches the 3-5 high-ticket Sunday patients when everyone is home."
-        elif any(w in txt_lower for w in ["busy", "in surgery", "with a patient", "no time", "call back"]):
-            detected_objection = "Doctor Busy with Patients"
-            counter_punch = "Completely understand, Dr. is focused on patients. Who coordinates the doctor's calendar so I can send a 90-second video breakdown?"
+        # 1. Master Clinical Objection Patterns & Counter-Punches
+        if any(w in txt_lower for w in ["weave", "nexhealth", "revenuewell", "podium", "birdeye", "software", "already use"]):
+            detected_objection = "Incumbent Software (Passive vs Active Conversion Layer)"
+            counter_punch = "Weave is great for daytime reminders, but Friday 8 PM emergency calls hit voicemail. We operate alongside Weave as an active triage layer in under 3 seconds."
+        elif any(w in txt_lower for w in ["full", "booked out", "packed", "three weeks", "at capacity", "don't need patients"]):
+            detected_objection = "Chairs Full / Calendar Backlog (Dormant Recall Opportunity)"
+            counter_punch = "Booked schedules experience 12-15% breakage. Your PMS holds ~850 dormant charts ($190k+ trapped). We reactivate hygiene and backfill cancellations automatically."
+        elif any(w in txt_lower for w in ["write directly", "dentrix", "eaglesoft", "open dental", "mess up", "double-book"]):
+            detected_objection = "PMS Calendar Integrity & Write-Protection Paranoia"
+            counter_punch = "We never overwrite provider columns. Certified APIs place bookings into an isolated WebSched hold column for front-desk approval during morning huddle."
+        elif any(w in txt_lower for w in ["don't want emergency", "bad payer", "chaotic", "walk-in", "emergencies disrupt"]):
+            detected_objection = "Emergency Patient Profile Concern"
+            counter_punch = "Our triage engine screens exclusively for high-value $1,250+ restorative cases (cracked molars, broken crowns) slotted strictly into your pre-set buffer blocks."
+        elif any(w in txt_lower for w in ["hipaa", "baa", "compliance", "privacy", "security"]):
+            detected_objection = "HIPAA Compliance & Data Security"
+            counter_punch = "We execute an omnibus BAA directly with the practice. 256-bit encryption, strict PHI segregation, 10DLC healthcare routes, and TCPA consent logging."
+        elif any(w in txt_lower for w in ["partner", "wife", "think about it", "committee", "discuss"]):
+            detected_objection = "Internal Governance Deferral (3-Mile Scarcity Lock)"
+            counter_punch = "We enforce a strict 3-mile postal exclusivity lock. We can place a temporary 72-hour administrative hold on your territory while your team reviews the SLA."
+        elif any(w in txt_lower for w in ["cost", "how much", "price", "expensive", "fee", "$1,500", "budget"]):
+            detected_objection = "Setup Cost & Retainer (Single-Patient Break-Even SLA)"
+            counter_punch = "A single $1,250 restorative case covers the entire setup. Backed by our Single-Patient Break-Even Guarantee: book >=1 patient in 30 days or 100% refund."
+        elif any(w in txt_lower for w in ["ai", "robot", "automated", "recording"]):
+            detected_objection = "AI Identity Detection (Live Operational Proof)"
+            counter_punch = "Demonstrates how fluidly the engine triages after-hours emergency patients and books them into your PMS in under 5 seconds."
+        elif any(w in txt_lower for w in ["operatory", "with a patient", "chair time", "surgery", "busy"]):
+            detected_objection = "Doctor In Operatory / Clinical Care Priority"
+            counter_punch = f"Clinical care comes first! A 60-second video teardown was prepared for {clinic}. Does the office manager oversee after-hours schedule capacity?"
         elif any(w in txt_lower for w in ["send an email", "email us", "info@", "send information"]):
-            detected_objection = "Send Information via Email"
-            counter_punch = f"Happy to email it right over. What's the direct email for {doctor}'s practice manager so it doesn't get buried in the general info inbox?"
+            detected_objection = "Send Information via Email (Unmonitored Inbox Trap)"
+            counter_punch = f"The general info inbox auto-archives outside diagnostic reports. What is the direct email for {doctor}'s practice manager so it routes properly?"
         elif any(w in txt_lower for w in ["not interested", "no thanks", "take off list", "don't call"]):
-            detected_objection = "General Disinterest"
-            counter_punch = "Totally fair. If uncaptured Sunday implant inquiries ever become a priority, we're here to help. Have a great week!"
-        elif any(w in txt_lower for w in ["cost", "how much", "price", "expensive", "fee"]):
-            detected_objection = "Pricing Question"
-            counter_punch = "It's a flat $397/month with zero per-lead fees — if it captures just one routine filling or implant consultation, it pays for itself 5x over."
+            detected_objection = "General Disinterest / Territory Closeout"
+            counter_punch = "Understood. The 3-mile submarket audit showed $5,350/mo leaking to competitors. Should we close out the territory reservation for another office?"
 
         # 2. Buying Signals
         if any(w in txt_lower for w in ["sunday", "weekend", "after hours", "evening", "voicemail"]):
             buying_signals.append("Acknowledged after-hours / weekend missed calls")
+        if any(w in txt_lower for w in ["hygiene", "recall", "dormant", "cleaning", "reactivat"]):
+            buying_signals.append("Interested in dormant hygiene recall cash injection")
         if any(w in txt_lower for w in ["how does it work", "tell me more", "how does that", "show me"]):
             buying_signals.append("Inquiry about operational mechanics")
-        if any(w in txt_lower for w in ["thursday", "friday", "tomorrow", "calendar", "meet", "demo", "zoom"]):
-            buying_signals.append("Receptive to scheduling preview / meeting")
-        if any(w in txt_lower for w in ["implant", "cosmetic", "emergency", "invisalign", "dentures"]):
+        if any(w in txt_lower for w in ["thursday", "friday", "tomorrow", "calendar", "meet", "demo", "zoom", "agreement", "sla"]):
+            buying_signals.append("Receptive to scheduling preview / territory SLA execution")
+        if any(w in txt_lower for w in ["implant", "crown", "emergency", "root canal", "restorative"]):
             buying_signals.append("Mentioned high-ticket clinical procedures")
 
         # 3. Suggested Next Line for Human
         suggested_line = "Could you tell me who handles patient inquiries when the office closes on Friday?"
         if counter_punch:
             suggested_line = counter_punch
-        elif "thursday" in txt_lower or "meet" in txt_lower or "demo" in txt_lower:
-            suggested_line = "Thursday at 11 AM works great on my end. Who should receive the 10-minute preview invite?"
+        elif "thursday" in txt_lower or "meet" in txt_lower or "demo" in txt_lower or "agreement" in txt_lower:
+            suggested_line = "Thursday at 11 AM works great on my end. Who should receive the 10-minute preview invite and territory SLA link?"
         elif buying_signals:
-            suggested_line = f"Exactly — when those inquiries come in on Sunday, our AI answers in 5 seconds and puts them right on {doctor}'s schedule."
+            suggested_line = f"Exactly — our AI triages callers in 5 seconds and places them into your WebSched hold column for Dr. {doctor}'s review."
 
         return {
             "detected_objection": detected_objection,
