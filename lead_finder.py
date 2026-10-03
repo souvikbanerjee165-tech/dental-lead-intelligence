@@ -36,6 +36,48 @@ class GoogleMapsLeadFinder:
         Automatically ignores leads already tracked in database if is_existing_fn is provided.
         """
         results: List[RawLead] = []
+
+        # 1. Try Official Google Places API (New) if API key is active
+        try:
+            from google_places_client import GooglePlacesClient
+            places_client = GooglePlacesClient()
+            if places_client.is_configured():
+                places_leads = await places_client.search_clinics(query=query, limit=limit)
+                if places_leads:
+                    for idx, lead in enumerate(places_leads, 1):
+                        is_dup = False
+                        if is_existing_fn:
+                            try:
+                                is_dup = is_existing_fn(lead.name, lead.website, lead.phone)
+                            except TypeError:
+                                try:
+                                    is_dup = is_existing_fn(lead.name, lead.website)
+                                except Exception:
+                                    is_dup = False
+                        if not is_dup:
+                            results.append(lead)
+                            if on_lead_found:
+                                try:
+                                    if asyncio.iscoroutinefunction(on_lead_found):
+                                        await on_lead_found(lead, idx, len(places_leads))
+                                    else:
+                                        on_lead_found(lead, idx, len(places_leads))
+                                except Exception:
+                                    pass
+                        elif on_lead_skipped:
+                            try:
+                                if asyncio.iscoroutinefunction(on_lead_skipped):
+                                    await on_lead_skipped(lead.name, "Already in database")
+                                else:
+                                    on_lead_skipped(lead.name, "Already in database")
+                            except Exception:
+                                pass
+                    if results:
+                        return results
+        except Exception:
+            pass
+
+        # 2. Fallback: Browser Scraper (Playwright)
         encoded_query = urllib.parse.quote_plus(query)
         search_url = f"{MAPS_BASE_URL}/search/{encoded_query}"
 
