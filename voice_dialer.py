@@ -13,6 +13,8 @@ import json
 import logging
 import asyncio
 import base64
+import threading
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import urllib.request
@@ -558,7 +560,7 @@ class VoiceDialerEngine:
 
             if db:
                 db.log_call_outcome(
-                    lead_id=lead.get("id"),
+                    lead_id=lead.get("id") or "manual_call",
                     outcome="CALL_INITIATED",
                     rep_notes=f"Twilio outbound call placed to {target_phone} via {from_phone}. Call SID: {call_sid}",
                     duration_sec=0
@@ -588,6 +590,46 @@ class VoiceDialerEngine:
                 "error": err_msg,
                 "message": f"Twilio call failed: {err_msg}"
             }
+
+    @classmethod
+    def _monitor_and_speak_on_answer(cls, call_control_id: str, text: str, api_key: str):
+        """Monitors an active Telnyx outbound call and speaks the hook the instant recipient answers."""
+        if not call_control_id or call_control_id.startswith("mock_"):
+            return
+        for _ in range(25):  # poll every 1.5s for up to ~35s
+            time.sleep(1.5)
+            try:
+                speak_req = urllib.request.Request(
+                    f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/speak",
+                    data=json.dumps({
+                        "payload": text,
+                        "voice": "female",
+                        "language": "en-US",
+                        "service_level": "basic"
+                    }).encode("utf-8"),
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    method="POST"
+                )
+                with urllib.request.urlopen(speak_req, timeout=5) as resp:
+                    if resp.status == 200:
+                        logger.info(f"Telnyx call {call_control_id} answered! Spoke opening hook.")
+                        break
+            except urllib.error.HTTPError as e:
+                try:
+                    raw = e.read().decode("utf-8")
+                    err_json = json.loads(raw)
+                    err_code = err_json.get("errors", [{}])[0].get("code")
+                    # 90034 = Call not answered yet (keep waiting)
+                    if err_code == "90034":
+                        continue
+                except Exception:
+                    pass
+                break
+            except Exception:
+                break
 
     @classmethod
     def _dispatch_telnyx_call(
@@ -637,11 +679,20 @@ class VoiceDialerEngine:
                 # Log to DB
                 if db:
                     db.log_call_outcome(
-                        lead_id=lead.get("id"),
+                        lead_id=lead.get("id") or "manual_call",
                         outcome="CALL_INITIATED",
                         rep_notes=f"Telnyx outbound call placed to {target_phone}. Call ID: {call_control_id}",
                         duration_sec=0
                     )
+
+                # Asynchronously monitor and speak opening hook the instant recipient answers
+                hook_text = script.get("gatekeeper_hook") or "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
+                if call_control_id and not call_control_id.startswith("mock_"):
+                    threading.Thread(
+                        target=cls._monitor_and_speak_on_answer,
+                        args=(call_control_id, hook_text, get_telnyx_api_key()),
+                        daemon=True
+                    ).start()
 
                 return {
                     "status": "initiated",

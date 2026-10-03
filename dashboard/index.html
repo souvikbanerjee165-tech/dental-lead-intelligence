@@ -4519,18 +4519,25 @@
 
     // Initialize Interactive Geographic Map
     function initMap() {
-      if (leafletMap) return;
       const mapElem = document.getElementById('clinics-map');
       if (!mapElem) return;
+      if (leafletMap) {
+        leafletMap.invalidateSize();
+        return;
+      }
       
       try {
-        leafletMap = L.map('clinics-map', { zoomControl: true }).setView([30.2672, -97.7431], 11);
-        // Ultra-clean, dark-themed canvas tiles (100% Free, Zero Watermark, Dark Mode Optimized)
-        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-          attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
-          maxZoom: 16
+        leafletMap = L.map('clinics-map', { zoomControl: true }).setView([37.0902, -95.7129], 4);
+        // Ultra-clean, high-performance dark tiles (100% Free, Zero Watermark, Fast CDN)
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+          subdomains: 'abcd',
+          maxZoom: 19
         }).addTo(leafletMap);
         markersLayer = L.featureGroup().addTo(leafletMap);
+        setTimeout(() => {
+          if (leafletMap) leafletMap.invalidateSize();
+        }, 300);
       } catch (err) {
         console.error("Map initialization failed", err);
       }
@@ -4601,11 +4608,16 @@
         countElem.innerText = `${validCount} practices mapped`;
       }
 
-      if (validCount > 0 && leafletMap) {
-        try {
-          leafletMap.fitBounds(markersLayer.getBounds().pad(0.15));
-        } catch (e) {}
-      }
+      setTimeout(() => {
+        if (leafletMap) {
+          leafletMap.invalidateSize();
+          if (validCount > 0 && markersLayer && markersLayer.getLayers().length > 0) {
+            try {
+              leafletMap.fitBounds(markersLayer.getBounds().pad(0.15));
+            } catch (e) {}
+          }
+        }
+      }, 250);
     }
 
     // Switch Tabs
@@ -4618,6 +4630,9 @@
           if (t === tab) {
             view.classList.remove('hidden');
             btn.className = "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all bg-emerald-500/10 text-emerald-400 border border-emerald-500/20";
+            if (t === 'finder' && leafletMap) {
+              setTimeout(() => { leafletMap.invalidateSize(); }, 200);
+            }
           } else {
             view.classList.add('hidden');
             btn.className = "w-full flex items-center space-x-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent";
@@ -9971,6 +9986,71 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
     let currentDossierLeadId = null;
     let currentPlayingAudio = null;
 
+    // Realistic North American Telephone Ringback Sound Generator (440Hz + 480Hz dual-tone)
+    let ringtoneAudioContext = null;
+    let ringtoneOsc1 = null;
+    let ringtoneOsc2 = null;
+    let ringtoneGain = null;
+    let ringtoneInterval = null;
+
+    function playRingtone() {
+      try {
+        stopRingtone();
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        ringtoneAudioContext = new AudioCtx();
+
+        const pulseTone = () => {
+          if (!ringtoneAudioContext || ringtoneAudioContext.state === 'closed') return;
+          try {
+            ringtoneGain = ringtoneAudioContext.createGain();
+            ringtoneGain.gain.setValueAtTime(0.08, ringtoneAudioContext.currentTime);
+            ringtoneGain.connect(ringtoneAudioContext.destination);
+
+            ringtoneOsc1 = ringtoneAudioContext.createOscillator();
+            ringtoneOsc2 = ringtoneAudioContext.createOscillator();
+            ringtoneOsc1.type = 'sine';
+            ringtoneOsc2.type = 'sine';
+            ringtoneOsc1.frequency.setValueAtTime(440, ringtoneAudioContext.currentTime);
+            ringtoneOsc2.frequency.setValueAtTime(480, ringtoneAudioContext.currentTime);
+            ringtoneOsc1.connect(ringtoneGain);
+            ringtoneOsc2.connect(ringtoneGain);
+            ringtoneOsc1.start();
+            ringtoneOsc2.start();
+
+            setTimeout(() => {
+              try {
+                if (ringtoneOsc1) { ringtoneOsc1.stop(); ringtoneOsc1.disconnect(); ringtoneOsc1 = null; }
+                if (ringtoneOsc2) { ringtoneOsc2.stop(); ringtoneOsc2.disconnect(); ringtoneOsc2 = null; }
+                if (ringtoneGain) { ringtoneGain.disconnect(); ringtoneGain = null; }
+              } catch(e) {}
+            }, 1800);
+          } catch(e) {}
+        };
+
+        pulseTone();
+        ringtoneInterval = setInterval(pulseTone, 4200);
+      } catch (e) {
+        console.warn("Could not play ringtone:", e);
+      }
+    }
+
+    function stopRingtone() {
+      if (ringtoneInterval) {
+        clearInterval(ringtoneInterval);
+        ringtoneInterval = null;
+      }
+      try {
+        if (ringtoneOsc1) { ringtoneOsc1.stop(); ringtoneOsc1.disconnect(); ringtoneOsc1 = null; }
+        if (ringtoneOsc2) { ringtoneOsc2.stop(); ringtoneOsc2.disconnect(); ringtoneOsc2 = null; }
+        if (ringtoneGain) { ringtoneGain.disconnect(); ringtoneGain = null; }
+        if (ringtoneAudioContext && ringtoneAudioContext.state !== 'closed') {
+          ringtoneAudioContext.close();
+          ringtoneAudioContext = null;
+        }
+      } catch(e) {}
+    }
+
     let zeroLongPressTimer = null;
     let zeroIsLongPress = false;
     let zeroTouchHandled = false;
@@ -10158,8 +10238,10 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
             telnyxAlertText.innerHTML = `<strong>Carrier notice:</strong> ${session.telnyx_error}`;
             telnyxAlert.classList.remove('hidden');
           }
+          stopRingtone();
         } else {
           if (telnyxAlert) telnyxAlert.classList.add('hidden');
+          playRingtone();
         }
 
         document.getElementById('mdialer-active-phone').innerText = session.phone_number;
@@ -10306,6 +10388,7 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
 
     async function sendManualTurn(text, speaker = 'HUMAN') {
       if (!mdialerSessionId || !text) return;
+      stopRingtone();
 
       try {
         const res = await fetch('/api/dialer/manual/turn', {
@@ -10416,6 +10499,7 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
 
     async function triggerAITakeoverAction() {
       if (!mdialerSessionId) return;
+      stopRingtone();
 
       const btn = document.getElementById('btn-mdialer-ai-takeover');
       btn.disabled = true;
@@ -10557,6 +10641,7 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
     }
 
     async function endAndFinalizeCallAction() {
+      stopRingtone();
       if (!mdialerSessionId) return;
 
       const sid = mdialerSessionId;
