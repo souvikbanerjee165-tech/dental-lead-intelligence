@@ -44,7 +44,16 @@ DEFAULT_SETTINGS = {
     "llm_provider": "OPENAI",
     "openai_model": "gpt-4o-mini",
     "deepseek_model": "deepseek-chat",
-    "gemini_model": "gemini-2.5-flash"
+    "gemini_model": "gemini-2.5-flash",
+    "active_carrier": "TWILIO",
+    "twilio_account_sid": "",
+    "twilio_auth_token": "",
+    "twilio_api_key_sid": "",
+    "twilio_api_key_secret": "",
+    "twilio_from_phone": "",
+    "telnyx_api_key": "",
+    "telnyx_connection_id": "",
+    "telnyx_from_phone": ""
 }
 
 
@@ -133,6 +142,11 @@ class SettingsManager:
                 raise ValueError("Target territories list cannot be empty")
             if len(cities) > 50:
                 raise ValueError("Target territories list cannot exceed 50 entries")
+
+        if "active_carrier" in updates:
+            carrier = str(updates["active_carrier"]).upper()
+            if carrier not in ["TELNYX", "TWILIO", "BROWSER"]:
+                raise ValueError("Active carrier must be TELNYX, TWILIO, or BROWSER")
 
     @staticmethod
     def _get_settings_impl(settings_file: Path) -> Dict[str, Any]:

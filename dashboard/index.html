@@ -1882,6 +1882,126 @@
             </div>
           </div>
 
+          <!-- Card: Telephony & Voice Carrier Configuration (Choose Telnyx vs Twilio) -->
+          <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-phone text-emerald-400"></i> Telephony Carrier (Telnyx vs Twilio)
+              </h3>
+              <button onclick="saveTelephonyCarrierAction()" id="btn-save-telephony" class="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition cursor-pointer">
+                <i class="fa-solid fa-check"></i> Save Carrier Choice
+              </button>
+            </div>
+
+            <div class="space-y-3 text-xs">
+              <!-- Active Carrier Selector -->
+              <div>
+                <label class="text-[11px] text-slate-300 font-semibold block mb-1.5">Choose Active Calling Provider</label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <!-- Telnyx Choice -->
+                  <label id="carrier-card-telnyx" class="p-3 rounded-xl border border-slate-700 bg-slate-950/60 cursor-pointer hover:border-emerald-500/60 transition flex items-start gap-2.5">
+                    <input type="radio" name="settings-active-carrier" value="TELNYX" class="mt-0.5 text-emerald-500" onchange="toggleCarrierFormUI('TELNYX')">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-white text-xs">Telnyx Wholesale</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-300 font-mono">~$0.007/min</span>
+                      </div>
+                      <p class="text-[10px] text-slate-400 leading-snug">Wholesale SIP Call Control API with ultra-low latency. Ideal for high-volume automated dialing.</p>
+                    </div>
+                  </label>
+
+                  <!-- Twilio Choice -->
+                  <label id="carrier-card-twilio" class="p-3 rounded-xl border border-cyan-500/60 bg-cyan-950/20 cursor-pointer hover:border-cyan-400 transition flex items-start gap-2.5">
+                    <input type="radio" name="settings-active-carrier" value="TWILIO" checked class="mt-0.5 text-cyan-500" onchange="toggleCarrierFormUI('TWILIO')">
+                    <div class="space-y-1">
+                      <div class="flex items-center gap-2">
+                        <span class="font-bold text-white text-xs">Twilio Voice</span>
+                        <span class="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-300 font-mono">~$0.014/min</span>
+                      </div>
+                      <p class="text-[10px] text-slate-400 leading-snug">Global enterprise telecom infrastructure with TwiML execution and 10DLC healthcare compliance.</p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Twilio Parameters Form -->
+              <div id="carrier-form-twilio" class="p-3.5 rounded-xl border border-cyan-500/30 bg-cyan-950/10 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-cyan-300 text-[11px] flex items-center gap-1.5">
+                    <i class="fa-solid fa-key"></i> Twilio API Credentials
+                  </span>
+                  <span id="twilio-auth-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300">
+                    Ready to Configure
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">Twilio Account SID (starts with AC...)</label>
+                    <input type="text" id="input-twilio-account-sid" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-cyan-500">
+                    <span class="text-[9px] text-slate-400 mt-0.5 block">Found on your Twilio Console homepage under Account Info</span>
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">Twilio API Key SID (SK...)</label>
+                    <input type="text" id="input-twilio-key-sid" placeholder="SKxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value="" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-cyan-500">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">Twilio Client Secret / Auth Token</label>
+                    <input type="password" id="input-twilio-secret" placeholder="Enter API Secret or Auth Token" value="" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-cyan-500">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">Twilio Outbound Phone (+1...)</label>
+                    <input type="text" id="input-twilio-phone" placeholder="+1XXXXXXXXXX" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-cyan-500">
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                  <button onclick="testTelephonyConnectionAction('TWILIO')" id="btn-test-twilio" class="px-3 py-1.5 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white font-bold text-[11px] transition flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-satellite-dish"></i> Test Twilio Connection
+                  </button>
+                  <span id="twilio-test-status" class="text-[10px] text-slate-400 italic"></span>
+                </div>
+              </div>
+
+              <!-- Telnyx Parameters Form -->
+              <div id="carrier-form-telnyx" class="p-3.5 rounded-xl border border-slate-700 bg-slate-950/40 space-y-3">
+                <div class="flex items-center justify-between">
+                  <span class="font-bold text-emerald-400 text-[11px] flex items-center gap-1.5">
+                    <i class="fa-solid fa-tower-broadcast"></i> Telnyx API Credentials
+                  </span>
+                  <span id="telnyx-auth-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300">
+                    Configured
+                  </span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">Telnyx API Key</label>
+                    <input type="password" id="input-telnyx-key" placeholder="KEYxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value="" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-emerald-500">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">Connection ID</label>
+                    <input type="text" id="input-telnyx-conn-id" placeholder="Connection ID" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-emerald-500">
+                  </div>
+                  <div>
+                    <label class="text-[10px] text-slate-400 font-semibold block mb-1">Caller Phone (+1...)</label>
+                    <input type="text" id="input-telnyx-phone" placeholder="+1XXXXXXXXXX" class="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-1.5 text-white font-mono text-xs focus:outline-none focus:border-emerald-500">
+                  </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-1">
+                  <button onclick="testTelephonyConnectionAction('TELNYX')" id="btn-test-telnyx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] transition flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-satellite-dish"></i> Test Telnyx Connection
+                  </button>
+                  <span id="telnyx-test-status" class="text-[10px] text-slate-400 italic"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Card 5: Discovery Pipeline Latency & Speed Breakdown -->
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
@@ -3870,19 +3990,26 @@
                 <!-- Carrier Route Selector -->
                 <div>
                   <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Telephony Audio Carrier</label>
-                  <div class="grid grid-cols-2 gap-2 text-xs">
-                    <label class="p-2.5 rounded-lg border border-emerald-500/50 bg-emerald-950/20 text-white flex items-center gap-2 cursor-pointer">
+                  <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                    <label class="p-2 rounded-lg border border-emerald-500/50 bg-emerald-950/20 text-white flex items-center gap-2 cursor-pointer hover:border-emerald-400">
                       <input type="radio" name="mdialer-carrier" value="BROWSER" checked class="text-emerald-500">
                       <div>
                         <span class="font-bold text-[11px] block">Browser Live Mic</span>
-                        <span class="text-[10px] text-emerald-400">$0 Free &bull; Dual-Audio</span>
+                        <span class="text-[9px] text-emerald-400">$0 Free &bull; WebRTC</span>
                       </div>
                     </label>
-                    <label class="p-2.5 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 flex items-center gap-2 cursor-pointer">
+                    <label class="p-2 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 flex items-center gap-2 cursor-pointer hover:border-emerald-500/50">
                       <input type="radio" name="mdialer-carrier" value="TELNYX" class="text-emerald-500">
                       <div>
                         <span class="font-bold text-[11px] block">Telnyx Wholesale</span>
-                        <span class="text-[10px] text-slate-400">~$0.007/min PSTN</span>
+                        <span class="text-[9px] text-slate-400">~$0.007/min PSTN</span>
+                      </div>
+                    </label>
+                    <label class="p-2 rounded-lg border border-slate-800 bg-slate-900 text-slate-300 flex items-center gap-2 cursor-pointer hover:border-cyan-500/50">
+                      <input type="radio" name="mdialer-carrier" value="TWILIO" class="text-cyan-500">
+                      <div>
+                        <span class="font-bold text-[11px] block">Twilio Voice</span>
+                        <span class="text-[9px] text-cyan-400">~$0.014/min PSTN</span>
                       </div>
                     </label>
                   </div>
@@ -8479,6 +8606,144 @@
             deepseekStatus.innerHTML = data.providers.DEEPSEEK?.configured 
               ? `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> Configured</span>` 
               : `<span class="text-amber-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Key Needed</span>`;
+          }
+        })
+        .catch(() => {});
+
+      loadTelephonySettings();
+    }
+
+    function toggleCarrierFormUI(carrier) {
+      const telnyxCard = document.getElementById('carrier-card-telnyx');
+      const twilioCard = document.getElementById('carrier-card-twilio');
+      if (carrier === 'TWILIO') {
+        if (twilioCard) {
+          twilioCard.classList.add('border-cyan-500/60', 'bg-cyan-950/20');
+          twilioCard.classList.remove('border-slate-700', 'bg-slate-950/60');
+        }
+        if (telnyxCard) {
+          telnyxCard.classList.add('border-slate-700', 'bg-slate-950/60');
+          telnyxCard.classList.remove('border-emerald-500/60', 'bg-emerald-950/20');
+        }
+      } else {
+        if (telnyxCard) {
+          telnyxCard.classList.add('border-emerald-500/60', 'bg-emerald-950/20');
+          telnyxCard.classList.remove('border-slate-700', 'bg-slate-950/60');
+        }
+        if (twilioCard) {
+          twilioCard.classList.add('border-slate-700', 'bg-slate-950/60');
+          twilioCard.classList.remove('border-cyan-500/60', 'bg-cyan-950/20');
+        }
+      }
+    }
+
+    function saveTelephonyCarrierAction() {
+      const btn = document.getElementById('btn-save-telephony');
+      const originalText = btn ? btn.innerHTML : 'Save';
+      if (btn) {
+        btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
+        btn.disabled = true;
+      }
+
+      const carrier = document.querySelector('input[name="settings-active-carrier"]:checked')?.value || 'TWILIO';
+      const twilioAcc = document.getElementById('input-twilio-account-sid')?.value.trim();
+      const twilioKey = document.getElementById('input-twilio-key-sid')?.value.trim();
+      const twilioSec = document.getElementById('input-twilio-secret')?.value.trim();
+      const twilioPhone = document.getElementById('input-twilio-phone')?.value.trim();
+      const telnyxKey = document.getElementById('input-telnyx-key')?.value.trim();
+      const telnyxConn = document.getElementById('input-telnyx-conn-id')?.value.trim();
+      const telnyxPhone = document.getElementById('input-telnyx-phone')?.value.trim();
+
+      fetch('/api/settings/telephony', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          active_carrier: carrier,
+          twilio_account_sid: twilioAcc,
+          twilio_api_key_sid: twilioKey,
+          twilio_api_key_secret: twilioSec,
+          twilio_from_phone: twilioPhone,
+          telnyx_api_key: telnyxKey,
+          telnyx_connection_id: telnyxConn,
+          telnyx_from_phone: telnyxPhone
+        })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'success') {
+          showToast(`Active telephony carrier set to ${carrier}!`);
+          loadTelephonySettings();
+        } else {
+          showToast(`Error: ${res.detail || 'Failed to update carrier'}`);
+        }
+      })
+      .catch(err => showToast(`Network error: ${err.message}`))
+      .finally(() => {
+        if (btn) {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      });
+    }
+
+    function testTelephonyConnectionAction(carrier) {
+      const statusSpan = document.getElementById(`${carrier.toLowerCase()}-test-status`);
+      if (statusSpan) statusSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Testing...';
+
+      fetch('/api/settings/telephony/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ carrier: carrier })
+      })
+      .then(r => r.json())
+      .then(res => {
+        if (res.status === 'success') {
+          if (statusSpan) statusSpan.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> ${res.message}</span>`;
+          showToast(`Connected to ${carrier}!`);
+        } else {
+          if (statusSpan) statusSpan.innerHTML = `<span class="text-amber-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${res.message}</span>`;
+          showToast(`Notice: ${res.message}`);
+        }
+      })
+      .catch(err => {
+        if (statusSpan) statusSpan.innerText = `Error: ${err.message}`;
+      });
+    }
+
+    function loadTelephonySettings() {
+      fetch('/api/settings/telephony')
+        .then(r => r.json())
+        .then(data => {
+          const active = data.active_carrier || 'TWILIO';
+          const radio = document.querySelector(`input[name="settings-active-carrier"][value="${active}"]`);
+          if (radio) {
+            radio.checked = true;
+            toggleCarrierFormUI(active);
+          }
+
+          if (data.twilio_phone) {
+            const phInput = document.getElementById('input-twilio-phone');
+            if (phInput && !phInput.value) phInput.value = data.twilio_phone;
+          }
+          if (data.telnyx_phone) {
+            const tPhInput = document.getElementById('input-telnyx-phone');
+            if (tPhInput && !tPhInput.value) tPhInput.value = data.telnyx_phone;
+          }
+
+          const twBadge = document.getElementById('twilio-auth-badge');
+          if (twBadge) {
+            twBadge.className = data.has_twilio 
+              ? "px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300"
+              : "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300";
+            twBadge.innerText = data.has_twilio ? "Authenticated" : "Needs Credentials";
+          }
+
+          const telBadge = document.getElementById('telnyx-auth-badge');
+          if (telBadge) {
+            telBadge.className = data.has_telnyx
+              ? "px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300"
+              : "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300";
+            telBadge.innerText = data.has_telnyx ? "Configured" : "Not Set";
           }
         })
         .catch(() => {});

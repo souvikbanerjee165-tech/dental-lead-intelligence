@@ -129,23 +129,28 @@ class LiveDialerEngine:
             session["talk_metrics"]["ai_words"] += len(hook.split())
             session["initial_hook"] = hook
 
-        if carrier_mode == "TELNYX":
+        if carrier_mode in ("TELNYX", "TWILIO"):
             try:
                 from voice_dialer import VoiceDialerEngine
-                telnyx_res = VoiceDialerEngine.dispatch_call(
+                carrier_res = VoiceDialerEngine.dispatch_call(
                     lead=lead_dict,
                     to_phone=clean_phone or phone,
+                    carrier_override=carrier_mode,
                     db=db,
                     server_base_url=server_base_url
                 )
-                session["telnyx_dispatch"] = telnyx_res
-                session["telnyx_call_id"] = telnyx_res.get("call_id")
-                session["call_id"] = telnyx_res.get("call_id") or session_id
-                if telnyx_res.get("status") == "failed" or telnyx_res.get("error"):
-                    session["telnyx_error"] = telnyx_res.get("error") or telnyx_res.get("message")
-                logger.info(f"Dispatched real Telnyx call to {clean_phone}: {telnyx_res.get('status')}")
+                session["carrier_dispatch"] = carrier_res
+                session["carrier_name"] = carrier_mode
+                session["carrier_call_id"] = carrier_res.get("call_id")
+                session["call_id"] = carrier_res.get("call_id") or session_id
+                if carrier_res.get("status") == "failed" or carrier_res.get("error"):
+                    err_msg = carrier_res.get("error") or carrier_res.get("message")
+                    session["carrier_error"] = err_msg
+                    session["telnyx_error"] = err_msg
+                logger.info(f"Dispatched real {carrier_mode} call to {clean_phone}: {carrier_res.get('status')}")
             except Exception as e:
-                logger.error(f"Telnyx manual dispatch error: {e}")
+                logger.error(f"{carrier_mode} manual dispatch error: {e}")
+                session["carrier_error"] = str(e)
                 session["telnyx_error"] = str(e)
 
         cls._active_sessions[session_id] = session

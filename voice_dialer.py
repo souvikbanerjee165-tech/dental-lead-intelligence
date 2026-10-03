@@ -40,6 +40,58 @@ def get_telnyx_from_phone() -> str:
     return os.getenv("TELNYX_FROM_PHONE", "")
 
 
+def get_twilio_account_sid() -> str:
+    return os.getenv("TWILIO_ACCOUNT_SID", "")
+
+def get_twilio_auth_token() -> str:
+    return os.getenv("TWILIO_AUTH_TOKEN", "")
+
+def get_twilio_api_key_sid() -> str:
+    return os.getenv("TWILIO_API_KEY_SID", os.getenv("TWILIO_API_KEY", ""))
+
+def get_twilio_api_key_secret() -> str:
+    return os.getenv("TWILIO_API_KEY_SECRET", os.getenv("TWILIO_CLIENT_SECRET", ""))
+
+def get_twilio_from_phone() -> str:
+    return os.getenv("TWILIO_FROM_PHONE", os.getenv("TWILIO_PHONE_NUMBER", ""))
+
+def get_active_carrier() -> str:
+    return os.getenv("ACTIVE_CARRIER", "TWILIO").upper()
+
+def get_twilio_client() -> Optional[Any]:
+    """Initializes Twilio Client supporting standard Auth Token or API Key + Secret."""
+    try:
+        from twilio.rest import Client
+        acc_sid = get_twilio_account_sid()
+        auth_token = get_twilio_auth_token()
+        key_sid = get_twilio_api_key_sid()
+        key_secret = get_twilio_api_key_secret()
+
+        # Mode 1: Standard Account SID + Auth Token
+        if acc_sid and auth_token and acc_sid.startswith("AC"):
+            return Client(acc_sid, auth_token)
+
+        # Mode 2: API Key SID + API Key Secret + Account SID
+        if key_sid and key_secret and acc_sid and acc_sid.startswith("AC"):
+            return Client(key_sid, key_secret, account_sid=acc_sid)
+
+        # Mode 3: Key SID + Auth Token
+        if key_sid and auth_token:
+            return Client(key_sid, auth_token)
+
+        # Mode 4: Key SID + Key Secret (if user only has API Key and secret)
+        if key_sid and key_secret and not acc_sid:
+            try:
+                return Client(key_sid, key_secret)
+            except Exception:
+                pass
+
+        return None
+    except Exception as e:
+        logger.error(f"Error initializing Twilio client: {e}")
+        return None
+
+
 
 def clean_phone_e164(phone_str: Optional[str]) -> str:
     """Formats phone into standard E.164 (+1XXXXXXXXXX or +<country_code><number>)."""
@@ -351,6 +403,28 @@ class VoiceDialerEngine:
         """Returns the current telecommunications configuration, voice models, and readiness."""
         api_key = get_telnyx_api_key()
         has_telnyx = bool(api_key and not api_key.startswith("mock_"))
+
+        acc_sid = get_twilio_account_sid()
+        key_sid = get_twilio_api_key_sid()
+        auth_tok = get_twilio_auth_token()
+        key_sec = get_twilio_api_key_secret()
+        has_twilio = bool((acc_sid and auth_tok) or (key_sid and key_sec) or (acc_sid and key_sid))
+
+        active_carrier = get_active_carrier()
+        if active_carrier not in ["TELNYX", "TWILIO"]:
+            active_carrier = "TWILIO" if has_twilio and not has_telnyx else "TELNYX"
+
+        if active_carrier == "TELNYX" and has_telnyx:
+            mode = "TELNYX_LIVE"
+        elif active_carrier == "TWILIO" and has_twilio:
+            mode = "TWILIO_LIVE"
+        elif has_telnyx:
+            mode = "TELNYX_LIVE"
+        elif has_twilio:
+            mode = "TWILIO_LIVE"
+        else:
+            mode = "SANDBOX_SIMULATOR"
+
         has_gemini = bool(GOOGLE_API_KEY or GEMINI_API_KEY)
         has_deepgram = bool(os.getenv("DEEPGRAM_API_KEY"))
         has_cartesia = bool(os.getenv("CARTESIA_API_KEY"))
@@ -361,11 +435,13 @@ class VoiceDialerEngine:
         voices_path = base_dir / "models" / "kokoro" / "voices-v1.0.bin"
         has_kokoro_local = model_path.exists() and voices_path.exists()
 
-        mode = "TELNYX_LIVE" if has_telnyx else "SANDBOX_SIMULATOR"
+        cost_label = "$0.007/min (Telnyx SIP)" if active_carrier == "TELNYX" else "$0.014/min (Twilio Voice)" if active_carrier == "TWILIO" else "$0.000 (Sandbox)"
 
         return {
             "mode": mode,
+            "active_carrier": active_carrier,
             "has_telnyx": has_telnyx,
+            "has_twilio": has_twilio,
             "has_gemini": has_gemini,
             "has_kokoro_local": has_kokoro_local,
             "primary_voice": "Google Gemini 2.5 TTS" if has_gemini else "Kokoro-82M Local",
@@ -373,8 +449,11 @@ class VoiceDialerEngine:
             "voice_pipeline": "Gemini Primary + Kokoro Local Fallback" if (has_gemini and has_kokoro_local) else ("Gemini Only" if has_gemini else ("Kokoro Local Only" if has_kokoro_local else "None")),
             "has_deepgram": has_deepgram,
             "has_cartesia": has_cartesia,
-            "telnyx_from_phone": get_telnyx_from_phone() or "(Not configured - Using Sandbox)",
-            "estimated_cost_per_minute": "$0.018 - $0.022" if has_telnyx else "$0.000 (Sandbox)",
+            "telnyx_from_phone": get_telnyx_from_phone() or "(Not configured)",
+            "twilio_from_phone": get_twilio_from_phone() or "(Not configured)",
+            "twilio_account_sid": acc_sid or "(Not set)",
+            "twilio_api_key_sid": key_sid or "(Not set)",
+            "estimated_cost_per_minute": cost_label,
             "ready_for_calls": True
         }
 
@@ -383,24 +462,28 @@ class VoiceDialerEngine:
         cls,
         lead: Dict[str, Any],
         to_phone: Optional[str] = None,
+        carrier_override: Optional[str] = None,
         db: Any = None,
         server_base_url: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Dispatches an autonomous AI call to a confirmed dental lead.
-        If Telnyx credentials are set, places a real PSTN call via Telnyx Call Control.
-        Otherwise, runs a high-fidelity AI sandbox call simulating the clinic's response.
+        Supports selection between Telnyx, Twilio, or sandbox simulation.
         """
         target_phone = clean_phone_e164(to_phone or lead.get("phone"))
-        lead_id = lead.get("id") or "lead_unknown"
-        lead_name = lead.get("name") or "Dental Practice"
-        doctor_name = lead.get("doctor_name") or "Doctor"
-
         carrier_status = cls.get_carrier_status()
         script = DentalCallerPersona.build_call_script(lead)
+        selected_carrier = (carrier_override or carrier_status.get("active_carrier") or "TELNYX").upper()
 
-        if carrier_status["has_telnyx"]:
-            # Real Outbound PSTN Call via Telnyx Call Control API
+        if selected_carrier == "TWILIO" and carrier_status.get("has_twilio"):
+            return cls._dispatch_twilio_call(
+                lead=lead,
+                target_phone=target_phone,
+                script=script,
+                server_base_url=server_base_url,
+                db=db
+            )
+        elif selected_carrier == "TELNYX" and carrier_status.get("has_telnyx"):
             return cls._dispatch_telnyx_call(
                 lead=lead,
                 target_phone=target_phone,
@@ -408,14 +491,103 @@ class VoiceDialerEngine:
                 server_base_url=server_base_url,
                 db=db
             )
+        elif selected_carrier == "TWILIO" and not carrier_status.get("has_twilio"):
+            err_reason = "Twilio credentials incomplete. Configure Account SID, Auth Token / API Secret, and From Phone in settings."
+            return cls._dispatch_sandbox_call(lead=lead, target_phone=target_phone, script=script, db=db, error_reason=err_reason)
+        elif selected_carrier == "TELNYX" and not carrier_status.get("has_telnyx"):
+            err_reason = "Telnyx credentials not configured. Using Sandbox mode."
+            return cls._dispatch_sandbox_call(lead=lead, target_phone=target_phone, script=script, db=db, error_reason=err_reason)
         else:
-            # High Fidelity Sandbox Simulation
             return cls._dispatch_sandbox_call(
                 lead=lead,
                 target_phone=target_phone,
                 script=script,
                 db=db
             )
+
+    @classmethod
+    def _dispatch_twilio_call(
+        cls,
+        lead: Dict[str, Any],
+        target_phone: str,
+        script: Dict[str, Any],
+        server_base_url: Optional[str],
+        db: Any
+    ) -> Dict[str, Any]:
+        """Initiates real PSTN call via Twilio Voice API with TwiML."""
+        clinic_name = lead.get("name") or "Dental Practice"
+        doctor_name = lead.get("doctor_name") or "Doctor"
+        client = get_twilio_client()
+
+        if not client:
+            acc_sid = get_twilio_account_sid()
+            key_sid = get_twilio_api_key_sid()
+            err_reason = "Twilio client could not be initialized. Please verify Account SID (AC...) and Auth Token or API Secret."
+            if key_sid and not acc_sid:
+                err_reason = "Twilio API Key SID detected. Please also provide your main Account SID (starts with AC...) from the Twilio Console."
+            logger.warning(f"Twilio dispatch error: {err_reason}")
+            return cls._dispatch_sandbox_call(lead=lead, target_phone=target_phone, script=script, db=db, error_reason=err_reason)
+
+        from_phone = get_twilio_from_phone()
+        if not from_phone:
+            err_reason = "Twilio From Phone number not configured. Please add TWILIO_FROM_PHONE in settings."
+            logger.warning(f"Twilio dispatch error: {err_reason}")
+            return cls._dispatch_sandbox_call(lead=lead, target_phone=target_phone, script=script, db=db, error_reason=err_reason)
+
+        try:
+            spoken_text = script.get("opening_hook", f"Hello Dr. {doctor_name}, this is Jordan calling regarding after-hours patient intake.")
+            twiml_content = f"""<Response>
+    <Pause length="1"/>
+    <Say voice="Polly.Joanna-Neural">{spoken_text}</Say>
+    <Pause length="2"/>
+</Response>"""
+
+            call_kwargs = {
+                "to": target_phone,
+                "from_": from_phone,
+                "twiml": twiml_content,
+                "timeout": 30
+            }
+
+            if server_base_url and not any(h in server_base_url for h in ["127.0.0.1", "localhost", "0.0.0.0"]):
+                call_kwargs["status_callback"] = f"{server_base_url}/api/voice/webhook/twilio"
+                call_kwargs["status_callback_event"] = ["initiated", "ringing", "answered", "completed"]
+
+            call = client.calls.create(**call_kwargs)
+            call_sid = getattr(call, "sid", "twilio_live_call")
+
+            if db:
+                db.log_call_outcome(
+                    lead_id=lead.get("id"),
+                    outcome="CALL_INITIATED",
+                    rep_notes=f"Twilio outbound call placed to {target_phone} via {from_phone}. Call SID: {call_sid}",
+                    duration_sec=0
+                )
+
+            return {
+                "status": "initiated",
+                "mode": "TWILIO_LIVE",
+                "carrier": "TWILIO",
+                "call_id": call_sid,
+                "target_phone": target_phone,
+                "clinic_name": clinic_name,
+                "doctor_name": doctor_name,
+                "message": f"Twilio outbound call ringing {target_phone} via {from_phone}..."
+            }
+        except Exception as e:
+            err_msg = str(e)
+            logger.error(f"Twilio API call failed: {err_msg}")
+            return {
+                "status": "failed",
+                "mode": "TWILIO_FAILED",
+                "carrier": "TWILIO",
+                "call_id": None,
+                "target_phone": target_phone,
+                "clinic_name": clinic_name,
+                "doctor_name": doctor_name,
+                "error": err_msg,
+                "message": f"Twilio call failed: {err_msg}"
+            }
 
     @classmethod
     def _dispatch_telnyx_call(

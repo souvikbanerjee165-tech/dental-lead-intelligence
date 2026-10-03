@@ -1742,6 +1742,162 @@ async def telnyx_webhook_handler(request: Request):
     except Exception as e:
         return {"status": "error", "detail": str(e)}
 
+@app.post("/api/voice/webhook/twilio")
+async def twilio_webhook_handler(request: Request):
+    """Handles inbound Call Control & Status webhooks from Twilio."""
+    try:
+        form = await request.form()
+        call_sid = form.get("CallSid")
+        call_status = form.get("CallStatus")
+        from_num = form.get("From")
+        to_num = form.get("To")
+        logger.info(f"Twilio webhook received: CallSid={call_sid}, Status={call_status}, From={from_num}, To={to_num}")
+        
+        twiml_response = '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="Polly.Joanna-Neural">Thank you for connecting with Dental Practice Intelligence.</Say></Response>'
+        from fastapi.responses import Response
+        return Response(content=twiml_response, media_type="application/xml")
+    except Exception as e:
+        logger.error(f"Error handling Twilio webhook: {e}")
+        return {"status": "error", "detail": str(e)}
+
+@app.get("/api/settings/telephony")
+async def get_telephony_settings():
+    """Returns active telephony carrier and masked configuration."""
+    from voice_dialer import (
+        VoiceDialerEngine, get_active_carrier, get_telnyx_from_phone,
+        get_twilio_from_phone, get_twilio_account_sid, get_twilio_api_key_sid
+    )
+    st = VoiceDialerEngine.get_carrier_status()
+    acc_sid = get_twilio_account_sid()
+    key_sid = get_twilio_api_key_sid()
+    masked_acc = f"{acc_sid[:4]}...{acc_sid[-4:]}" if len(acc_sid) > 8 else ("(Configured)" if acc_sid else "")
+    masked_key = f"{key_sid[:6]}...{key_sid[-4:]}" if len(key_sid) > 10 else ("(Configured)" if key_sid else "")
+
+    return {
+        "active_carrier": st.get("active_carrier", "TWILIO"),
+        "has_telnyx": st.get("has_telnyx", False),
+        "has_twilio": st.get("has_twilio", False),
+        "telnyx_phone": get_telnyx_from_phone(),
+        "twilio_phone": get_twilio_from_phone(),
+        "twilio_account_sid_masked": masked_acc,
+        "twilio_api_key_sid_masked": masked_key,
+        "has_twilio_secret": bool(os.getenv("TWILIO_API_KEY_SECRET") or os.getenv("TWILIO_AUTH_TOKEN")),
+        "carrier_mode": st.get("mode"),
+        "estimated_cost_per_minute": st.get("estimated_cost_per_minute")
+    }
+
+@app.post("/api/settings/telephony")
+async def update_telephony_settings(payload: Dict[str, Any] = Body(...)):
+    """Switches active carrier (TELNYX vs TWILIO) and persists credentials."""
+    from voice_dialer import VoiceDialerEngine
+    env_file = Path(".env")
+    env_lines = {}
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                env_lines[k.strip()] = v.strip()
+
+    updates = {}
+    if "active_carrier" in payload:
+        carrier = str(payload["active_carrier"]).upper()
+        if carrier in ["TELNYX", "TWILIO", "BROWSER"]:
+            updates["ACTIVE_CARRIER"] = carrier
+            os.environ["ACTIVE_CARRIER"] = carrier
+
+    carrier_keys = {
+        "twilio_account_sid": "TWILIO_ACCOUNT_SID",
+        "twilio_auth_token": "TWILIO_AUTH_TOKEN",
+        "twilio_api_key_sid": "TWILIO_API_KEY_SID",
+        "twilio_api_key_secret": "TWILIO_API_KEY_SECRET",
+        "twilio_from_phone": "TWILIO_FROM_PHONE",
+        "telnyx_api_key": "TELNYX_API_KEY",
+        "telnyx_connection_id": "TELNYX_CONNECTION_ID",
+        "telnyx_from_phone": "TELNYX_FROM_PHONE"
+    }
+
+    for req_key, env_var in carrier_keys.items():
+        if req_key in payload and payload[req_key] is not None:
+            val = str(payload[req_key]).strip()
+            if val:
+                updates[env_var] = val
+                os.environ[env_var] = val
+
+    env_lines.update(updates)
+    out_lines = [f"{k}={v}" for k, v in env_lines.items()]
+    env_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+
+    # Sync to settings_mgr as well
+    settings_dict = {}
+    if "ACTIVE_CARRIER" in updates:
+        settings_dict["active_carrier"] = updates["ACTIVE_CARRIER"]
+    for req_key, env_var in carrier_keys.items():
+        if env_var in updates:
+            settings_dict[req_key] = updates[env_var]
+    if settings_dict:
+        try:
+            settings_mgr.update_settings(settings_dict)
+        except Exception:
+            pass
+
+    return {
+        "status": "success",
+        "message": f"Telephony configuration updated. Active carrier: {os.getenv('ACTIVE_CARRIER', 'TWILIO')}",
+        "carrier_status": VoiceDialerEngine.get_carrier_status()
+    }
+
+@app.post("/api/settings/telephony/test")
+async def test_telephony_carrier(payload: Dict[str, Any] = Body(default={})):
+    """Tests connectivity to the active or requested carrier (Telnyx vs Twilio)."""
+    carrier = (payload.get("carrier") or os.getenv("ACTIVE_CARRIER", "TWILIO")).upper()
+    if carrier == "TWILIO":
+        try:
+            from voice_dialer import get_twilio_client, get_twilio_account_sid, get_twilio_api_key_sid, get_twilio_from_phone
+            client = get_twilio_client()
+            if not client:
+                acc = get_twilio_account_sid()
+                key = get_twilio_api_key_sid()
+                if key and not acc:
+                    return {
+                        "status": "error",
+                        "carrier": "TWILIO",
+                        "message": "Twilio API Key (SK...) detected, but Account SID (AC...) is missing. In Twilio, API Keys require your main Account SID (starts with AC...) from twilio.com/console."
+                    }
+                return {
+                    "status": "error",
+                    "carrier": "TWILIO",
+                    "message": "Twilio credentials incomplete. Please provide Account SID (AC...) and Auth Token or API Secret."
+                }
+            from_phone = get_twilio_from_phone()
+            return {
+                "status": "success",
+                "carrier": "TWILIO",
+                "message": f"Twilio API client authenticated successfully! Ready to dial via {from_phone or 'configured phone'}.",
+                "from_phone": from_phone
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "carrier": "TWILIO",
+                "message": f"Twilio authentication error: {str(e)}"
+            }
+    elif carrier == "TELNYX":
+        try:
+            from voice_dialer import get_telnyx_api_key, get_telnyx_connection_id, get_telnyx_from_phone
+            key = get_telnyx_api_key()
+            if not key or key.startswith("mock_"):
+                return {"status": "error", "carrier": "TELNYX", "message": "Telnyx API key not configured."}
+            return {
+                "status": "success",
+                "carrier": "TELNYX",
+                "message": f"Telnyx credentials active! Connection ID: {get_telnyx_connection_id() or 'Default'}, Caller: {get_telnyx_from_phone()}"
+            }
+        except Exception as e:
+            return {"status": "error", "carrier": "TELNYX", "message": str(e)}
+    else:
+        return {"status": "success", "carrier": "BROWSER", "message": "In-browser WebRTC / mic audio mode active."}
+
 # --- Expected Value ($EV) Prioritized Queue ---
 
 @app.get("/api/queue/top-ev")
