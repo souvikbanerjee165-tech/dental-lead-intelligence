@@ -521,9 +521,20 @@
               <div class="text-slate-500">// Ready to initiate scraping and automated analysis...</div>
             </div>
           </div>
+        <!-- Territory Map & Practice Density Section -->
+        <div id="map-section" class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-map-location-dot text-emerald-400"></i>
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider">Territory Map & Clinic Density</h3>
+            </div>
+            <div class="flex items-center space-x-3 text-xs">
+              <span id="map-clinic-count" class="text-slate-400">0 practices mapped</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Interactive Pins</span>
+            </div>
+          </div>
+          <div id="clinics-map" style="height: 320px; z-index: 1;" class="w-full rounded-xl border border-slate-800 bg-slate-950"></div>
         </div>
-
-
 
         <!-- Discovered Leads Live Grid -->
         <div class="space-y-3">
@@ -4376,10 +4387,10 @@
       
       try {
         leafletMap = L.map('clinics-map', { zoomControl: true }).setView([30.2672, -97.7431], 11);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: 'abcd',
-          maxZoom: 19
+        // Ultra-clean, dark-themed canvas tiles (100% Free, Zero Watermark, Dark Mode Optimized)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+          attribution: '&copy; Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
+          maxZoom: 16
         }).addTo(leafletMap);
         markersLayer = L.featureGroup().addTo(leafletMap);
       } catch (err) {
