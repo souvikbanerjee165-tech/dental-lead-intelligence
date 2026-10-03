@@ -273,30 +273,6 @@ def generate_speech_audio(
         return {"audio_url": res["audio_url"], "engine": "Gemini 3.1 Flash TTS (Fallback)"}
 
     return {"audio_url": None, "engine": "NONE"}
-        gemini_voice = voice_name if voice_name in ["Puck", "Charon", "Kore", "Fenrir", "Aoede"] else "Puck"
-        res = generate_gemini_speech_wav(text=text, filename=filename, voice_name=gemini_voice, target_model="gemini-3.1-flash-tts-preview")
-        if res:
-            m_label = "Gemini 3.1 Flash TTS" if "3.1" in res["model_used"] else "Gemini 2.5 Flash TTS"
-            return {"audio_url": res["audio_url"], "engine": m_label}
-
-        logger.warning("Gemini 3.1/2.5 TTS unavailable or rate-limited. Failing over to Local Kokoro-82M ONNX...")
-        k_voice = voice_name if voice_name.startswith(("af_", "am_", "bf_", "bm_")) else "af_sarah"
-        audio_url = generate_kokoro_speech_wav(text=text, filename=filename, voice_name=k_voice, speed=1.10)
-        if audio_url:
-            return {"audio_url": audio_url, "engine": "Kokoro-82M (Local Offline Fallback)"}
-
-    elif engine_req in ("gemini-2.5", "gemini-2.5-flash"):
-        gemini_voice = voice_name if voice_name in ["Puck", "Charon", "Kore", "Fenrir", "Aoede"] else "Puck"
-        res = generate_gemini_speech_wav(text=text, filename=filename, voice_name=gemini_voice, target_model="gemini-2.5-flash-preview-tts")
-        if res:
-            return {"audio_url": res["audio_url"], "engine": "Gemini 2.5 Flash TTS"}
-
-        k_voice = voice_name if voice_name.startswith(("af_", "am_", "bf_", "bm_")) else "af_sarah"
-        audio_url = generate_kokoro_speech_wav(text=text, filename=filename, voice_name=k_voice, speed=1.10)
-        if audio_url:
-            return {"audio_url": audio_url, "engine": "Kokoro-82M (Local Offline Fallback)"}
-
-    return {"audio_url": None, "engine": "None"}
 
 
 class VoiceDialerEngine:
