@@ -37,7 +37,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or GEMINI_API_KEY
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 
-LLM_PROVIDER = os.getenv("LLM_PROVIDER", "OPENAI").upper()
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "GEMINI").upper()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")

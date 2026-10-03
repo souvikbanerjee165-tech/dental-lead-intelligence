@@ -1773,17 +1773,30 @@
 
             <!-- Provider Selection Grid -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <!-- OpenAI Option (Recommended) -->
+              <!-- Gemini Option (100% Free / Google AI Pro) -->
+              <label class="p-3 rounded-xl border border-slate-700 bg-slate-950 hover:border-purple-500 cursor-pointer flex flex-col justify-between transition relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="flex items-center gap-2">
+                    <input type="radio" name="llm-provider-radio" value="GEMINI" checked class="text-purple-500" onchange="onLLMProviderChange('GEMINI')">
+                    <span class="font-bold text-white text-xs">Google Gemini</span>
+                  </div>
+                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold uppercase">$0 Free Tier</span>
+                </div>
+                <p class="text-[10px] text-slate-300 leading-tight">Gemini 2.5 Flash • 250ms latency, 1,500 free calls/day from Google AI Studio. 0 API bills.</p>
+                <span class="text-[9px] text-emerald-400 mt-2 block font-mono">100% Free / Included in AI Studio</span>
+              </label>
+
+              <!-- OpenAI Option -->
               <label class="p-3 rounded-xl border border-slate-700 bg-slate-950 hover:border-cyan-500 cursor-pointer flex flex-col justify-between transition relative overflow-hidden group">
                 <div class="flex items-center justify-between mb-1.5">
                   <div class="flex items-center gap-2">
-                    <input type="radio" name="llm-provider-radio" value="OPENAI" checked class="text-cyan-500" onchange="onLLMProviderChange('OPENAI')">
+                    <input type="radio" name="llm-provider-radio" value="OPENAI" class="text-cyan-500" onchange="onLLMProviderChange('OPENAI')">
                     <span class="font-bold text-white text-xs">OpenAI</span>
                   </div>
-                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Recommended</span>
+                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold uppercase">Paid Tokens</span>
                 </div>
-                <p class="text-[10px] text-slate-300 leading-tight">GPT-4o-mini • 200ms US latency, natural human cadence, 99.99% uptime for cold calls.</p>
-                <span class="text-[9px] text-slate-400 mt-2 block font-mono">~$0.15/1M tokens (pennies/mo)</span>
+                <p class="text-[10px] text-slate-300 leading-tight">GPT-4o-mini • Requires paid OpenAI billing balance ($5+ deposit).</p>
+                <span class="text-[9px] text-slate-400 mt-2 block font-mono">~$0.15/1M tokens (Requires Balance)</span>
               </label>
 
               <!-- DeepSeek Option -->
@@ -1793,28 +1806,25 @@
                     <input type="radio" name="llm-provider-radio" value="DEEPSEEK" class="text-blue-500" onchange="onLLMProviderChange('DEEPSEEK')">
                     <span class="font-bold text-white text-xs">DeepSeek</span>
                   </div>
-                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold uppercase">Direct &amp; Cheap</span>
+                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-bold uppercase">Budget Cloud</span>
                 </div>
-                <p class="text-[10px] text-slate-300 leading-tight">DeepSeek-V3 • Raw conversational banter, zero corporate fluff, best for WhatsApp texts.</p>
-                <span class="text-[9px] text-slate-400 mt-2 block font-mono">~$0.14/1M tokens (lowest cost)</span>
-              </label>
-
-              <!-- Gemini Option -->
-              <label class="p-3 rounded-xl border border-slate-700 bg-slate-950 hover:border-purple-500 cursor-pointer flex flex-col justify-between transition relative overflow-hidden group">
-                <div class="flex items-center justify-between mb-1.5">
-                  <div class="flex items-center gap-2">
-                    <input type="radio" name="llm-provider-radio" value="GEMINI" class="text-purple-500" onchange="onLLMProviderChange('GEMINI')">
-                    <span class="font-bold text-white text-xs">Google Gemini</span>
-                  </div>
-                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 font-bold uppercase">High Context</span>
-                </div>
-                <p class="text-[10px] text-slate-300 leading-tight">Gemini 2.5 Flash • 1M token context, best for reading massive 50-page dental website HTML.</p>
-                <span class="text-[9px] text-slate-400 mt-2 block font-mono">Free Tier / ~$0.075/1M</span>
+                <p class="text-[10px] text-slate-300 leading-tight">DeepSeek-V3 • Conversational banter, best for secondary background audits.</p>
+                <span class="text-[9px] text-slate-400 mt-2 block font-mono">~$0.14/1M tokens</span>
               </label>
             </div>
 
             <!-- API Keys Section -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-slate-800 text-xs">
+              <div>
+                <label class="text-[11px] text-slate-400 font-semibold flex items-center justify-between mb-1">
+                  <span>Google Gemini Key ($0 Free)</span>
+                  <span id="gemini-key-status" class="text-[10px] text-slate-400">Not set</span>
+                </label>
+                <div class="relative">
+                  <input type="password" id="input-gemini-key" placeholder="Enter AIzaSy... from AI Studio" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500 text-xs">
+                </div>
+              </div>
+
               <div>
                 <label class="text-[11px] text-slate-400 font-semibold flex items-center justify-between mb-1">
                   <span>OpenAI API Key (sk-...)</span>
@@ -1837,8 +1847,8 @@
             </div>
 
             <div class="flex items-center justify-between pt-1">
-              <span class="text-[11px] text-slate-400">💡 <strong>Zero Downtime Protection</strong>: If an API key is missing, the system automatically falls back to your secondary provider.</span>
-              <button onclick="saveLLMSettingsAction()" id="btn-save-llm" class="px-4 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition cursor-pointer shrink-0">
+              <span class="text-[11px] text-slate-400">💡 <strong>Zero Cost Calling</strong>: Google AI Studio gives 1,500 free calls/day with Gemini 2.5 Flash. Kokoro-82M TTS runs locally for $0.</span>
+              <button onclick="saveLLMSettingsAction()" id="btn-save-llm" class="px-4 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition cursor-pointer shrink-0">
                 <i class="fa-solid fa-check"></i> Apply Engine
               </button>
             </div>
@@ -8594,6 +8604,13 @@
           const radio = document.querySelector(`input[name="llm-provider-radio"][value="${active}"]`);
           if (radio) radio.checked = true;
 
+          const geminiStatus = document.getElementById('gemini-key-status');
+          if (geminiStatus) {
+            geminiStatus.innerHTML = data.providers.GEMINI?.configured 
+              ? `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> $0 Free Active</span>` 
+              : `<span class="text-amber-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Free Key Needed</span>`;
+          }
+
           const openAiStatus = document.getElementById('openai-key-status');
           if (openAiStatus) {
             openAiStatus.innerHTML = data.providers.OPENAI?.configured 
@@ -8762,7 +8779,8 @@
       btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Saving...';
       btn.disabled = true;
 
-      const provider = document.querySelector('input[name="llm-provider-radio"]:checked')?.value || 'OPENAI';
+      const provider = document.querySelector('input[name="llm-provider-radio"]:checked')?.value || 'GEMINI';
+      const geminiKey = document.getElementById('input-gemini-key')?.value.trim();
       const openaiKey = document.getElementById('input-openai-key')?.value.trim();
       const deepseekKey = document.getElementById('input-deepseek-key')?.value.trim();
 
@@ -8771,6 +8789,7 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider: provider,
+          gemini_api_key: geminiKey || undefined,
           openai_api_key: openaiKey || undefined,
           deepseek_api_key: deepseekKey || undefined
         })
