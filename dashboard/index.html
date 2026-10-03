@@ -4528,16 +4528,15 @@
       
       try {
         leafletMap = L.map('clinics-map', { zoomControl: true }).setView([37.0902, -95.7129], 4);
-        // Ultra-clean, high-performance dark tiles (100% Free, Zero Watermark, Fast CDN)
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-          subdomains: 'abcd',
-          maxZoom: 19
+        // Clean Dark Canvas tiles (100% Free, ZERO API Keys, ZERO Watermarks)
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+          attribution: '&copy; Esri &copy; OpenStreetMap contributors',
+          maxZoom: 16
         }).addTo(leafletMap);
         markersLayer = L.featureGroup().addTo(leafletMap);
         setTimeout(() => {
           if (leafletMap) leafletMap.invalidateSize();
-        }, 300);
+        }, 250);
       } catch (err) {
         console.error("Map initialization failed", err);
       }
