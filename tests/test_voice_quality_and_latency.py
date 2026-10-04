@@ -15,6 +15,8 @@ def test_speech_normalization():
 
 
 def test_acoustic_fillers_exist():
+    from voice_dialer import ensure_fillers_pregenerated
+    ensure_fillers_pregenerated()
     assert len(INSTANT_FILLERS) >= 6
     for f in INSTANT_FILLERS:
         assert "audio_url" in f
