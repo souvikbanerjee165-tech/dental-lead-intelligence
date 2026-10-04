@@ -644,7 +644,8 @@ class VoiceDialerEngine:
         to_phone: Optional[str] = None,
         carrier_override: Optional[str] = None,
         db: Any = None,
-        server_base_url: Optional[str] = None
+        server_base_url: Optional[str] = None,
+        initial_mode: str = "AI_FIRST"
     ) -> Dict[str, Any]:
         """
         Dispatches an autonomous AI call to a confirmed dental lead.
@@ -669,7 +670,8 @@ class VoiceDialerEngine:
                 target_phone=target_phone,
                 script=script,
                 server_base_url=server_base_url,
-                db=db
+                db=db,
+                initial_mode=initial_mode
             )
         elif selected_carrier == "TWILIO" and not carrier_status.get("has_twilio"):
             err_reason = "Twilio credentials incomplete. Configure Account SID, Auth Token / API Secret, and From Phone in settings."
@@ -779,9 +781,8 @@ class VoiceDialerEngine:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json"
         }
-        # Priority 1: High-Fidelity Neural voice (AWS.Polly.Joanna-Neural)
-        # Fallback 2: Basic female voice
-        for voice_name, s_level in [("AWS.Polly.Joanna-Neural", "premium"), ("female", "basic")]:
+        # Priority: Studio-Grade Neural Voices (AWS.Polly.Joanna-Neural, Polly.Joanna)
+        for voice_name, s_level in [("AWS.Polly.Joanna-Neural", "premium"), ("Polly.Joanna", "premium")]:
             try:
                 req = urllib.request.Request(
                     f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/speak",
@@ -893,7 +894,8 @@ class VoiceDialerEngine:
         target_phone: str,
         script: Dict[str, Any],
         server_base_url: Optional[str],
-        db: Any
+        db: Any,
+        initial_mode: str = "AI_FIRST"
     ) -> Dict[str, Any]:
         """Initiates real PSTN call via Telnyx Call Control v2 REST API."""
         url = "https://api.telnyx.com/v2/calls"
@@ -901,7 +903,8 @@ class VoiceDialerEngine:
             "lead_id": lead.get("id"),
             "name": lead.get("name"),
             "doctor_name": lead.get("doctor_name"),
-            "phone": target_phone
+            "phone": target_phone,
+            "initial_mode": initial_mode
         }).encode()).decode()
 
         # Resolve Caller ID: prefer saved setting, then query owned Telnyx numbers
@@ -967,14 +970,17 @@ class VoiceDialerEngine:
                         duration_sec=0
                     )
 
-                # Asynchronously monitor and speak opening hook the instant recipient answers
-                hook_text = script.get("gatekeeper_hook") or "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
-                if call_control_id and not call_control_id.startswith("mock_"):
-                    threading.Thread(
-                        target=cls._monitor_and_speak_on_answer,
-                        args=(call_control_id, hook_text, get_telnyx_api_key()),
-                        daemon=True
-                    ).start()
+                # Only speak on answer if initial_mode is AI-led (not HUMAN_FIRST)
+                if initial_mode not in ("HUMAN_FIRST", "HUMAN_CONTROL"):
+                    hook_text = script.get("gatekeeper_hook") or "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
+                    if call_control_id and not call_control_id.startswith("mock_"):
+                        threading.Thread(
+                            target=cls._monitor_and_speak_on_answer,
+                            args=(call_control_id, hook_text, get_telnyx_api_key()),
+                            daemon=True
+                        ).start()
+                else:
+                    logger.info(f"Telnyx call {call_control_id} started in {initial_mode} mode. Bot auto-intro disabled.")
 
                 return {
                     "status": "initiated",

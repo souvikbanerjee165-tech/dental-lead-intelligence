@@ -137,7 +137,8 @@ class LiveDialerEngine:
                     to_phone=clean_phone or phone,
                     carrier_override=carrier_mode,
                     db=db,
-                    server_base_url=server_base_url
+                    server_base_url=server_base_url,
+                    initial_mode=mode
                 )
                 session["carrier_dispatch"] = carrier_res
                 session["carrier_name"] = carrier_mode

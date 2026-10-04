@@ -4112,6 +4112,11 @@
               <span id="mdialer-handoff-pill" class="px-2 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-cyan-300 border border-slate-700">
                 0 Handoffs
               </span>
+              <label class="flex items-center gap-1.5 text-[11px] text-cyan-300 bg-slate-900 border border-cyan-500/30 px-2.5 py-1 rounded-lg cursor-pointer hover:bg-slate-800 transition" title="Hear prospect words through your PC speakers">
+                <input type="checkbox" id="mdialer-audio-monitor-chk" checked class="rounded border-slate-700 text-cyan-500 focus:ring-0">
+                <i class="fa-solid fa-volume-high text-xs text-cyan-400"></i>
+                <span>PC Audio Monitor</span>
+              </label>
               <!-- Prominent End Call Button in status bar -->
               <button onclick="endAndFinalizeCallAction()" id="btn-mdialer-bar-end" class="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white font-black text-xs shadow-lg shadow-rose-600/30 transition flex items-center gap-1.5 cursor-pointer shrink-0" title="End call now">
                 <i class="fa-solid fa-phone-slash text-xs"></i>
@@ -10613,6 +10618,21 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
       `;
       feed.appendChild(turnElem);
       feed.scrollTop = feed.scrollHeight;
+
+      // Real-Time PC Speaker Audio Monitor: voices phone conversation through PC speakers!
+      if (mdialerIsActive && 'speechSynthesis' in window && turn.text) {
+        const monitorCheck = document.getElementById('mdialer-audio-monitor-chk');
+        if (!monitorCheck || monitorCheck.checked) {
+          try {
+            const utter = new SpeechSynthesisUtterance(turn.text);
+            utter.rate = 1.05;
+            utter.volume = 1.0;
+            if (isProspect) utter.pitch = 1.1;
+            else if (isAI) utter.pitch = 0.95;
+            window.speechSynthesis.speak(utter);
+          } catch (e) {}
+        }
+      }
     }
 
     function updateCopilotHUD(hud) {

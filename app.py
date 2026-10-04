@@ -1782,20 +1782,26 @@ async def telnyx_webhook_handler(request: Request):
                 break
 
         if event_type == "call.answered":
-            # Speak opening pitch immediately upon answer using neural voice
-            hook_text = "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
+            start_telnyx_transcription(call_control_id)
             if matched_session:
-                hook_text = matched_session.get("script", {}).get("gatekeeper_hook") or hook_text
                 matched_session["status"] = "CONNECTED"
 
-            send_telnyx_speak(call_control_id, hook_text)
-            start_telnyx_transcription(call_control_id)
+            initial_mode = client_state.get("initial_mode") or (matched_session.get("current_mode") if matched_session else "AI_FIRST")
+            if initial_mode not in ("HUMAN_FIRST", "HUMAN_CONTROL"):
+                hook_text = "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
+                if matched_session:
+                    hook_text = matched_session.get("script", {}).get("gatekeeper_hook") or hook_text
+                send_telnyx_speak(call_control_id, hook_text)
+                notes = f"Telnyx call answered ({client_state.get('name')}). AI intro spoken with neural voice."
+            else:
+                logger.info(f"Telnyx call {call_control_id} answered in HUMAN_FIRST mode. AI keeping line open for human rep.")
+                notes = f"Telnyx call answered ({client_state.get('name')}). Human-first mode active (AI silent)."
 
             if lead_id and db:
                 db.log_call_outcome(
                     lead_id=lead_id,
                     outcome="CALL_CONNECTED",
-                    rep_notes=f"Telnyx call answered by recipient ({client_state.get('name')}). Spoke pitch with neural voice.",
+                    rep_notes=notes,
                     duration_sec=0
                 )
 
