@@ -1757,10 +1757,102 @@ async def telnyx_webhook_handler(request: Request):
         event_type = data.get("data", {}).get("event_type")
         payload = data.get("data", {}).get("payload", {})
         call_control_id = payload.get("call_control_id")
-        
-        logger.info(f"Telnyx webhook received: {event_type} (Call ID: {call_control_id})")
+        raw_cs = payload.get("client_state")
+
+        client_state = {}
+        if raw_cs:
+            try:
+                client_state = json.loads(base64.b64decode(raw_cs).decode("utf-8"))
+            except Exception:
+                pass
+
+        lead_id = client_state.get("lead_id")
+        hangup_cause = payload.get("hangup_cause")
+
+        logger.info(f"Telnyx webhook received: {event_type} (Call ID: {call_control_id}, Lead: {lead_id}, Hangup: {hangup_cause})")
+
+        from voice_dialer import start_telnyx_transcription, send_telnyx_speak
+        from live_dialer_engine import LiveDialerEngine
+
+        # Match active dialer session if one exists
+        matched_session = None
+        for s in list(LiveDialerEngine._active_sessions.values()):
+            if s.get("carrier_call_id") == call_control_id or s.get("call_id") == call_control_id:
+                matched_session = s
+                break
+
+        if event_type == "call.answered":
+            start_telnyx_transcription(call_control_id)
+            if lead_id and db:
+                db.log_call_outcome(
+                    lead_id=lead_id,
+                    outcome="CALL_CONNECTED",
+                    rep_notes=f"Telnyx call answered by recipient ({client_state.get('name')}). Live bidirectional audio active.",
+                    duration_sec=0
+                )
+
+        elif event_type == "call.transcription":
+            transcription_data = payload.get("transcription_data") or {}
+            transcript = (transcription_data.get("transcript") or "").strip()
+            is_final = transcription_data.get("is_final", False)
+
+            if transcript and is_final:
+                logger.info(f"Telnyx Phone Recipient Said: '{transcript}'")
+                
+                # If session doesn't exist yet, spin up a live session
+                if not matched_session:
+                    matched_session = LiveDialerEngine.start_manual_session(
+                        phone=client_state.get("phone") or "+15125550199",
+                        lead_id=lead_id,
+                        contact_name=client_state.get("name"),
+                        mode="AI_FIRST",
+                        carrier_mode="TELNYX",
+                        db=db
+                    )
+                    matched_session["carrier_call_id"] = call_control_id
+                
+                session_id = matched_session["session_id"]
+
+                # 1. Ingest prospect turn into HUD and transcript
+                LiveDialerEngine.process_live_turn(
+                    session_id=session_id,
+                    text=transcript,
+                    speaker="PROSPECT",
+                    db=db
+                )
+
+                # 2. Formulate real-time tactical AI response
+                ai_reply = LiveDialerEngine._generate_takeover_response(matched_session, None)
+                logger.info(f"AI Replying to Phone: '{ai_reply}'")
+
+                # 3. Speak response back to the phone line using Neural Voice
+                send_telnyx_speak(call_control_id, ai_reply)
+
+                # 4. Ingest AI turn into transcript
+                LiveDialerEngine.process_live_turn(
+                    session_id=session_id,
+                    text=ai_reply,
+                    speaker="AI Growth Specialist",
+                    db=db
+                )
+
+        elif event_type == "call.hangup":
+            duration = payload.get("call_duration_seconds") or payload.get("duration") or 0
+            outcome = "CALL_COMPLETED" if str(hangup_cause).lower() == "normal_clearing" else "CALL_DROPPED"
+            if lead_id and db:
+                db.log_call_outcome(
+                    lead_id=lead_id,
+                    outcome=outcome,
+                    rep_notes=f"Telnyx call ended. Cause: {hangup_cause}. Duration: {duration}s.",
+                    duration_sec=int(duration)
+                )
+            if matched_session:
+                matched_session["status"] = "COMPLETED"
+                matched_session["duration_sec"] = int(duration)
+
         return {"status": "received", "event": event_type}
     except Exception as e:
+        logger.error(f"Error handling Telnyx webhook: {e}")
         return {"status": "error", "detail": str(e)}
 
 @app.post("/api/voice/webhook/twilio")

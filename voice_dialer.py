@@ -769,6 +769,82 @@ class VoiceDialerEngine:
                 "message": f"Twilio call failed: {err_msg}"
             }
 
+    @staticmethod
+    def send_telnyx_speak(call_control_id: str, text: str, api_key: Optional[str] = None) -> bool:
+        """Speaks text on an active Telnyx call using high-fidelity AWS Polly Neural voice."""
+        if not call_control_id or call_control_id.startswith("mock_"):
+            return False
+        key = api_key or get_telnyx_api_key()
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
+        # Priority 1: High-Fidelity Neural voice (AWS.Polly.Joanna-Neural)
+        # Fallback 2: Basic female voice
+        for voice_name, s_level in [("AWS.Polly.Joanna-Neural", "premium"), ("female", "basic")]:
+            try:
+                req = urllib.request.Request(
+                    f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/speak",
+                    data=json.dumps({
+                        "payload": text,
+                        "voice": voice_name,
+                        "language": "en-US",
+                        "service_level": s_level
+                    }).encode("utf-8"),
+                    headers=headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status == 200:
+                        logger.info(f"Telnyx call {call_control_id}: Spoke '{text[:50]}...' using {voice_name} ({s_level})")
+                        return True
+            except urllib.error.HTTPError as e:
+                raw = ""
+                try:
+                    raw = e.read().decode("utf-8")
+                except Exception:
+                    pass
+                logger.warning(f"Telnyx speak attempt with {voice_name} returned {e.code}: {raw[:150]}")
+                if any(k in raw.lower() for k in ["not answered", "not ready", "invalid state"]):
+                    raise e
+                if s_level == "basic":
+                    break
+            except Exception as e:
+                logger.warning(f"Telnyx speak general error with {voice_name}: {e}")
+                break
+        return False
+
+    @staticmethod
+    def start_telnyx_transcription(call_control_id: str, api_key: Optional[str] = None) -> bool:
+        """Enables real-time Deepgram speech-to-text on an active Telnyx call leg."""
+        if not call_control_id or call_control_id.startswith("mock_"):
+            return False
+        key = api_key or get_telnyx_api_key()
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
+        try:
+            req = urllib.request.Request(
+                f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/transcription_start",
+                data=json.dumps({
+                    "transcription_engine": "deepgram",
+                    "transcription_engine_config": {
+                        "model": "deepgram/nova-3",
+                        "language": "en"
+                    }
+                }).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status == 200:
+                    logger.info(f"Telnyx call {call_control_id}: Live Deepgram transcription started.")
+                    return True
+        except Exception as e:
+            logger.warning(f"Failed to start Telnyx transcription on {call_control_id}: {e}")
+        return False
+
     @classmethod
     def _monitor_and_speak_on_answer(cls, call_control_id: str, text: str, api_key: str):
         """Monitors an active Telnyx outbound call and speaks the opening hook the instant recipient answers."""
@@ -803,22 +879,12 @@ class VoiceDialerEngine:
                     logger.info(f"Telnyx call {call_control_id} ended with state '{call_state}'. Stopping monitoring.")
                     break
 
-                # 2. Attempt speak action
-                speak_req = urllib.request.Request(
-                    f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/speak",
-                    data=json.dumps({
-                        "payload": text,
-                        "voice": "female",
-                        "language": "en-US",
-                        "service_level": "basic"
-                    }).encode("utf-8"),
-                    headers=headers,
-                    method="POST"
-                )
-                with urllib.request.urlopen(speak_req, timeout=5) as resp:
-                    if resp.status == 200:
-                        logger.info(f"Telnyx call {call_control_id} answered! Spoke opening hook.")
-                        break
+                # 2. Attempt speak action and initiate live transcription
+                cls.start_telnyx_transcription(call_control_id, api_key)
+                spoke = cls.send_telnyx_speak(call_control_id, text, api_key)
+                if spoke:
+                    logger.info(f"Telnyx call {call_control_id} answered! Spoke opening hook with neural voice.")
+                    break
             except urllib.error.HTTPError as e:
                 try:
                     raw = e.read().decode("utf-8")
@@ -1100,3 +1166,8 @@ Output strictly valid JSON with this exact structure:
             ],
             "summary": "Receptionist confirmed after-hours missed call pain and accepted a 10-minute demo on Thursday at 11:00 AM."
         }
+
+
+# Module-level convenience aliases
+send_telnyx_speak = VoiceDialerEngine.send_telnyx_speak
+start_telnyx_transcription = VoiceDialerEngine.start_telnyx_transcription
