@@ -805,8 +805,6 @@ class VoiceDialerEngine:
                 except Exception:
                     pass
                 logger.warning(f"Telnyx speak attempt with {voice_name} returned {e.code}: {raw[:150]}")
-                if any(k in raw.lower() for k in ["not answered", "not ready", "invalid state"]):
-                    raise e
                 if s_level == "basic":
                     break
             except Exception as e:
@@ -857,34 +855,18 @@ class VoiceDialerEngine:
         }
 
         # Poll call status and trigger speech upon answer
-        for attempt in range(35):  # up to ~45 seconds
+        for attempt in range(45):  # up to ~60 seconds
             time.sleep(1.2)
             try:
-                # 1. Inspect call status first
-                status_url = f"https://api.telnyx.com/v2/calls/{call_control_id}"
-                st_req = urllib.request.Request(status_url, headers=headers)
-                call_alive = True
-                call_state = "ringing"
-                try:
-                    with urllib.request.urlopen(st_req, timeout=4) as st_resp:
-                        st_data = json.loads(st_resp.read().decode("utf-8")).get("data", {})
-                        call_alive = st_data.get("is_alive", True)
-                        call_state = st_data.get("call_state") or st_data.get("state") or "ringing"
-                except Exception:
-                    # If status check fails, proceed directly to speak attempt
-                    pass
-
-                # If call hung up before answer, stop polling
-                if not call_alive or call_state in ["hangup", "completed", "rejected"]:
-                    logger.info(f"Telnyx call {call_control_id} ended with state '{call_state}'. Stopping monitoring.")
-                    break
-
-                # 2. Attempt speak action and initiate live transcription
-                cls.start_telnyx_transcription(call_control_id, api_key)
+                # Attempt speak action
                 spoke = cls.send_telnyx_speak(call_control_id, text, api_key)
                 if spoke:
                     logger.info(f"Telnyx call {call_control_id} answered! Spoke opening hook with neural voice.")
+                    cls.start_telnyx_transcription(call_control_id, api_key)
                     break
+            except Exception as e:
+                logger.debug(f"Telnyx monitoring polling tick {attempt}: {e}")
+                continue
             except urllib.error.HTTPError as e:
                 try:
                     raw = e.read().decode("utf-8")
@@ -941,7 +923,7 @@ class VoiceDialerEngine:
             "from": caller_id or "+13343780005",
             "connection_id": get_telnyx_connection_id(),
             "client_state": client_state,
-            "timeout_secs": 30
+            "timeout_secs": 60
         }
 
         # Pass public webhook_url (Telnyx rejects localhost/127.0.0.1)

@@ -1782,12 +1782,20 @@ async def telnyx_webhook_handler(request: Request):
                 break
 
         if event_type == "call.answered":
+            # Speak opening pitch immediately upon answer using neural voice
+            hook_text = "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
+            if matched_session:
+                hook_text = matched_session.get("script", {}).get("gatekeeper_hook") or hook_text
+                matched_session["status"] = "CONNECTED"
+
+            send_telnyx_speak(call_control_id, hook_text)
             start_telnyx_transcription(call_control_id)
+
             if lead_id and db:
                 db.log_call_outcome(
                     lead_id=lead_id,
                     outcome="CALL_CONNECTED",
-                    rep_notes=f"Telnyx call answered by recipient ({client_state.get('name')}). Live bidirectional audio active.",
+                    rep_notes=f"Telnyx call answered by recipient ({client_state.get('name')}). Spoke pitch with neural voice.",
                     duration_sec=0
                 )
 
@@ -3248,6 +3256,34 @@ async def start_manual_dialer_session(req: ManualDialerStartRequest, request: Re
         server_base_url=base_url
     )
     return session
+
+@app.get("/api/dialer/manual/session/{session_id}")
+async def get_manual_dialer_session_state(session_id: str):
+    """
+    Returns real-time call status, live transcripts, and Co-Pilot HUD telemetry
+    for active or recently completed manual/AI dialer sessions.
+    """
+    session = LiveDialerEngine.get_session(session_id)
+    if not session:
+        for s in list(LiveDialerEngine._active_sessions.values()):
+            if s.get("session_id") == session_id or s.get("carrier_call_id") == session_id:
+                session = s
+                break
+    if not session:
+        return {"status": "NOT_FOUND", "transcript": []}
+
+    return {
+        "session_id": session.get("session_id"),
+        "status": session.get("status", "ACTIVE"),
+        "current_mode": session.get("current_mode"),
+        "carrier_mode": session.get("carrier_mode"),
+        "transcript": session.get("transcript", []),
+        "talk_metrics": session.get("talk_metrics", {}),
+        "duration_sec": session.get("duration_sec", 0),
+        "clinic_name": session.get("clinic_name"),
+        "doctor_name": session.get("doctor_name"),
+        "phone_number": session.get("phone_number")
+    }
 
 @app.post("/api/dialer/manual/turn")
 async def process_manual_dialer_turn(req: ManualDialerTurnRequest):

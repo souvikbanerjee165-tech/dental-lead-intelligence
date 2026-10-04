@@ -10097,6 +10097,7 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
     let mdialerMediaRecorder = null;
     let mdialerAudioChunks = [];
     let mdialerCallTimer = null;
+    let mdialerSyncInterval = null;
     let mdialerSecondsElapsed = 0;
     let mdialerPhoneLookupTimeout = null;
     let mdialerAudioContext = null;
@@ -10382,9 +10383,40 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
         const feed = document.getElementById('mdialer-transcript-feed');
         feed.innerHTML = '';
 
+        let renderedTurnCount = 0;
         if (session.transcript && session.transcript.length > 0) {
           session.transcript.forEach(t => renderManualTranscriptTurn(t));
+          renderedTurnCount = session.transcript.length;
         }
+
+        // Live Telnyx / Carrier audio transcript synchronizer
+        clearInterval(mdialerSyncInterval);
+        mdialerSyncInterval = setInterval(async () => {
+          if (!mdialerIsActive || !mdialerSessionId) {
+            clearInterval(mdialerSyncInterval);
+            return;
+          }
+          try {
+            const pollRes = await fetch(`/api/dialer/manual/session/${mdialerSessionId}`);
+            if (pollRes.ok) {
+              const pollData = await pollRes.json();
+              if (pollData.transcript && pollData.transcript.length > renderedTurnCount) {
+                stopRingtone();
+                const newTurns = pollData.transcript.slice(renderedTurnCount);
+                newTurns.forEach(t => renderManualTranscriptTurn(t));
+                renderedTurnCount = pollData.transcript.length;
+              }
+              if (pollData.status === 'CONNECTED') {
+                stopRingtone();
+              } else if (pollData.status === 'COMPLETED' || pollData.status === 'DROPPED') {
+                clearInterval(mdialerSyncInterval);
+                stopRingtone();
+              }
+            }
+          } catch (e) {
+            // Polling error non-blocking
+          }
+        }, 1200);
 
         // Initialize Audio Capture & VU Meter
         await initManualAudioStream();
@@ -10765,6 +10797,7 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
 
       const sid = mdialerSessionId;
       clearInterval(mdialerCallTimer);
+      clearInterval(mdialerSyncInterval);
       mdialerIsActive = false;
       const headerEndBtn = document.getElementById('btn-mdialer-header-end');
       if (headerEndBtn) headerEndBtn.classList.add('hidden');
