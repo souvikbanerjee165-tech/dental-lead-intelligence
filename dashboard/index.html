@@ -6182,6 +6182,7 @@
     }
 
     function closeVoiceCallModal() {
+      fetch('/api/voice/call/hangup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).catch(() => {});
       document.getElementById('modal-voice-call').classList.add('hidden');
     }
 
@@ -10241,11 +10242,12 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
 
     function closeManualDialerModal() {
       if (mdialerIsActive) {
-        if (!confirm("A live call session is currently active. Do you want to end and finalize the call?")) {
+        if (!confirm("A live call session is currently active. Do you want to end and hang up the call?")) {
           return;
         }
         endAndFinalizeCallAction();
       }
+      fetch('/api/dialer/manual/hangup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ session_id: mdialerSessionId }) }).catch(() => {});
       document.getElementById('modal-manual-dialer').classList.add('hidden');
     }
 
@@ -10312,6 +10314,11 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
     }
 
     async function startManualCallAction() {
+      if (mdialerIsActive) {
+        showToast("⚠️ A call is already connected! Hang up first before placing a new call.");
+        return;
+      }
+
       const phoneInput = document.getElementById('mdialer-phone-input').value.trim();
       if (!phoneInput) {
         showToast("Please enter or dial a phone number first.");
@@ -10835,6 +10842,14 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
       clearInterval(mdialerCallTimer);
       clearInterval(mdialerSyncInterval);
       mdialerIsActive = false;
+
+      // ⚡ Instantly kill the telecom call on Telnyx
+      fetch('/api/dialer/manual/hangup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sid })
+      }).catch(e => console.warn("Hangup error:", e));
+
       const headerEndBtn = document.getElementById('btn-mdialer-header-end');
       if (headerEndBtn) headerEndBtn.classList.add('hidden');
 

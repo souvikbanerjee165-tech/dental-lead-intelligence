@@ -1,6 +1,8 @@
 import os
 import re
 import json
+import time
+import base64
 import asyncio
 import uuid
 import urllib.parse
@@ -1809,8 +1811,16 @@ async def telnyx_webhook_handler(request: Request):
             transcription_data = payload.get("transcription_data") or {}
             transcript = (transcription_data.get("transcript") or "").strip()
             is_final = transcription_data.get("is_final", False)
+            if isinstance(is_final, str):
+                is_final = is_final.lower() in ("true", "1")
 
-            if transcript and is_final:
+            # Process final transcripts or substantial speech blocks
+            if transcript and (is_final or len(transcript.split()) >= 3):
+                # Deduplication check against recent turns
+                existing_texts = [t.get("text", "") for t in (matched_session.get("transcript", []) if matched_session else [])[-3:]]
+                if transcript in existing_texts:
+                    return {"status": "skipped_duplicate"}
+
                 logger.info(f"Telnyx Phone Recipient Said: '{transcript}'")
                 
                 # If session doesn't exist yet, spin up a live session
@@ -1819,7 +1829,7 @@ async def telnyx_webhook_handler(request: Request):
                         phone=client_state.get("phone") or "+15125550199",
                         lead_id=lead_id,
                         contact_name=client_state.get("name"),
-                        mode="AI_FIRST",
+                        mode=client_state.get("initial_mode") or "AI_FIRST",
                         carrier_mode="TELNYX",
                         db=db
                     )
@@ -1832,7 +1842,7 @@ async def telnyx_webhook_handler(request: Request):
                 # 1. Synthesize audio for prospect turn so the PC speaker can play it!
                 p_fn = f"prospect_{int(time.time())}_{abs(hash(transcript)) % 1000}"
                 p_audio = generate_speech_audio(text=transcript, filename=p_fn, voice_name="en-US-ChristopherNeural")
-                p_url = p_audio.get("audio_url")
+                p_url = p_audio.get("audio_url") if p_audio else None
 
                 # Ingest prospect turn into HUD and transcript
                 LiveDialerEngine.process_live_turn(
@@ -1843,26 +1853,31 @@ async def telnyx_webhook_handler(request: Request):
                     db=db
                 )
 
-                # 2. Formulate real-time tactical AI response
-                ai_reply = LiveDialerEngine._generate_takeover_response(matched_session, None)
-                logger.info(f"AI Replying to Phone: '{ai_reply}'")
+                # 2. Check if AI is in control (or AI_FIRST mode) - if so, generate response
+                current_mode = matched_session.get("current_mode", "AI_CONTROL")
+                if current_mode in ("AI_CONTROL", "AI_FIRST"):
+                    # Formulate real-time tactical AI response
+                    ai_reply = LiveDialerEngine._generate_takeover_response(matched_session, None)
+                    logger.info(f"AI Replying to Phone: '{ai_reply}'")
 
-                # 3. Speak response back to the phone line using Neural Voice
-                send_telnyx_speak(call_control_id, ai_reply)
+                    # Speak response back to the phone line using Neural Voice
+                    send_telnyx_speak(call_control_id, ai_reply)
 
-                # 4. Synthesize audio for AI turn so the PC speaker can play it!
-                ai_fn = f"ai_{int(time.time())}_{abs(hash(ai_reply)) % 1000}"
-                ai_audio = generate_speech_audio(text=ai_reply, filename=ai_fn, voice_name="en-US-AriaNeural")
-                ai_url = ai_audio.get("audio_url")
+                    # Synthesize audio for AI turn so the PC speaker can play it!
+                    ai_fn = f"ai_{int(time.time())}_{abs(hash(ai_reply)) % 1000}"
+                    ai_audio = generate_speech_audio(text=ai_reply, filename=ai_fn, voice_name="en-US-AriaNeural")
+                    ai_url = ai_audio.get("audio_url") if ai_audio else None
 
-                # Ingest AI turn into transcript
-                LiveDialerEngine.process_live_turn(
-                    session_id=session_id,
-                    text=ai_reply,
-                    speaker="AI Growth Specialist",
-                    audio_url=ai_url,
-                    db=db
-                )
+                    # Ingest AI turn into transcript
+                    LiveDialerEngine.process_live_turn(
+                        session_id=session_id,
+                        text=ai_reply,
+                        speaker="AI Growth Specialist",
+                        audio_url=ai_url,
+                        db=db
+                    )
+                else:
+                    logger.info(f"Session in {current_mode} mode. Prospect speech ingested for rep. AI holding response.")
 
         elif event_type == "call.hangup":
             duration = payload.get("call_duration_seconds") or payload.get("duration") or 0
@@ -3376,6 +3391,35 @@ async def save_manual_call_recording(req: ManualDialerSaveRecordingRequest):
 async def finalize_manual_dialer_call(req: ManualDialerSaveRecordingRequest):
     """Alias for finalizing call session."""
     return await save_manual_call_recording(req)
+
+class DialerHangupRequest(BaseModel):
+    session_id: Optional[str] = None
+    call_id: Optional[str] = None
+
+@app.post("/api/dialer/manual/hangup")
+@app.post("/api/voice/call/hangup")
+async def hangup_live_call(req: Optional[DialerHangupRequest] = None):
+    """Immediately sends a hangup command to Telnyx to terminate telecom connection."""
+    from live_dialer_engine import LiveDialerEngine
+    from voice_dialer import hangup_telnyx_call
+    
+    target_id = None
+    if req:
+        target_id = req.session_id or req.call_id
+
+    # If no target provided, search active sessions
+    if not target_id:
+        for sid, sess in list(LiveDialerEngine._active_sessions.items()):
+            if sess.get("carrier_call_id") or sess.get("call_id"):
+                target_id = sid
+                break
+
+    if target_id:
+        res = LiveDialerEngine.hangup_session(target_id)
+        return {"status": "hung_up", "target": target_id, "detail": res}
+
+    return {"status": "ok", "message": "No active carrier session found"}
+
 
 @app.get("/api/dialer/recordings")
 async def get_call_recordings_list(limit: int = 50):

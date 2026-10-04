@@ -284,9 +284,17 @@ class LiveDialerEngine:
             "engine": speech.get("engine")
         }
         session["transcript"].append(ai_turn)
-        session["talk_metrics"]["ai_words"] += len(reply_text.split())
-
         logger.info(f"Session {session_id}: Handed over to AI. Generated: '{reply_text}'")
+
+        # Relay AI speech to live Telnyx phone line
+        carrier_call_id = session.get("carrier_call_id") or session.get("call_id")
+        if carrier_call_id and not str(carrier_call_id).startswith("mock_"):
+            try:
+                from voice_dialer import send_telnyx_speak
+                send_telnyx_speak(carrier_call_id, reply_text)
+                logger.info(f"Relayed AI takeover speech to Telnyx phone line {carrier_call_id}")
+            except Exception as e:
+                logger.warning(f"Failed to relay AI speech to Telnyx phone line: {e}")
 
         return {
             "session_id": session_id,
@@ -359,6 +367,27 @@ class LiveDialerEngine:
         }
 
     @classmethod
+    def hangup_session(cls, session_id: str) -> Dict[str, Any]:
+        """Terminates carrier telecom call and marks active session COMPLETED."""
+        session = cls._active_sessions.get(session_id)
+        carrier_call_id = None
+        if session:
+            session["status"] = "COMPLETED"
+            carrier_call_id = session.get("carrier_call_id") or session.get("call_id")
+        
+        # Also check if session_id itself is a call_control_id
+        target_carrier_id = carrier_call_id or session_id
+        if target_carrier_id and not str(target_carrier_id).startswith("mock_"):
+            try:
+                from voice_dialer import hangup_telnyx_call
+                hangup_telnyx_call(target_carrier_id)
+                logger.info(f"Terminated carrier call {target_carrier_id} via hangup_session.")
+            except Exception as e:
+                logger.warning(f"Error hanging up call {target_carrier_id}: {e}")
+
+        return {"status": "hung_up", "session_id": session_id, "carrier_call_id": target_carrier_id}
+
+    @classmethod
     def finalize_call_session(
         cls,
         session_id: str,
@@ -375,6 +404,16 @@ class LiveDialerEngine:
         db = db or DatabaseManager()
         session = cls._active_sessions.pop(session_id, None) or {}
         now_str = datetime.now().isoformat()
+
+        # Immediately terminate live telecom call leg on Telnyx
+        carrier_call_id = session.get("carrier_call_id") or session.get("call_id")
+        if carrier_call_id and not str(carrier_call_id).startswith("mock_"):
+            try:
+                from voice_dialer import hangup_telnyx_call
+                hangup_telnyx_call(carrier_call_id)
+                logger.info(f"Terminated Telnyx telecom call {carrier_call_id} on finalize.")
+            except Exception as e:
+                logger.warning(f"Failed to hangup Telnyx call on finalize: {e}")
 
         clean_phone = session.get("phone_number") or "+15125550199"
         clinic_name = session.get("clinic_name") or "Dental Practice"

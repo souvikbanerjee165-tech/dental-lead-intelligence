@@ -545,11 +545,21 @@ def generate_edge_tts_mp3(
         elif any(k in voice_name for k in ["Christopher", "Matthew", "Guy", "-M", "male", "prospect"]):
             v_target = "en-US-ChristopherNeural"
 
-        async def _synth():
-            comm = edge_tts.Communicate(text, v_target)
-            await comm.save(str(out_file))
+        def _synth_worker():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                async def _synth():
+                    comm = edge_tts.Communicate(text, v_target)
+                    await comm.save(str(out_file))
+                loop.run_until_complete(_synth())
+            finally:
+                loop.close()
 
-        asyncio.run(_synth())
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            pool.submit(_synth_worker).result(timeout=12)
+
         if out_file.exists() and out_file.stat().st_size > 500:
             logger.info(f"Generated Edge Neural TTS: {out_file.name} ({v_target}, {out_file.stat().st_size} bytes)")
             return {
@@ -821,17 +831,19 @@ class VoiceDialerEngine:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json"
         }
-        # Priority: Studio-Grade Neural Voices (AWS.Polly.Joanna-Neural, Polly.Joanna)
-        for voice_name, s_level in [("AWS.Polly.Joanna-Neural", "premium"), ("Polly.Joanna", "premium")]:
+        # Priority: Studio-Grade Neural Voices (AWS.Polly.Joanna-Neural, Polly.Joanna), fallback to standard female
+        for voice_name, s_level in [("AWS.Polly.Joanna-Neural", "premium"), ("Polly.Joanna", "premium"), ("female", "basic")]:
             try:
+                payload = {
+                    "payload": text,
+                    "voice": voice_name,
+                    "language": "en-US"
+                }
+                if s_level != "basic":
+                    payload["service_level"] = s_level
                 req = urllib.request.Request(
                     f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/speak",
-                    data=json.dumps({
-                        "payload": text,
-                        "voice": voice_name,
-                        "language": "en-US",
-                        "service_level": s_level
-                    }).encode("utf-8"),
+                    data=json.dumps(payload).encode("utf-8"),
                     headers=headers,
                     method="POST"
                 )
@@ -846,11 +858,36 @@ class VoiceDialerEngine:
                 except Exception:
                     pass
                 logger.warning(f"Telnyx speak attempt with {voice_name} returned {e.code}: {raw[:150]}")
-                if s_level == "basic":
-                    break
             except Exception as e:
                 logger.warning(f"Telnyx speak general error with {voice_name}: {e}")
-                break
+        return False
+
+    @staticmethod
+    def hangup_telnyx_call(call_control_id: str, api_key: Optional[str] = None) -> bool:
+        """Terminates an active Telnyx Call Control call leg immediately."""
+        if not call_control_id or call_control_id.startswith("mock_"):
+            return False
+        key = api_key or get_telnyx_api_key()
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
+        try:
+            req = urllib.request.Request(
+                f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/hangup",
+                data=json.dumps({}).encode("utf-8"),
+                headers=headers,
+                method="POST"
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                if resp.status in (200, 204):
+                    logger.info(f"Telnyx call {call_control_id} hung up successfully.")
+                    return True
+        except urllib.error.HTTPError as e:
+            logger.info(f"Telnyx hangup call {call_control_id} returned {e.code} (may already be ended).")
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to hangup Telnyx call {call_control_id}: {e}")
         return False
 
     @staticmethod
@@ -1199,3 +1236,5 @@ Output strictly valid JSON with this exact structure:
 # Module-level convenience aliases
 send_telnyx_speak = VoiceDialerEngine.send_telnyx_speak
 start_telnyx_transcription = VoiceDialerEngine.start_telnyx_transcription
+hangup_telnyx_call = VoiceDialerEngine.hangup_telnyx_call
+
