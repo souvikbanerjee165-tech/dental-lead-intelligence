@@ -527,6 +527,40 @@ def generate_google_cloud_tts_mp3(
     return None
 
 
+def generate_edge_tts_mp3(
+    text: str,
+    filename: str,
+    voice_name: str = "en-US-AriaNeural"
+) -> Optional[Dict[str, Any]]:
+    """Synthesizes studio-grade neural voice MP3 via edge-tts (free, zero-config, hyper-realistic)."""
+    try:
+        import asyncio, edge_tts
+        out_dir = Path("output/calls")
+        out_dir.mkdir(parents=True, exist_ok=True)
+        out_file = out_dir / f"{filename}.mp3"
+
+        v_target = voice_name
+        if any(k in voice_name for k in ["Aria", "Joanna", "Jenny", "Sarah", "-F", "female"]):
+            v_target = "en-US-AriaNeural"
+        elif any(k in voice_name for k in ["Christopher", "Matthew", "Guy", "-M", "male", "prospect"]):
+            v_target = "en-US-ChristopherNeural"
+
+        async def _synth():
+            comm = edge_tts.Communicate(text, v_target)
+            await comm.save(str(out_file))
+
+        asyncio.run(_synth())
+        if out_file.exists() and out_file.stat().st_size > 500:
+            logger.info(f"Generated Edge Neural TTS: {out_file.name} ({v_target}, {out_file.stat().st_size} bytes)")
+            return {
+                "audio_url": f"/output/calls/{out_file.name}",
+                "engine": f"Neural TTS ({v_target})"
+            }
+    except Exception as e:
+        logger.warning(f"edge-tts synthesis warning: {e}")
+    return None
+
+
 def generate_speech_audio(
     text: str,
     filename: str,
@@ -535,13 +569,19 @@ def generate_speech_audio(
 ) -> Dict[str, Any]:
     """
     High-reliability Multi-Model Voice Synthesis Pipeline:
-    1. Google Cloud Text-to-Speech (Journey Neural Voices - Human-Grade, GCP Credit).
-    2. Local Kokoro-82M ONNX (Ultra-Fast 0ms network latency fallback).
-    3. Gemini Flash TTS preview.
+    1. Microsoft Edge Neural Voice (Studio-grade Aria / Christopher, 0 credentials, $0 free).
+    2. Google Cloud Text-to-Speech (Journey Neural Voices).
+    3. Local Kokoro-82M ONNX.
+    4. Gemini Flash TTS preview.
     """
+    # 1. Try Edge Neural Voice first (Free, 0 credentials, hyper-realistic, instant MP3)
+    edge_res = generate_edge_tts_mp3(text=text, filename=filename, voice_name=voice_name)
+    if edge_res:
+        return edge_res
+
     engine_req = preferred_engine.lower()
 
-    # 1. Try Google Cloud Journey Neural TTS first (Paid by GCP Credits)
+    # 2. Try Google Cloud Journey Neural TTS (Paid by GCP Credits)
     g_voice = voice_name if "Journey" in voice_name or "Neural2" in voice_name or "Studio" in voice_name else "en-US-Journey-F"
     g_res = generate_google_cloud_tts_mp3(text=text, filename=filename, voice_name=g_voice)
     if g_res:

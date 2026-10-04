@@ -211,6 +211,14 @@ class LiveDialerEngine:
         }
         session["transcript"].append(turn_entry)
 
+        # If in a live Telnyx call and the human rep at PC spoke, relay speech to the phone line
+        if speaker_role == "user" and session.get("carrier_mode") == "TELNYX" and session.get("carrier_call_id"):
+            try:
+                from voice_dialer import send_telnyx_speak
+                send_telnyx_speak(session["carrier_call_id"], text.strip())
+            except Exception as e:
+                logger.warning(f"Failed to relay human turn to Telnyx phone line: {e}")
+
         # Real-Time Co-Pilot Analysis
         copilot_hud = cls._analyze_copilot_hud(session, text, speaker_role)
 

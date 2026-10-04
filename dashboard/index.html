@@ -10326,6 +10326,13 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
       btn.disabled = true;
       btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin mr-1"></i> Connecting call...`;
 
+      // Pre-unlock audio context and speech synthesis on user gesture
+      try {
+        const unlocker = new Audio();
+        unlocker.play().catch(() => {});
+        if ('speechSynthesis' in window) window.speechSynthesis.resume();
+      } catch (e) {}
+
       try {
         const res = await fetch('/api/dialer/manual/start', {
           method: 'POST',
@@ -10619,11 +10626,20 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
       feed.appendChild(turnElem);
       feed.scrollTop = feed.scrollHeight;
 
-      // Real-Time PC Speaker Audio Monitor: voices phone conversation through PC speakers!
-      if (mdialerIsActive && 'speechSynthesis' in window && turn.text) {
-        const monitorCheck = document.getElementById('mdialer-audio-monitor-chk');
-        if (!monitorCheck || monitorCheck.checked) {
+      // Real-Time PC Speaker Audio Monitor: plays studio-grade audio through PC speakers!
+      const monitorCheck = document.getElementById('mdialer-audio-monitor-chk');
+      if (mdialerIsActive && (!monitorCheck || monitorCheck.checked)) {
+        if (turn.audio_url) {
           try {
+            const snd = new Audio(turn.audio_url);
+            snd.volume = 1.0;
+            snd.play().catch(e => console.warn("Audio play blocked:", e));
+          } catch (e) {
+            console.warn("Audio playback error:", e);
+          }
+        } else if ('speechSynthesis' in window && turn.text) {
+          try {
+            window.speechSynthesis.resume();
             const utter = new SpeechSynthesisUtterance(turn.text);
             utter.rate = 1.05;
             utter.volume = 1.0;

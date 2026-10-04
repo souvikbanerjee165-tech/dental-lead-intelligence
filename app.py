@@ -1827,11 +1827,19 @@ async def telnyx_webhook_handler(request: Request):
                 
                 session_id = matched_session["session_id"]
 
-                # 1. Ingest prospect turn into HUD and transcript
+                from voice_dialer import generate_speech_audio
+
+                # 1. Synthesize audio for prospect turn so the PC speaker can play it!
+                p_fn = f"prospect_{int(time.time())}_{abs(hash(transcript)) % 1000}"
+                p_audio = generate_speech_audio(text=transcript, filename=p_fn, voice_name="en-US-ChristopherNeural")
+                p_url = p_audio.get("audio_url")
+
+                # Ingest prospect turn into HUD and transcript
                 LiveDialerEngine.process_live_turn(
                     session_id=session_id,
                     text=transcript,
-                    speaker="PROSPECT",
+                    speaker="Receptionist (Phone)",
+                    audio_url=p_url,
                     db=db
                 )
 
@@ -1842,11 +1850,17 @@ async def telnyx_webhook_handler(request: Request):
                 # 3. Speak response back to the phone line using Neural Voice
                 send_telnyx_speak(call_control_id, ai_reply)
 
-                # 4. Ingest AI turn into transcript
+                # 4. Synthesize audio for AI turn so the PC speaker can play it!
+                ai_fn = f"ai_{int(time.time())}_{abs(hash(ai_reply)) % 1000}"
+                ai_audio = generate_speech_audio(text=ai_reply, filename=ai_fn, voice_name="en-US-AriaNeural")
+                ai_url = ai_audio.get("audio_url")
+
+                # Ingest AI turn into transcript
                 LiveDialerEngine.process_live_turn(
                     session_id=session_id,
                     text=ai_reply,
                     speaker="AI Growth Specialist",
+                    audio_url=ai_url,
                     db=db
                 )
 
