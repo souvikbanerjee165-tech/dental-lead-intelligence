@@ -1902,6 +1902,24 @@
                 <i class="fa-solid fa-check"></i> Save Carrier Choice
               </button>
             </div>
+            <!-- Cloudflare Public Webhook Tunnel Banner -->
+            <div id="cloudflare-tunnel-banner" class="p-3 rounded-xl bg-gradient-to-r from-amber-950/30 via-emerald-950/40 to-slate-900 border border-emerald-500/40 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-sm">
+                  <i class="fa-solid fa-satellite-dish animate-pulse"></i>
+                </div>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <span class="font-bold text-white text-xs">Cloudflare Public Webhook Tunnel</span>
+                    <span id="cloudflare-tunnel-badge" class="px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">ACTIVE</span>
+                  </div>
+                  <p id="cloudflare-tunnel-url-text" class="text-[11px] text-emerald-300 font-mono mt-0.5">https://fails-futures-key-grande.trycloudflare.com</p>
+                </div>
+              </div>
+              <button onclick="copyCloudflareWebhookAction()" id="btn-copy-cf-webhook" class="px-2.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[10px] transition cursor-pointer flex items-center gap-1 shadow">
+                <i class="fa-solid fa-copy"></i> Copy Telnyx Webhook URL
+              </button>
+            </div>
 
             <div class="space-y-3 text-xs">
               <!-- Active Carrier Selector -->
@@ -8843,10 +8861,43 @@
             telBadge.className = data.has_telnyx
               ? "px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300"
               : "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300";
-            telBadge.innerText = data.has_telnyx ? "Configured" : "Not Set";
+          }
+          loadCloudflareTunnelStatus();
+        })
+        .catch(() => {});
+    }
+
+    function loadCloudflareTunnelStatus() {
+      fetch('/api/tunnel/status')
+        .then(r => r.json())
+        .then(data => {
+          const badge = document.getElementById('cloudflare-tunnel-badge');
+          const urlText = document.getElementById('cloudflare-tunnel-url-text');
+          if (data.status === 'active' && data.url) {
+            if (badge) {
+              badge.className = "px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30";
+              badge.innerText = "ONLINE";
+            }
+            if (urlText) urlText.innerText = data.url;
+            window._activeCloudflareWebhook = data.webhook_telnyx || `${data.url}/api/voice/webhook/telnyx`;
+          } else {
+            if (badge) {
+              badge.className = "px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
+              badge.innerText = "OFFLINE";
+            }
+            if (urlText) urlText.innerText = "Run 'python start_tunnel.py' to launch public HTTPS tunnel";
           }
         })
         .catch(() => {});
+    }
+
+    function copyCloudflareWebhookAction() {
+      const webhookUrl = window._activeCloudflareWebhook || (document.getElementById('cloudflare-tunnel-url-text')?.innerText + '/api/voice/webhook/telnyx');
+      navigator.clipboard.writeText(webhookUrl).then(() => {
+        showToast("Copied Telnyx Webhook URL to clipboard! Paste into portal.telnyx.com Call Control App.");
+      }).catch(() => {
+        prompt("Copy this Telnyx Webhook URL:", webhookUrl);
+      });
     }
 
     function onLLMProviderChange(provider) {

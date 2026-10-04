@@ -1943,6 +1943,23 @@ async def get_telnyx_diagnostics_endpoint():
     from voice_dialer import verify_telnyx_diagnostics
     return verify_telnyx_diagnostics()
 
+@app.get("/api/tunnel/status")
+async def get_tunnel_status_endpoint():
+    """Returns active Cloudflare tunnel URL and webhook endpoints."""
+    tunnel_file = Path("output/cloudflare_tunnel.json")
+    if tunnel_file.exists():
+        try:
+            data = json.loads(tunnel_file.read_text())
+            return data
+        except Exception:
+            pass
+    return {
+        "status": "inactive",
+        "url": None,
+        "message": "Cloudflare tunnel is not running. Launch start_tunnel.py to enable live public webhooks."
+    }
+
+
 # --- Two-Way Calendar Sync & Demo Booking Endpoints ---
 
 @app.get("/api/calendar/slots")

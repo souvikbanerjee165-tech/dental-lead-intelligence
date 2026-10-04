@@ -878,9 +878,22 @@ class VoiceDialerEngine:
             "timeout_secs": 30
         }
 
-        # Only pass webhook_url if it's a real public domain (Telnyx rejects localhost/127.0.0.1)
+        # Pass public webhook_url (Telnyx rejects localhost/127.0.0.1)
+        public_url = None
         if server_base_url and not any(h in server_base_url for h in ["127.0.0.1", "localhost", "0.0.0.0"]):
-            payload["webhook_url"] = f"{server_base_url}/api/voice/webhook/telnyx"
+            public_url = server_base_url
+        else:
+            tunnel_file = Path("output/cloudflare_tunnel.json")
+            if tunnel_file.exists():
+                try:
+                    t_data = json.loads(tunnel_file.read_text())
+                    if t_data.get("url"):
+                        public_url = t_data["url"]
+                except Exception:
+                    pass
+
+        if public_url:
+            payload["webhook_url"] = f"{public_url.rstrip('/')}/api/voice/webhook/telnyx"
 
         req = urllib.request.Request(
             url,
