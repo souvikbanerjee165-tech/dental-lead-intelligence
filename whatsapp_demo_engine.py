@@ -248,10 +248,32 @@ class WhatsAppDemoEngine:
       stream.scrollTop = stream.scrollHeight;
     }}
 
-    function generateBotReply(patientText) {{
+    async function generateBotReply(patientText) {{
       const lower = patientText.toLowerCase();
       let reply = "";
 
+      // Try live AI backend first
+      try {{
+        const res = await fetch('/api/whatsapp/turn', {{
+          method: 'POST',
+          headers: {{ 'Content-Type': 'application/json' }},
+          body: JSON.stringify({{
+            lead_id: '{assets["lead_id"]}',
+            message: patientText,
+            clinic_name: clinicName,
+            doctor_name: docName
+          }})
+        }});
+        if (res.ok) {{
+          const data = await res.json();
+          if (data.reply) {{
+            appendMessage(data.reply, 'bot');
+            return;
+          }}
+        }}
+      }} catch (e) {{}}
+
+      // Deterministic fallback rules
       if (lower.includes("emergency") || lower.includes("toothache") || lower.includes("pain") || lower.includes("broken")) {{
         reply = `We're so sorry you're in pain! ${{docName}} reserves emergency priority slots tomorrow morning at <strong>9:30 AM</strong> and <strong>11:15 AM</strong>. Which of those times works best to get you out of pain?`;
       }} else if (lower.includes("implant") || lower.includes("cost") || lower.includes("price")) {{

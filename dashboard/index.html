@@ -2004,9 +2004,25 @@
 
                 <div class="flex items-center justify-between pt-1">
                   <button onclick="testTelephonyConnectionAction('TELNYX')" id="btn-test-telnyx" class="px-3 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-[11px] transition flex items-center gap-1.5 cursor-pointer">
-                    <i class="fa-solid fa-satellite-dish"></i> Test Telnyx Connection
+                    <i class="fa-solid fa-satellite-dish"></i> Test & Verify Carrier Hangup Causes
                   </button>
                   <span id="telnyx-test-status" class="text-[10px] text-slate-400 italic"></span>
+                </div>
+
+                <!-- Telnyx Live Diagnostics & Carrier Hangup Causes Audit Box -->
+                <div id="telnyx-diagnostics-box" class="hidden mt-3 p-3.5 rounded-xl bg-slate-950/90 border border-emerald-500/30 space-y-2.5 text-xs">
+                  <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+                    <span class="font-bold text-white flex items-center gap-1.5">
+                      <i class="fa-solid fa-stethoscope text-emerald-400"></i> Telnyx Live Account Audit
+                    </span>
+                    <span id="telnyx-diag-balance" class="px-2 py-0.5 rounded font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">$0.00 USD</span>
+                  </div>
+                  <div id="telnyx-diag-numbers" class="text-[11px] text-slate-300"></div>
+                  <div id="telnyx-diag-tips" class="text-[11px] text-amber-300 space-y-1"></div>
+                  <div class="pt-1">
+                    <span class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Recent Outbound Calls & Disconnect Causes:</span>
+                    <div id="telnyx-diag-calls" class="space-y-1.5 max-h-48 overflow-y-auto font-mono text-[11px]"></div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -8021,7 +8037,7 @@
         const res = await fetch('/api/radar/active-viewers');
         if (!res.ok) return;
         const data = await res.json();
-        const viewers = data.active_viewers || [];
+        const viewers = Array.isArray(data) ? data : (data.active_viewers || []);
         const banner = document.getElementById('banner-live-radar-intercept');
         if (!banner) return;
 
@@ -8719,7 +8735,7 @@
 
     function testTelephonyConnectionAction(carrier) {
       const statusSpan = document.getElementById(`${carrier.toLowerCase()}-test-status`);
-      if (statusSpan) statusSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Testing...';
+      if (statusSpan) statusSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Testing & Verifying...';
 
       fetch('/api/settings/telephony/test', {
         method: 'POST',
@@ -8731,6 +8747,59 @@
         if (res.status === 'success') {
           if (statusSpan) statusSpan.innerHTML = `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> ${res.message}</span>`;
           showToast(`Connected to ${carrier}!`);
+
+          // Render Telnyx Live Diagnostics if returned
+          if (carrier === 'TELNYX' && res.diagnostics) {
+            const diag = res.diagnostics;
+            const box = document.getElementById('telnyx-diagnostics-box');
+            if (box) {
+              box.classList.remove('hidden');
+              
+              // Balance
+              const balElem = document.getElementById('telnyx-diag-balance');
+              if (balElem) {
+                balElem.innerText = diag.balance !== null ? `$${parseFloat(diag.balance).toFixed(2)} ${diag.currency || 'USD'}` : 'Unchecked';
+              }
+
+              // Numbers
+              const numElem = document.getElementById('telnyx-diag-numbers');
+              if (numElem) {
+                if (diag.numbers && diag.numbers.length > 0) {
+                  numElem.innerHTML = `<span class="text-emerald-400 font-semibold"><i class="fa-solid fa-phone-volume mr-1"></i> Active Owned Phone:</span> ${diag.numbers.map(n => `<span class="bg-slate-800 px-1.5 py-0.5 rounded text-white font-mono cursor-pointer hover:bg-slate-700" onclick="document.getElementById('input-telnyx-phone').value='${n.phone}'" title="Click to use as caller ID">${n.phone}</span>`).join(' ')}`;
+                } else {
+                  numElem.innerHTML = `<span class="text-amber-400 font-semibold"><i class="fa-solid fa-triangle-exclamation mr-1"></i> No Purchased Numbers:</span> Outbound calls with unowned caller ID will be dropped by telecom spam filters.`;
+                }
+              }
+
+              // Tips
+              const tipsElem = document.getElementById('telnyx-diag-tips');
+              if (tipsElem && diag.root_cause_analysis) {
+                tipsElem.innerHTML = diag.root_cause_analysis.map(t => `<div class="p-1.5 rounded bg-amber-950/40 border border-amber-500/20 text-[10px] leading-tight"><i class="fa-solid fa-circle-info mr-1"></i>${t}</div>`).join('');
+              }
+
+              // Recent Calls
+              const callsElem = document.getElementById('telnyx-diag-calls');
+              if (callsElem && diag.recent_calls) {
+                if (diag.recent_calls.length === 0) {
+                  callsElem.innerHTML = `<div class="text-slate-500 italic text-[10px]">No recent outbound call attempts recorded on Telnyx.</div>`;
+                } else {
+                  callsElem.innerHTML = diag.recent_calls.map(c => {
+                    const isBad = ['CALL_REJECTED', 'UNALLOCATED_NUMBER', 'TIMEOUT', 'NO_ANSWER'].includes(c.hangup_cause);
+                    const pillClass = isBad ? 'bg-rose-500/10 text-rose-400 border-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                    return `
+                      <div class="p-1.5 rounded bg-slate-900 border border-slate-800 text-[10px] space-y-0.5">
+                        <div class="flex items-center justify-between">
+                          <span class="text-white font-bold">${c.to || 'Unknown'}</span>
+                          <span class="px-1.5 py-0.2 rounded border text-[9px] font-bold ${pillClass}">${c.hangup_cause}</span>
+                        </div>
+                        <div class="text-[9px] text-slate-400 leading-tight">${c.explanation || ''}</div>
+                      </div>
+                    `;
+                  }).join('');
+                }
+              }
+            }
+          }
         } else {
           if (statusSpan) statusSpan.innerHTML = `<span class="text-amber-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${res.message}</span>`;
           showToast(`Notice: ${res.message}`);

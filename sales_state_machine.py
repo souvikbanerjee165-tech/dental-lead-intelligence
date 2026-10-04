@@ -401,12 +401,36 @@ class SalesStateMachine:
                 "error": f"Tool '{tool_name}' is not permitted during state '{self.current_state}'"
             }
 
-        if tool_name == "book_calendar_slot":
-            slot = arguments.get("slot") or "Thursday 11:00 AM"
+        if tool_name == "check_calendar_availability":
+            from calendar_sync import CalendarSyncEngine
+            slots = CalendarSyncEngine.get_available_slots(days_ahead=3)
+            slot_names = [s["slot_key"] for s in slots[:3]]
+            return {
+                "success": True,
+                "available_slots": slot_names or ["Thursday at 11:00 AM", "Friday at 2:00 PM"],
+                "recommended_slot": slot_names[0] if slot_names else "Thursday at 11:00 AM"
+            }
+
+        elif tool_name == "book_calendar_slot":
+            from calendar_sync import CalendarSyncEngine
+            slot = arguments.get("slot") or "Thursday at 11:00 AM"
             self.booked_slot = slot
             self.outcome = "MEETING_BOOKED"
+            booking = CalendarSyncEngine.book_slot(
+                lead_id=self.lead_id,
+                slot_str=slot,
+                clinic_name=self.lead.get("name"),
+                doctor_name=self.lead.get("doctor_name"),
+                phone=self.lead.get("phone"),
+                db=self.db
+            )
             self.transition_to(CallState.TERMINATED, reason=f"Tool booked slot {slot}")
-            return {"success": True, "booked_slot": slot, "status": "CONFIRMED"}
+            return {
+                "success": True,
+                "booked_slot": slot,
+                "status": "CONFIRMED",
+                "meet_link": booking.get("meet_link")
+            }
 
         elif tool_name == "mark_dnc":
             self.transition_to(CallState.DNC_EXIT, reason="Tool triggered DNC")

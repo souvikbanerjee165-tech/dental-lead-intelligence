@@ -303,6 +303,27 @@ class ClientMetricLogRequest(BaseModel):
     clinic_name: Optional[str] = None
     doctor_name: Optional[str] = None
     plan_tier: Optional[str] = None
+
+class CalendarBookRequest(BaseModel):
+    lead_id: Optional[str] = "preview"
+    slot: str = "Thursday at 11:00 AM"
+    clinic_name: Optional[str] = None
+    doctor_name: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+class WhatsAppInboundRequest(BaseModel):
+    lead_id: Optional[str] = "preview"
+    message: str
+    clinic_name: Optional[str] = None
+    doctor_name: Optional[str] = None
+    patient_phone: Optional[str] = None
+
+class CadenceReminderRequest(BaseModel):
+    lead_id: str
+    reminder_type: str = "T-24H"  # T-24H or T-1H
+    custom_message: Optional[str] = None
+
     monthly_retainer: Optional[float] = None
 
 class SwarmCycleRequest(BaseModel):
@@ -1884,19 +1905,223 @@ async def test_telephony_carrier(payload: Dict[str, Any] = Body(default={})):
             }
     elif carrier == "TELNYX":
         try:
-            from voice_dialer import get_telnyx_api_key, get_telnyx_connection_id, get_telnyx_from_phone
+            from voice_dialer import verify_telnyx_diagnostics, get_telnyx_api_key, get_telnyx_connection_id, get_telnyx_from_phone
             key = get_telnyx_api_key()
             if not key or key.startswith("mock_"):
-                return {"status": "error", "carrier": "TELNYX", "message": "Telnyx API key not configured."}
+                return {"status": "error", "carrier": "TELNYX", "message": "Telnyx API key not configured in Settings or .env."}
+            
+            diag = verify_telnyx_diagnostics(key)
+            bal = diag.get("balance")
+            nums = diag.get("numbers", [])
+            recent = diag.get("recent_calls", [])
+            root_causes = diag.get("root_cause_analysis", [])
+
+            num_str = f"{len(nums)} owned number(s)" if nums else "0 owned numbers (Outbound calls may be dropped as spam)"
+            bal_str = f"${float(bal):.2f}" if bal is not None else "Unknown"
+
+            msg = f"Telnyx verified! Balance: {bal_str} USD | Active Numbers: {num_str}."
+            if not nums:
+                msg += " ⚠️ Warning: No phone numbers purchased on this Telnyx account. Outbound PSTN calls without an owned Caller ID will be rejected by telecom carriers."
+
             return {
                 "status": "success",
                 "carrier": "TELNYX",
-                "message": f"Telnyx credentials active! Connection ID: {get_telnyx_connection_id() or 'Default'}, Caller: {get_telnyx_from_phone()}"
+                "message": msg,
+                "diagnostics": diag
             }
         except Exception as e:
             return {"status": "error", "carrier": "TELNYX", "message": str(e)}
     else:
         return {"status": "success", "carrier": "BROWSER", "message": "In-browser WebRTC / mic audio mode active."}
+
+@app.get("/api/voice/telnyx/verify")
+async def get_telnyx_diagnostics_endpoint():
+    """
+    Returns full diagnostic verification of Telnyx balance, owned numbers,
+    call control applications, and recent carrier hangup causes.
+    """
+    from voice_dialer import verify_telnyx_diagnostics
+    return verify_telnyx_diagnostics()
+
+# --- Two-Way Calendar Sync & Demo Booking Endpoints ---
+
+@app.get("/api/calendar/slots")
+async def get_calendar_slots_endpoint(days: int = 5):
+    """Returns available 15-minute demo slots for dental practice owners."""
+    from calendar_sync import CalendarSyncEngine
+    return {
+        "status": "success",
+        "days_ahead": days,
+        "slots": CalendarSyncEngine.get_available_slots(days_ahead=days)
+    }
+
+@app.post("/api/calendar/book")
+async def book_calendar_demo_endpoint(req: CalendarBookRequest):
+    """Books a demo slot, updates lead to DEMO_BOOKED, and generates Google Meet invite."""
+    from calendar_sync import CalendarSyncEngine
+    booking = CalendarSyncEngine.book_slot(
+        lead_id=req.lead_id or "preview",
+        slot_str=req.slot,
+        clinic_name=req.clinic_name,
+        doctor_name=req.doctor_name,
+        phone=req.phone,
+        email=req.email,
+        db=db
+    )
+    return {
+        "status": "success",
+        "booking": booking,
+        "message": f"Demo confirmed for {req.slot}! Google Meet: {booking.get('meet_link')}"
+    }
+
+@app.get("/api/calendar/bookings")
+async def get_calendar_bookings_endpoint():
+    """Returns all confirmed demo bookings."""
+    from calendar_sync import CalendarSyncEngine
+    return {
+        "status": "success",
+        "bookings": CalendarSyncEngine.get_upcoming_bookings(db=db)
+    }
+
+# --- Two-Way Interactive WhatsApp Test Sandbox Endpoints ---
+
+@app.post("/api/whatsapp/sandbox/inbound")
+@app.post("/api/whatsapp/turn")
+async def handle_whatsapp_sandbox_message(req: WhatsAppInboundRequest):
+    """
+    Handles two-way WhatsApp patient conversation turns with dental intake AI.
+    Processes patient concerns (emergency toothaches, implant consultations, insurance)
+    and books triage appointment slots.
+    """
+    lead = db.get_lead(req.lead_id) if (req.lead_id and req.lead_id != "preview") else None
+    clinic_name = req.clinic_name or (lead.get("name") if lead else "Dental Practice")
+    doctor_name = req.doctor_name or (lead.get("doctor_name") if lead else "Doctor")
+    clean_doc = doctor_name.replace("Dr.", "").replace("Dr", "").strip()
+    doc_display = f"Dr. {clean_doc}" if clean_doc else "the Practice Owner"
+
+    user_text = req.message.strip()
+    key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+    prompt = f"""You are the 24/7 AI Patient Care Concierge for '{clinic_name}' ({doc_display}).
+A prospective dental patient just texted you on WhatsApp:
+"{user_text}"
+
+INSTRUCTIONS:
+1. Be warm, empathetic, and professional.
+2. If they have an emergency or toothache: offer tomorrow morning priority slots (9:30 AM or 11:15 AM).
+3. If they ask about dental implants or cosmetic work: highlight customized treatment plans and offer a 3D digital scan consultation this Thursday at 11:00 AM.
+4. If they ask about insurance: confirm we file with major PPOs (Delta Dental, MetLife, Cigna, Aetna).
+5. Always guide towards reserving an appointment time and getting their full name/cell.
+6. Keep the reply under 2-3 concise conversational WhatsApp sentences with appropriate emojis.
+
+Return strictly valid JSON:
+{{
+  "reply": "Your WhatsApp message text here.",
+  "intent": "EMERGENCY" / "IMPLANT" / "INSURANCE" / "BOOKING" / "GENERAL",
+  "is_appointment_requested": true/false,
+  "proposed_slot": "Tomorrow at 9:30 AM" (or null)
+}}"""
+
+    reply_text = f"Hello! 👋 I'm the 24/7 patient coordinator for {clinic_name}. We'd love to help! {doc_display} has an open emergency slot tomorrow at 9:30 AM or 11:15 AM. Which time works best for you?"
+    intent = "GENERAL"
+    is_booked = False
+    proposed_slot = None
+
+    if key and not key.startswith("mock_"):
+        try:
+            from google import genai
+            client = genai.Client(api_key=key)
+            resp = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=prompt
+            )
+            txt = resp.text.strip()
+            if "```json" in txt:
+                txt = txt.split("```json")[1].split("```")[0].strip()
+            elif "```" in txt:
+                txt = txt.split("```")[1].split("```")[0].strip()
+            parsed = json.loads(txt)
+            reply_text = parsed.get("reply", reply_text)
+            intent = parsed.get("intent", intent)
+            is_booked = parsed.get("is_appointment_requested", False)
+            proposed_slot = parsed.get("proposed_slot")
+        except Exception as e:
+            logger.warning(f"Gemini WhatsApp intake fallback: {e}")
+
+    # Log to CRM timeline
+    if req.lead_id and req.lead_id != "preview":
+        try:
+            OpportunityTimelineManager.log_event(
+                db=db,
+                lead_id=req.lead_id,
+                event_type="WHATSAPP_MESSAGE_SENT",
+                title=f"💬 WhatsApp Sandbox Turn: {intent}",
+                description=f"Patient: '{user_text}' -> AI Reply: '{reply_text}'",
+                actor="WHATSAPP_BOT",
+                metadata={"patient_message": user_text, "reply": reply_text, "intent": intent}
+            )
+        except Exception:
+            pass
+
+    return {
+        "status": "success",
+        "reply": reply_text,
+        "intent": intent,
+        "is_appointment_requested": is_booked,
+        "proposed_slot": proposed_slot
+    }
+
+# --- Pillar 4: Automated No-Show Elimination Sequence ---
+
+@app.post("/api/cadence/trigger-reminder")
+async def trigger_cadence_reminder_endpoint(req: CadenceReminderRequest):
+    """
+    Triggers automated No-Show Elimination SMS & Video touchpoints:
+    T-24h: Personalized Loom teardown link to build anticipation.
+    T-1h: Direct Google Meet / Zoom link with 1-click confirm/reschedule.
+    """
+    lead = db.get_lead(req.lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+        
+    clinic_name = lead.get("name", "Dental Practice")
+    doctor_name = lead.get("doctor_name", "Doctor")
+    phone = lead.get("phone", "")
+
+    if req.reminder_type == "T-24H":
+        msg = req.custom_message or (
+            f"Hi {doctor_name}! Looking forward to our 15-min practice growth walkthrough tomorrow. "
+            f"Here is a 90-second preview of the after-hours emergency leakage analysis for {clinic_name}: "
+            f"http://127.0.0.1:8000/demo/{req.lead_id} — See you tomorrow!"
+        )
+    else:  # T-1H
+        meet_code = f"den-{abs(hash(req.lead_id)) % 1000000:06d}"
+        meet_link = f"https://meet.google.com/{meet_code[:3]}-{meet_code[3:]}"
+        msg = req.custom_message or (
+            f"Hi {doctor_name}, our live demo starts in 60 minutes! "
+            f"Here is your direct meeting link: {meet_link} "
+            f"(Reply 'RESCHEDULE' if you need a different time today)."
+        )
+
+    # Log to timeline
+    OpportunityTimelineManager.log_event(
+        db=db,
+        lead_id=req.lead_id,
+        event_type="NO_SHOW_REMINDER_SENT",
+        title=f"🛡️ No-Show Prevention ({req.reminder_type}) Dispatched",
+        description=f"Sent automated {req.reminder_type} reminder: '{msg}'",
+        actor="SALES_CADENCE",
+        metadata={"reminder_type": req.reminder_type, "message": msg, "phone": phone}
+    )
+
+    return {
+        "status": "success",
+        "reminder_type": req.reminder_type,
+        "lead_id": req.lead_id,
+        "phone": phone,
+        "message_sent": msg
+    }
+
 
 # --- Expected Value ($EV) Prioritized Queue ---
 

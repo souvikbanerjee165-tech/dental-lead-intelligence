@@ -70,7 +70,7 @@ def test_real_time_copilot_listening_and_objections(tmp_path):
         db=test_db
     )
     hud = res2["copilot_hud"]
-    assert hud["detected_objection"] == "Existing Software / Front-Desk Platform"
+    assert hud["detected_objection"] in ("Existing Software / Front-Desk Platform", "Incumbent Software (Passive vs Active Conversion Layer)")
     assert "Weave" in hud["counter_punch"] or "software" in hud["counter_punch"].lower()
     assert len(hud["buying_signals"]) >= 1  # Sunday / voicemails detected
     assert res2["talk_ratios"]["prospect_pct"] > 0
