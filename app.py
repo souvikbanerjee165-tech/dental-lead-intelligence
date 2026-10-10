@@ -577,6 +577,20 @@ async def get_leads(
         else:
             l_copy["screenshot_url"] = None
 
+        # Quick BANT and MEDDIC evaluation
+        try:
+            from bant_meddic_scorer import DentalBANTMEDDICScorer
+            eval_res = DentalBANTMEDDICScorer.evaluate_lead(l, {})
+            l_copy["bant_score"] = eval_res["bant"]["total_score"]
+            l_copy["bant_rating"] = eval_res["bant"]["rating"]
+            l_copy["meddic_pct"] = eval_res["meddic"]["overall_completeness_pct"]
+            l_copy["meddic_tier"] = eval_res["meddic"]["tier"]
+        except Exception:
+            l_copy["bant_score"] = None
+            l_copy["bant_rating"] = None
+            l_copy["meddic_pct"] = None
+            l_copy["meddic_tier"] = None
+
         results.append(l_copy)
 
     return results
@@ -771,6 +785,14 @@ async def get_lead_details(lead_id: str):
     pdf_file = OUTPUT_DIR / "reports" / f"{clean_name}_audit.pdf"
     pdf_url = f"/output/reports/{pdf_file.name}" if pdf_file.exists() else None
 
+    # Compute BANT & MEDDIC Enterprise Qualification
+    bant_meddic_data = None
+    try:
+        from bant_meddic_scorer import DentalBANTMEDDICScorer
+        bant_meddic_data = DentalBANTMEDDICScorer.evaluate_lead(lead, audit_dict)
+    except Exception as e:
+        logger.warning(f"Failed to calculate BANT/MEDDIC for lead {lead_id}: {e}")
+
     return {
         "lead": lead,
         "audit": audit_dict,
@@ -780,8 +802,43 @@ async def get_lead_details(lead_id: str):
         "history": history,
         "whatsapp": wa_data,
         "proposal_url": proposal_url,
-        "pdf_url": pdf_url
+        "pdf_url": pdf_url,
+        "bant_meddic": bant_meddic_data,
+        "dossier_pdf_url": f"/api/leads/{lead_id}/download-pdf-dossier"
     }
+
+@app.get("/api/leads/{lead_id}/bant-meddic")
+async def get_lead_bant_meddic(lead_id: str):
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    with db._get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM audits WHERE lead_id = ? ORDER BY timestamp DESC LIMIT 1", (lead_id,))
+        audit = cursor.fetchone()
+        audit_dict = dict(audit) if audit else {}
+    from bant_meddic_scorer import DentalBANTMEDDICScorer
+    return DentalBANTMEDDICScorer.evaluate_lead(lead, audit_dict)
+
+@app.get("/api/leads/{lead_id}/download-pdf-dossier")
+async def download_lead_pdf_dossier(lead_id: str):
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    with db._get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM audits WHERE lead_id = ? ORDER BY timestamp DESC LIMIT 1", (lead_id,))
+        audit = cursor.fetchone()
+        audit_dict = dict(audit) if audit else {}
+    from executive_pdf_reporter import ExecutivePDFReporter
+    pdf_path = ExecutivePDFReporter.generate_lead_dossier(lead, audit_dict)
+    file_name = Path(pdf_path).name
+    return FileResponse(
+        path=pdf_path,
+        media_type="application/pdf",
+        filename=file_name,
+        headers={"Content-Disposition": f"attachment; filename=\"{file_name}\""}
+    )
 
 @app.get("/api/leads/{lead_id}/battlecard")
 async def get_lead_battlecard(lead_id: str):

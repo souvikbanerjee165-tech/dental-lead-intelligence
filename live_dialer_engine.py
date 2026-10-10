@@ -722,37 +722,21 @@ Generate your next single spoken response (DO NOT REPEAT PREVIOUS STATEMENTS):""
     @classmethod
     def _extract_closed_loop_learnings(cls, session: Dict[str, Any], transcript: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Mines objections, winning pitch angles, and gatekeeper demeanor from the transcript."""
+        structured = EmpathyVoicePromptEngine.extract_structured_call_outcome(transcript)
         all_text = " ".join([t.get("text", "") for t in transcript]).lower()
         clinic_name = session.get("clinic_name", "Dental Practice")
         doctor_name = session.get("doctor_name", "Doctor")
 
-        objections_found = []
+        objections_found = structured.get("detected_objections", [])
         winning_angles = []
-        gatekeeper_demeanor = "Professional"
-        outcome = "COMPLETED"
+        gatekeeper_demeanor = "Friendly & Receptive" if any(w in all_text for w in ["friendly", "thanks", "great", "sure"]) else "Professional"
+        outcome = structured.get("predicted_outcome", "COMPLETED")
+        gatekeeper_name = structured.get("gatekeeper_name") or session.get("gatekeeper_name")
 
-        if "weave" in all_text or "podium" in all_text or "software" in all_text:
-            objections_found.append("Existing software objection (Weave/Podium)")
-        if "receptionist" in all_text or "staff" in all_text:
-            objections_found.append("Front-desk bandwidth defense")
-        if "busy" in all_text:
-            objections_found.append("Doctor unavailable / busy")
-
-        if any(w in all_text for w in ["thursday", "calendar", "demo", "zoom", "meet"]):
-            outcome = "MEETING_BOOKED"
-            winning_angles.append("10-minute low-friction Thursday preview pitch")
-        elif any(w in all_text for w in ["send email", "video", "prototype"]):
-            outcome = "INTERESTED"
+        if outcome == "MEETING_BOOKED":
+            winning_angles.append("Low-friction calendar preview pitch")
+        elif outcome == "EMAIL_REQUESTED":
             winning_angles.append("Direct practice manager video prototype offer")
-        elif "not interested" in all_text:
-            outcome = "NOT_INTERESTED"
-        elif any(w in all_text for w in ["gatekeeper", "block", "no solicit"]):
-            outcome = "GATEKEEPER_BLOCKED"
-
-        if any(w in all_text for w in ["friendly", "thanks", "great", "sure", "sounds good"]):
-            gatekeeper_demeanor = "Friendly & Receptive"
-        elif any(w in all_text for w in ["busy", "make it quick", "what is this"]):
-            gatekeeper_demeanor = "Guarded / Skeptical"
 
         playbook_insights = [
             {
@@ -775,7 +759,9 @@ Generate your next single spoken response (DO NOT REPEAT PREVIOUS STATEMENTS):""
             "objections_encountered": objections_found or ["Standard front-desk screening"],
             "winning_angles": winning_angles or ["Direct weekend revenue leakage calculation"],
             "gatekeeper_demeanor": gatekeeper_demeanor,
-            "gatekeeper_name": "Office Coordinator",
+            "gatekeeper_name": gatekeeper_name or "Office Coordinator",
+            "next_best_action": structured.get("next_best_action", "Re-engage during afternoon huddle"),
+            "pain_acknowledged": structured.get("pain_acknowledged", False),
             "handoff_summary": f"Switched between Human and AI {len(session.get('handoff_log', []))} times during the call.",
             "playbook_insights": playbook_insights,
             "summary": f"Call with {clinic_name} concluded as {outcome}. Demeanor: {gatekeeper_demeanor}."

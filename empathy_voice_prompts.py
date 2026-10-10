@@ -405,3 +405,98 @@ You adopt a calm, clinical cadence, deploy conversational disconfirmation, and s
         if not trimmed.endswith((".", "?", "!")):
             trimmed += "..."
         return trimmed
+
+    # ================= SPIN SELLING FRAMEWORK (from ai-dialer) =================
+    @classmethod
+    def get_spin_prompt(
+        cls,
+        stage: str,
+        clinic_name: str = "your clinic",
+        doctor_name: str = "the Doctor",
+        metro: str = "your area",
+        leakage: str = "$4,200/mo"
+    ) -> str:
+        """
+        Returns consultative discovery prompts using the SPIN Selling framework:
+        - Situation: Establishes current practice intake setup.
+        - Problem: Surfaces missed after-hours and weekend callers.
+        - Implication: Connects uncaptured calls to lost restorative revenue.
+        - Need-Payoff: Secures agreement on automated 24/7 capture.
+        """
+        doc = doctor_name if doctor_name and not doctor_name.lower().startswith("doc") else "Doctor"
+        spin_library = {
+            "SITUATION": [
+                f"Just confirming, does your front desk team manage all incoming patient inquiries directly during clinic hours?",
+                f"Quick question for {clinic_name}'s team: who typically handles patient intake when the phones ring while staff is with patients?"
+            ],
+            "PROBLEM": [
+                f"When emergency patients or weekend implant inquiries call after 5 PM, what captures them right now?",
+                f"Most clinics tell us 30% of emergency pain callers never leave voicemails. How is {clinic_name} currently handling after-hours call overflow?"
+            ],
+            "IMPLICATION": [
+                f"In {metro}, our audits show clinics lose 4 to 8 high-ticket restorative bookings monthly because pain callers simply dial the next dentist on Google.",
+                f"If an emergency patient calls at 8 PM and hits voicemail, that represents nearly {leakage} in restorative care going to a competing local practice."
+            ],
+            "NEED_PAYOFF": [
+                f"If an autonomous AI dental receptionist answered every after-hours call, verified insurance, and booked directly into your schedule, how much chair time would that protect for {doc}?",
+                f"Would a 60-second video showing how we capture and book those weekend implant patients be helpful for your office manager to review?"
+            ]
+        }
+        stage_key = stage.upper()
+        options = spin_library.get(stage_key, spin_library["PROBLEM"])
+        return random.choice(options)
+
+    @classmethod
+    def extract_structured_call_outcome(cls, transcript: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        Structured post-call data extractor (adapted from ai-dialer / VAPI schema).
+        Parses multi-turn dialogue into structured CRM data.
+        """
+        full_text = " ".join([t.get("text", "") for t in transcript]).lower()
+        
+        # 1. Detect Gatekeeper / Front Desk Name
+        gk_name = None
+        gk_match = re.search(r"(?:this is|my name is|speaking with|i'm|it's)\s+([a-zA-Z]{3,15})", full_text)
+        if gk_match:
+            candidate = gk_match.group(1).title()
+            if candidate.lower() not in ("doctor", "dentist", "office", "dental", "receptionist", "someone", "calling"):
+                gk_name = candidate
+
+        # 2. Detect Outcome
+        outcome = "COMPLETED"
+        if any(w in full_text for w in ["meeting booked", "thursday at", "friday at", "calendar invite", "zoom", "schedule demo"]):
+            outcome = "MEETING_BOOKED"
+        elif any(w in full_text for w in ["call back", "call tomorrow", "call later", "in the afternoon", "reach out next week"]):
+            outcome = "CALLBACK_REQUESTED"
+        elif any(w in full_text for w in ["not interested", "remove my number", "take me off", "do not call", "stop calling"]):
+            outcome = "NOT_INTERESTED"
+        elif any(w in full_text for w in ["send an email", "send info", "email it"]):
+            outcome = "EMAIL_REQUESTED"
+        elif any(w in full_text for w in ["in surgery", "with a patient", "chair time"]):
+            outcome = "DOCTOR_IN_SURGERY"
+
+        # 3. Detect Objections Raised
+        detected_objs = []
+        for obj_key, data in cls.OBJECTION_PLAYBOOKS.items():
+            for kw in data.get("keywords", []):
+                if kw in full_text and obj_key not in detected_objs:
+                    detected_objs.append(obj_key)
+                    break
+
+        # 4. Pain Point Acknowledged
+        pain_acknowledged = any(p in full_text for p in ["we do miss", "voicemail", "busy", "slammed", "after hours", "emergency"])
+
+        return {
+            "predicted_outcome": outcome,
+            "gatekeeper_name": gk_name,
+            "detected_objections": detected_objs,
+            "pain_acknowledged": pain_acknowledged,
+            "transcript_turns_count": len(transcript),
+            "next_best_action": (
+                "Send Zoom Calendar Invite" if outcome == "MEETING_BOOKED" else
+                ("Schedule Callback in CRM" if outcome == "CALLBACK_REQUESTED" else
+                ("Send WhatsApp 60-Second Video Teardown" if outcome == "EMAIL_REQUESTED" else
+                "Re-engage during afternoon huddle window"))
+            )
+        }
+

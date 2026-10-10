@@ -2219,6 +2219,23 @@
           </div>
         </div>
 
+        <!-- Executive Teardown Dossier (ReportLab Vector PDF) -->
+        <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950/60 p-3.5 rounded-xl border border-indigo-500/40 shadow-lg space-y-2">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-2">
+              <span class="font-extrabold text-indigo-300 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+                <i class="fa-solid fa-file-pdf text-rose-400"></i> Executive Teardown Dossier
+              </span>
+              <span id="modal-bant-badge" class="px-2 py-0.5 rounded text-[10px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono">BANT: --</span>
+              <span id="modal-meddic-badge" class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">MEDDIC: --%</span>
+            </div>
+            <a id="modal-download-dossier-btn" href="#" target="_blank" class="px-3 py-1.5 rounded-xl bg-gradient-to-r from-cyan-600 to-indigo-600 hover:from-cyan-500 hover:to-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow transition cursor-pointer">
+              <i class="fa-solid fa-cloud-arrow-down"></i> <span>Download PDF Dossier</span>
+            </a>
+          </div>
+          <p id="modal-bant-rec" class="text-[11px] text-slate-300 italic">High-velocity vector dossier with BANT/MEDDIC qualification matrix & chair-time recovery roadmap.</p>
+        </div>
+
         <!-- Pillar 3: Fast Agency Actions -->
         <div class="grid grid-cols-2 gap-2">
           <button onclick="openCallNotesModal(currentSelectedLeadId)" class="px-3 py-2 rounded-xl bg-amber-600/90 hover:bg-amber-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow transition cursor-pointer">
@@ -5159,11 +5176,15 @@
               <span class="font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-1.5 py-0.5 rounded text-[11px]">${l.win_probability_pct || l.buying_probability || 75}%</span>
               <span class="text-[10px] text-slate-500 font-mono">(${l.opportunity_score || 0} fit)</span>
             </div>
+            ${l.bant_score ? `<div class="mt-1 flex items-center gap-1"><span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">BANT ${l.bant_score}</span> <span class="px-1.5 py-0.5 rounded text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">MEDDIC ${l.meddic_pct}%</span></div>` : ''}
           </td>
           <td class="py-3 px-4 text-slate-300">$${Number(l.annual_gap || 65000).toLocaleString()}/yr</td>
           <td class="py-3 px-4 text-slate-400">${l.phone || 'N/A'}</td>
           <td class="py-3 px-4 text-slate-400 truncate max-w-[150px]"><a href="${l.website}" target="_blank" class="hover:text-emerald-400">${l.website || '-'}</a></td>
-          <td class="py-3 px-4 text-right space-x-1">
+          <td class="py-3 px-4 text-right space-x-1 whitespace-nowrap">
+            <a href="/api/leads/${l.id}/download-pdf-dossier" target="_blank" class="px-2 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 transition text-[11px] inline-block" title="Download Executive PDF Dossier">
+              <i class="fa-solid fa-file-pdf text-rose-400"></i>
+            </a>
             <button onclick="openBattlecard('${l.id}')" class="px-2 py-1 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition text-[11px] cursor-pointer" title="Pre-Call Battlecard">
               <i class="fa-solid fa-shield-halved"></i>
             </button>
@@ -5253,6 +5274,30 @@
       } else {
         waBtn.href = "#";
         waBtn.classList.add('opacity-50', 'pointer-events-none');
+      }
+
+      // Populate BANT & MEDDIC Executive Dossier
+      const dossierBtn = document.getElementById('modal-download-dossier-btn');
+      if (dossierBtn) {
+        dossierBtn.href = `/api/leads/${leadId}/download-pdf-dossier`;
+      }
+      const bantBadge = document.getElementById('modal-bant-badge');
+      const meddicBadge = document.getElementById('modal-meddic-badge');
+      const bantRec = document.getElementById('modal-bant-rec');
+      if (data.bant_meddic) {
+        const bm = data.bant_meddic;
+        if (bantBadge && bm.bant) {
+          bantBadge.innerText = `BANT: ${bm.bant.total_score}/100 (${(bm.bant.rating || 'A_TIER').replace('_', ' ')})`;
+          bantBadge.className = bm.bant.total_score >= 80 ? 'px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono' :
+                                bm.bant.total_score >= 60 ? 'px-2 py-0.5 rounded text-[10px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-mono' :
+                                'px-2 py-0.5 rounded text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 font-mono';
+        }
+        if (meddicBadge && bm.meddic) {
+          meddicBadge.innerText = `MEDDIC: ${bm.meddic.overall_completeness_pct}% (${(bm.meddic.tier || 'QUALIFIED').replace('_', ' ')})`;
+        }
+        if (bantRec) {
+          bantRec.innerText = bm.recommendation || 'High-velocity vector dossier with BANT/MEDDIC qualification matrix & chair-time recovery roadmap.';
+        }
       }
 
       // Configure Modal Gmail & Diagnostic buttons
@@ -5885,6 +5930,9 @@
                 <button onclick="openCallSimulatorModal('${lead.id}')" class="px-2.5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs flex items-center gap-1 transition shadow cursor-pointer" title="AI Call Roleplay Practice">
                   <i class="fa-solid fa-hand-fist"></i> Spar
                 </button>
+                <a href="/api/leads/${lead.id}/download-pdf-dossier" target="_blank" class="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs flex items-center gap-1 transition shadow cursor-pointer" title="Download Executive PDF Dossier">
+                  <i class="fa-solid fa-file-pdf text-rose-400"></i> Dossier
+                </a>
                 <button onclick="openProposalModal('${lead.id}')" class="px-2.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center gap-1 transition shadow cursor-pointer" title="Tailored AI ROI Proposal">
                   <i class="fa-solid fa-file-invoice-dollar"></i> Proposal
                 </button>

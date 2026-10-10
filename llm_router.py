@@ -28,17 +28,23 @@ logger = logging.getLogger("llm_router")
 PROVIDER_GEMINI = "GEMINI"
 PROVIDER_OPENAI = "OPENAI"
 PROVIDER_DEEPSEEK = "DEEPSEEK"
+PROVIDER_GROQ = "GROQ"
+PROVIDER_OPENROUTER = "OPENROUTER"
 
 # Default Model Mapping
 DEFAULT_MODELS = {
     PROVIDER_GEMINI: "gemini-2.5-flash",
     PROVIDER_OPENAI: "gpt-4o-mini",
-    PROVIDER_DEEPSEEK: "deepseek-chat"
+    PROVIDER_DEEPSEEK: "deepseek-chat",
+    PROVIDER_GROQ: "llama-3.3-70b-versatile",
+    PROVIDER_OPENROUTER: "meta-llama/llama-3.3-70b-instruct:free"
 }
 
 # Base URLs
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
+OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
 
 class ProviderHealthState(str, Enum):
@@ -128,8 +134,10 @@ _TRACKERS: Dict[str, ProviderHealthTracker] = {
     "GEMINI_PROJECT_A": ProviderHealthTracker("GEMINI_PROJECT_A"),
     "GEMINI_PROJECT_B": ProviderHealthTracker("GEMINI_PROJECT_B"),
     "GEMINI_PROJECT_C": ProviderHealthTracker("GEMINI_PROJECT_C"),
+    "GROQ": ProviderHealthTracker("GROQ"),
     "OPENAI": ProviderHealthTracker("OPENAI"),
     "DEEPSEEK": ProviderHealthTracker("DEEPSEEK"),
+    "OPENROUTER": ProviderHealthTracker("OPENROUTER"),
 }
 
 
@@ -174,25 +182,30 @@ class LLMRouter:
             pass
 
         env_provider = os.getenv("LLM_PROVIDER", "").upper()
-        if env_provider in (PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK):
+        if env_provider in (PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_OPENROUTER):
             return env_provider
 
-        # Default to Gemini for cost-efficiency, fallback to OpenAI if key exists
+        # Default to Gemini for cost-efficiency, fallback to Groq, OpenAI, DeepSeek, or OpenRouter
         gemini_keys = cls.get_gemini_keys()
         if gemini_keys:
             return PROVIDER_GEMINI
+        if os.getenv("GROQ_API_KEY"):
+            return PROVIDER_GROQ
         if os.getenv("OPENAI_API_KEY"):
             return PROVIDER_OPENAI
         if os.getenv("DEEPSEEK_API_KEY"):
             return PROVIDER_DEEPSEEK
+        if os.getenv("OPENROUTER_API_KEY"):
+            return PROVIDER_OPENROUTER
         return PROVIDER_GEMINI
 
     @classmethod
     def set_provider(cls, provider: str) -> str:
         """Dynamically updates active provider at runtime."""
         p_upper = provider.upper().strip()
-        if p_upper not in (PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK):
-            raise ValueError(f"Unsupported LLM provider: {provider}. Must be GEMINI, OPENAI, or DEEPSEEK.")
+        valid_providers = (PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_OPENROUTER)
+        if p_upper not in valid_providers:
+            raise ValueError(f"Unsupported LLM provider: {provider}. Must be one of: {', '.join(valid_providers)}.")
         cls._runtime_provider = p_upper
         try:
             from settings_manager import SettingsManager
@@ -209,6 +222,8 @@ class LLMRouter:
         gemini_keys = cls.get_gemini_keys()
         openai_key = os.getenv("OPENAI_API_KEY", "")
         deepseek_key = os.getenv("DEEPSEEK_API_KEY", "")
+        groq_key = os.getenv("GROQ_API_KEY", "")
+        openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
 
         return {
             "active_provider": active,
@@ -218,20 +233,27 @@ class LLMRouter:
                     "configured": len(gemini_keys) > 0,
                     "projects": [lbl for lbl, _ in gemini_keys],
                     "model": os.getenv("GEMINI_MODEL", DEFAULT_MODELS[PROVIDER_GEMINI]),
-                    "label": "Google Gemini (Primary Live Calling Brain)",
-                    "recommended_for": "Low Latency Realtime Speech & Scaled Calling"
+                    "trackers": {lbl: _TRACKERS[lbl].to_dict() for lbl, _ in gemini_keys}
+                },
+                PROVIDER_GROQ: {
+                    "configured": bool(groq_key and not groq_key.startswith("mock_")),
+                    "model": os.getenv("GROQ_MODEL", DEFAULT_MODELS[PROVIDER_GROQ]),
+                    "telemetry": _TRACKERS["GROQ"].to_dict()
                 },
                 PROVIDER_OPENAI: {
                     "configured": bool(openai_key and not openai_key.startswith("mock_")),
                     "model": os.getenv("OPENAI_MODEL", DEFAULT_MODELS[PROVIDER_OPENAI]),
-                    "label": "OpenAI (GPT-4o-mini / Realtime Benchmark)",
-                    "recommended_for": "High-Accuracy Benchmarking & Emergency Fallback"
+                    "telemetry": _TRACKERS["OPENAI"].to_dict()
                 },
                 PROVIDER_DEEPSEEK: {
                     "configured": bool(deepseek_key and not deepseek_key.startswith("mock_")),
                     "model": os.getenv("DEEPSEEK_MODEL", DEFAULT_MODELS[PROVIDER_DEEPSEEK]),
-                    "label": "DeepSeek (V3 Cheap Background Reasoning)",
-                    "recommended_for": "Pre-Call Clinic Dossiers & Post-Call Evaluation"
+                    "telemetry": _TRACKERS["DEEPSEEK"].to_dict()
+                },
+                PROVIDER_OPENROUTER: {
+                    "configured": bool(openrouter_key and not openrouter_key.startswith("mock_")),
+                    "model": os.getenv("OPENROUTER_MODEL", DEFAULT_MODELS[PROVIDER_OPENROUTER]),
+                    "telemetry": _TRACKERS["OPENROUTER"].to_dict()
                 }
             },
             "circuit_breakers": {k: tracker.to_dict() for k, tracker in _TRACKERS.items()}
@@ -280,9 +302,26 @@ class LLMRouter:
                             tracker.record_error(err_str)
                     logger.warning(f"{proj_lbl} failed ({err_str}). Cascading to next project...")
 
-        # 2. Try OpenAI
+        # 2. Try Groq (Ultra-Low Latency Inference & Quota Failover)
+        groq_tracker = _TRACKERS.get("GROQ")
+        if (target in (PROVIDER_GROQ, PROVIDER_GEMINI)) and groq_tracker and groq_tracker.is_usable():
+            try:
+                res = cls._call_groq(prompt, system_prompt, model, temperature, max_tokens)
+                if res:
+                    elapsed = int((time.time() - t0) * 1000)
+                    groq_tracker.record_success(latency_ms=elapsed, tokens=len(res.split()) * 2)
+                    return res
+            except Exception as e:
+                err_str = str(e)
+                if "429" in err_str:
+                    groq_tracker.record_429(cooldown_seconds=45, err_msg=err_str)
+                else:
+                    groq_tracker.record_error(err_str)
+                logger.warning(f"Groq fallback failed: {e}")
+
+        # 3. Try OpenAI
         openai_tracker = _TRACKERS.get("OPENAI")
-        if (target == PROVIDER_OPENAI or target == PROVIDER_GEMINI) and openai_tracker and openai_tracker.is_usable():
+        if (target in (PROVIDER_OPENAI, PROVIDER_GEMINI, PROVIDER_GROQ)) and openai_tracker and openai_tracker.is_usable():
             try:
                 res = cls._call_openai(prompt, system_prompt, model, temperature, max_tokens)
                 if res:
@@ -297,7 +336,7 @@ class LLMRouter:
                     openai_tracker.record_error(err_str)
                 logger.warning(f"OpenAI fallback failed: {e}")
 
-        # 3. Try DeepSeek (Secondary Reasoning)
+        # 4. Try DeepSeek (Secondary Reasoning)
         deepseek_tracker = _TRACKERS.get("DEEPSEEK")
         if deepseek_tracker and deepseek_tracker.is_usable():
             try:
@@ -310,7 +349,20 @@ class LLMRouter:
                 deepseek_tracker.record_error(str(e))
                 logger.warning(f"DeepSeek fallback failed: {e}")
 
-        # 4. Deterministic Emergency Fallback
+        # 5. Try OpenRouter (Multi-model free aggregation)
+        openrouter_tracker = _TRACKERS.get("OPENROUTER")
+        if openrouter_tracker and openrouter_tracker.is_usable():
+            try:
+                res = cls._call_openrouter(prompt, system_prompt, model, temperature, max_tokens)
+                if res:
+                    elapsed = int((time.time() - t0) * 1000)
+                    openrouter_tracker.record_success(latency_ms=elapsed, tokens=len(res.split()) * 2)
+                    return res
+            except Exception as e:
+                openrouter_tracker.record_error(str(e))
+                logger.warning(f"OpenRouter fallback failed: {e}")
+
+        # 6. Deterministic Emergency Fallback
         logger.error("All configured LLM providers in fallback cascade failed.")
         return ""
 
@@ -463,6 +515,52 @@ CRITICAL CONVERSATIONAL & CLINICAL RULES (LIVE PHONE CALL):
         from openai import OpenAI
         client = OpenAI(api_key=key, base_url=DEEPSEEK_BASE_URL, timeout=15.0)
         target_model = model or os.getenv("DEEPSEEK_MODEL", DEFAULT_MODELS[PROVIDER_DEEPSEEK])
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = client.chat.completions.create(
+            model=target_model,
+            messages=messages,
+            temperature=temp,
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message.content.strip()
+
+    @classmethod
+    def _call_groq(cls, prompt: str, system_prompt: Optional[str], model: Optional[str], temp: float, max_tokens: int) -> str:
+        key = os.getenv("GROQ_API_KEY", "")
+        if not key or key.startswith("mock_"):
+            raise ValueError("GROQ_API_KEY is not configured")
+
+        from openai import OpenAI
+        client = OpenAI(api_key=key, base_url=GROQ_BASE_URL, timeout=8.0)
+        target_model = model or os.getenv("GROQ_MODEL", DEFAULT_MODELS[PROVIDER_GROQ])
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = client.chat.completions.create(
+            model=target_model,
+            messages=messages,
+            temperature=temp,
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message.content.strip()
+
+    @classmethod
+    def _call_openrouter(cls, prompt: str, system_prompt: Optional[str], model: Optional[str], temp: float, max_tokens: int) -> str:
+        key = os.getenv("OPENROUTER_API_KEY", "")
+        if not key or key.startswith("mock_"):
+            raise ValueError("OPENROUTER_API_KEY is not configured")
+
+        from openai import OpenAI
+        client = OpenAI(api_key=key, base_url=OPENROUTER_BASE_URL, timeout=12.0)
+        target_model = model or os.getenv("OPENROUTER_MODEL", DEFAULT_MODELS[PROVIDER_OPENROUTER])
 
         messages = []
         if system_prompt:
