@@ -47,6 +47,12 @@ GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
 OPENROUTER_BASE_URL = os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
 
 
+class TaskComplexity(str, Enum):
+    EASY = "EASY"                  # High-volume, simple tasks (sentiment, category tags, string cleaning)
+    CONVERSATION = "CONVERSATION"  # Live phone call turns, quick interactive dialog
+    COMPLEX = "COMPLEX"            # In-depth strategic reasoning, BANT/MEDDIC evaluation, ROI proposals
+
+
 class ProviderHealthState(str, Enum):
     AVAILABLE = "AVAILABLE"
     DEGRADED = "DEGRADED"
@@ -185,7 +191,9 @@ class LLMRouter:
         if env_provider in (PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_OPENROUTER):
             return env_provider
 
-        # Default to Gemini for cost-efficiency, fallback to Groq, OpenAI, DeepSeek, or OpenRouter
+        # Default to DeepSeek as Primary Brain if configured
+        if os.getenv("DEEPSEEK_API_KEY"):
+            return PROVIDER_DEEPSEEK
         gemini_keys = cls.get_gemini_keys()
         if gemini_keys:
             return PROVIDER_GEMINI
@@ -193,11 +201,9 @@ class LLMRouter:
             return PROVIDER_GROQ
         if os.getenv("OPENAI_API_KEY"):
             return PROVIDER_OPENAI
-        if os.getenv("DEEPSEEK_API_KEY"):
-            return PROVIDER_DEEPSEEK
         if os.getenv("OPENROUTER_API_KEY"):
             return PROVIDER_OPENROUTER
-        return PROVIDER_GEMINI
+        return PROVIDER_DEEPSEEK
 
     @classmethod
     def set_provider(cls, provider: str) -> str:
@@ -269,17 +275,75 @@ class LLMRouter:
         provider: Optional[str] = None,
         model: Optional[str] = None,
         temperature: float = 0.7,
-        max_tokens: int = 800
+        max_tokens: int = 800,
+        complexity: TaskComplexity = TaskComplexity.COMPLEX
     ) -> str:
         """
-        Executes text generation with intelligent circuit breaker fallback:
-        Gemini Project A -> Project B -> Project C -> OpenAI -> DeepSeek.
+        Executes text generation with intelligent tiered cost-and-complexity dispatch:
+        - EASY tasks: Intelligently offloaded to free/micro-cost models (Gemini Flash / Groq) with capped tokens.
+        - COMPLEX / CONVERSATION tasks: DeepSeek-V3 is the Primary Reasoning Brain with
+          seamless circuit breaker cascade: DeepSeek -> Gemini Projects -> Groq -> OpenAI -> OpenRouter.
         """
-        target = (provider or cls.get_configured_provider()).upper()
+        configured = cls.get_configured_provider()
+        target = (provider or configured).upper()
         t0 = time.time()
 
-        # 1. Try Gemini Projects first if targeted or fallback
-        if target == PROVIDER_GEMINI:
+        # -------------------------------------------------------------
+        # Tiered Economics: Route EASY tasks to cheaper/free models first
+        # -------------------------------------------------------------
+        if complexity == TaskComplexity.EASY and target == PROVIDER_DEEPSEEK:
+            # Check if Gemini Flash has available quota (virtually free tier)
+            gemini_keys = cls.get_gemini_keys()
+            for proj_lbl, key in gemini_keys:
+                tracker = _TRACKERS.get(proj_lbl)
+                if tracker and tracker.is_usable():
+                    try:
+                        res = cls._call_gemini_with_key(key, prompt, system_prompt, model, temperature, min(max_tokens, 250))
+                        if res:
+                            elapsed = int((time.time() - t0) * 1000)
+                            tracker.record_success(latency_ms=elapsed, tokens=len(res.split()) * 2)
+                            logger.info(f"TaskComplexity.EASY offloaded to cheaper {proj_lbl} ({elapsed}ms)")
+                            return res
+                    except Exception:
+                        pass
+
+            # Check if Groq has free tier available
+            groq_tracker = _TRACKERS.get("GROQ")
+            if groq_tracker and groq_tracker.is_usable():
+                try:
+                    res = cls._call_groq(prompt, system_prompt, model or "llama-3.1-8b-instant", temperature, min(max_tokens, 250))
+                    if res:
+                        elapsed = int((time.time() - t0) * 1000)
+                        groq_tracker.record_success(latency_ms=elapsed, tokens=len(res.split()) * 2)
+                        logger.info(f"TaskComplexity.EASY offloaded to Groq ({elapsed}ms)")
+                        return res
+                except Exception:
+                    pass
+
+        # -------------------------------------------------------------
+        # 1. Primary Model: Try DeepSeek First if target is DEEPSEEK
+        # -------------------------------------------------------------
+        deepseek_tracker = _TRACKERS.get("DEEPSEEK")
+        if target == PROVIDER_DEEPSEEK and deepseek_tracker and deepseek_tracker.is_usable():
+            try:
+                res = cls._call_deepseek(prompt, system_prompt, model, temperature, max_tokens)
+                if res:
+                    elapsed = int((time.time() - t0) * 1000)
+                    deepseek_tracker.record_success(latency_ms=elapsed, tokens=len(res.split()) * 2)
+                    return res
+            except Exception as e:
+                err_str = str(e)
+                is_429 = "429" in err_str or "quota" in err_str.lower() or "rate limit" in err_str.lower() or "insufficient_balance" in err_str.lower()
+                if is_429:
+                    deepseek_tracker.record_429(cooldown_seconds=45, err_msg=err_str)
+                else:
+                    deepseek_tracker.record_error(err_str)
+                logger.warning(f"Primary DeepSeek failed ({err_str}). Cascading to secondary provider...")
+
+        # -------------------------------------------------------------
+        # 2. Try Gemini Projects (Projects A -> B -> C)
+        # -------------------------------------------------------------
+        if target in (PROVIDER_DEEPSEEK, PROVIDER_GEMINI):
             gemini_keys = cls.get_gemini_keys()
             for proj_lbl, key in gemini_keys:
                 tracker = _TRACKERS.get(proj_lbl)
@@ -302,9 +366,11 @@ class LLMRouter:
                             tracker.record_error(err_str)
                     logger.warning(f"{proj_lbl} failed ({err_str}). Cascading to next project...")
 
-        # 2. Try Groq (Ultra-Low Latency Inference & Quota Failover)
+        # -------------------------------------------------------------
+        # 3. Try Groq (Ultra-Low Latency Inference & Quota Failover)
+        # -------------------------------------------------------------
         groq_tracker = _TRACKERS.get("GROQ")
-        if (target in (PROVIDER_GROQ, PROVIDER_GEMINI)) and groq_tracker and groq_tracker.is_usable():
+        if (target in (PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_GEMINI)) and groq_tracker and groq_tracker.is_usable():
             try:
                 res = cls._call_groq(prompt, system_prompt, model, temperature, max_tokens)
                 if res:
@@ -319,9 +385,11 @@ class LLMRouter:
                     groq_tracker.record_error(err_str)
                 logger.warning(f"Groq fallback failed: {e}")
 
-        # 3. Try OpenAI
+        # -------------------------------------------------------------
+        # 4. Try OpenAI
+        # -------------------------------------------------------------
         openai_tracker = _TRACKERS.get("OPENAI")
-        if (target in (PROVIDER_OPENAI, PROVIDER_GEMINI, PROVIDER_GROQ)) and openai_tracker and openai_tracker.is_usable():
+        if (target in (PROVIDER_DEEPSEEK, PROVIDER_OPENAI, PROVIDER_GEMINI, PROVIDER_GROQ)) and openai_tracker and openai_tracker.is_usable():
             try:
                 res = cls._call_openai(prompt, system_prompt, model, temperature, max_tokens)
                 if res:
@@ -336,9 +404,10 @@ class LLMRouter:
                     openai_tracker.record_error(err_str)
                 logger.warning(f"OpenAI fallback failed: {e}")
 
-        # 4. Try DeepSeek (Secondary Reasoning)
-        deepseek_tracker = _TRACKERS.get("DEEPSEEK")
-        if deepseek_tracker and deepseek_tracker.is_usable():
+        # -------------------------------------------------------------
+        # 5. Try DeepSeek (if target was not originally DEEPSEEK)
+        # -------------------------------------------------------------
+        if target != PROVIDER_DEEPSEEK and deepseek_tracker and deepseek_tracker.is_usable():
             try:
                 res = cls._call_deepseek(prompt, system_prompt, model, temperature, max_tokens)
                 if res:
@@ -349,7 +418,9 @@ class LLMRouter:
                 deepseek_tracker.record_error(str(e))
                 logger.warning(f"DeepSeek fallback failed: {e}")
 
-        # 5. Try OpenRouter (Multi-model free aggregation)
+        # -------------------------------------------------------------
+        # 6. Try OpenRouter (Multi-model free aggregation)
+        # -------------------------------------------------------------
         openrouter_tracker = _TRACKERS.get("OPENROUTER")
         if openrouter_tracker and openrouter_tracker.is_usable():
             try:
@@ -362,7 +433,7 @@ class LLMRouter:
                 openrouter_tracker.record_error(str(e))
                 logger.warning(f"OpenRouter fallback failed: {e}")
 
-        # 6. Deterministic Emergency Fallback
+        # 7. Deterministic Emergency Fallback
         logger.error("All configured LLM providers in fallback cascade failed.")
         return ""
 
@@ -372,11 +443,12 @@ class LLMRouter:
         prompt: str,
         system_prompt: Optional[str] = None,
         provider: Optional[str] = None,
-        model: Optional[str] = None
+        model: Optional[str] = None,
+        complexity: TaskComplexity = TaskComplexity.COMPLEX
     ) -> Optional[Dict[str, Any]]:
         """Executes structured JSON generation and parsing across providers."""
         json_sys = (system_prompt or "") + "\n\nCRITICAL: Return STRICTLY valid RFC8259 JSON only. No markdown formatting, no code blocks."
-        raw_text = cls.generate_text(prompt=prompt, system_prompt=json_sys, provider=provider, model=model, temperature=0.2)
+        raw_text = cls.generate_text(prompt=prompt, system_prompt=json_sys, provider=provider, model=model, temperature=0.2, complexity=complexity)
         if not raw_text:
             return None
 
@@ -446,12 +518,12 @@ CRITICAL CONVERSATIONAL & CLINICAL RULES (LIVE PHONE CALL):
         full_system = f"{system_prompt}\n{history_str}\n{rules}"
         prompt = f"Prospect just said: \"{user_message}\"\n\nGenerate the next spoken response in JSON:"
 
-        json_res = cls.generate_json(prompt=prompt, system_prompt=full_system, provider=provider)
+        json_res = cls.generate_json(prompt=prompt, system_prompt=full_system, provider=provider, complexity=TaskComplexity.CONVERSATION)
         if json_res and "reply" in json_res:
             return json_res
 
         # Fallback
-        fallback_reply = cls.generate_text(prompt=prompt, system_prompt=full_system, provider=provider, max_tokens=60)
+        fallback_reply = cls.generate_text(prompt=prompt, system_prompt=full_system, provider=provider, max_tokens=60, complexity=TaskComplexity.CONVERSATION)
         clean_fallback = fallback_reply.replace('"', '').replace('\n', ' ').strip()
         if not clean_fallback:
             clean_fallback = "Completely understand. Could I share a quick two-minute video with your office manager?"
@@ -512,8 +584,6 @@ CRITICAL CONVERSATIONAL & CLINICAL RULES (LIVE PHONE CALL):
         if not key or key.startswith("mock_"):
             raise ValueError("DEEPSEEK_API_KEY is not configured")
 
-        from openai import OpenAI
-        client = OpenAI(api_key=key, base_url=DEEPSEEK_BASE_URL, timeout=15.0)
         target_model = model or os.getenv("DEEPSEEK_MODEL", DEFAULT_MODELS[PROVIDER_DEEPSEEK])
 
         messages = []
@@ -521,13 +591,36 @@ CRITICAL CONVERSATIONAL & CLINICAL RULES (LIVE PHONE CALL):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        response = client.chat.completions.create(
-            model=target_model,
-            messages=messages,
-            temperature=temp,
-            max_tokens=max_tokens
-        )
-        return response.choices[0].message.content.strip()
+        try:
+            from openai import OpenAI
+            client = OpenAI(api_key=key, base_url=DEEPSEEK_BASE_URL, timeout=15.0)
+            response = client.chat.completions.create(
+                model=target_model,
+                messages=messages,
+                temperature=temp,
+                max_tokens=max_tokens
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e_primary:
+            # Fallback to direct httpx POST to DeepSeek endpoint
+            try:
+                import httpx
+                with httpx.Client(timeout=15.0) as http_client:
+                    resp = http_client.post(
+                        f"{DEEPSEEK_BASE_URL.rstrip('/')}/chat/completions",
+                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                        json={
+                            "model": target_model,
+                            "messages": messages,
+                            "temperature": temp,
+                            "max_tokens": max_tokens
+                        }
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    return data["choices"][0]["message"]["content"].strip()
+            except Exception:
+                raise e_primary
 
     @classmethod
     def _call_groq(cls, prompt: str, system_prompt: Optional[str], model: Optional[str], temp: float, max_tokens: int) -> str:

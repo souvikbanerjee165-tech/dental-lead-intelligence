@@ -9,7 +9,7 @@ The system integrates five foundational pillars into a cohesive operational work
 2. **Deep Digital Maturity & Technical Fingerprinting**: Inspects website DOM, script bundles, and HTTP headers across 40+ rules to detect EHR systems, online scheduling tools, and missing patient intake mechanisms.
 3. **Enterprise BANT + MEDDIC Qualification**: Translates raw evidence into structured qualification scores (0–100 BANT and 0–100% MEDDIC completeness) with quantified financial leakage models.
 4. **Autonomous Voice Telephony & Bidirectional Audio Relay**: Outbound calling via Telnyx TeXML and Twilio, streaming bidirectional audio between phone lines and PC browsers with real-time speech synthesis.
-5. **Multi-Provider LLM Resilience & Closed-Loop Learning**: Multi-tier LLM cascade (Gemini $\rightarrow$ Groq $\rightarrow$ OpenAI $\rightarrow$ DeepSeek $\rightarrow$ OpenRouter) with circuit-breaker tracking and post-call structured extraction into institutional memory.
+5. **Multi-Provider LLM Resilience & Tiered Cost Routing**: DeepSeek-V3 as Primary Brain for voice & reasoning with cost-tier offloading (EASY $\rightarrow$ Gemini Flash/Groq micro-budget; COMPLEX $\rightarrow$ DeepSeek) and graceful circuit-breaker failover (DeepSeek $\rightarrow$ Gemini Projects A/B/C $\rightarrow$ Groq $\rightarrow$ OpenAI $\rightarrow$ OpenRouter).
 
 ---
 
@@ -44,14 +44,15 @@ flowchart TD
         AudioBridge --> TTS["TTS Synthesizer (Edge-TTS / Kokoro)"]
     end
 
-    subgraph Intelligence ["4. Conversational Voice Brain"]
+    subgraph Intelligence ["4. Conversational Voice Brain & Tiered Routing"]
         AudioBridge --> StateMachine["SPIN Selling Sales State Machine"]
         StateMachine --> LLMRouter["Multi-Provider LLM Router"]
-        LLMRouter -->|Primary| Gemini["Google Gemini 2.5 Flash"]
-        LLMRouter -->|429 Quota Failover| Groq["Groq (Llama-3.3-70b, <300ms)"]
-        LLMRouter -->|Secondary| OpenAI["OpenAI GPT-4o-mini"]
-        LLMRouter -->|Reasoning| DeepSeek["DeepSeek-Chat"]
-        LLMRouter -->|Catalog| OpenRouter["OpenRouter Free Tier"]
+        LLMRouter -->|TaskComplexity.EASY| FreeTier["Gemini Flash / Groq (Zero-Cost / Micro-Tokens)"]
+        LLMRouter -->|Primary Voice & Reasoning| DeepSeek["DeepSeek-V3 (deepseek-chat)"]
+        DeepSeek -->|Failover / Rate Limit| Gemini["Google Gemini 2.5 Flash (Projects A/B/C)"]
+        Gemini -->|Failover| Groq["Groq (Llama-3.3-70b, <300ms)"]
+        Groq -->|Failover| OpenAI["OpenAI GPT-4o-mini"]
+        OpenAI -->|Failover| OpenRouter["OpenRouter Free Tier"]
     end
 
     subgraph Learning ["5. Closed-Loop Learning"]
@@ -114,14 +115,18 @@ flowchart TD
   - **Edge-TTS**: Cloud-based Microsoft neural TTS (`en-US-AvaNeural`), asynchronous non-blocking synthesis.
   - **Kokoro ONNX**: Local CPU neural TTS model running offline without cloud API overhead.
 
-### 3.5. Multi-Provider LLM Router & Resilience
+### 3.5. Multi-Provider LLM Router, Primary DeepSeek Brain & Tiered Routing
 - **Module**: `llm_router.py`
-- **Architecture**: Decoupled multi-project, multi-provider circuit-breaker router.
-- **Cascade Fallback Strategy**:
-  1. **Google Gemini 2.5 Flash** (Primary live calling brain across up to 3 Google AI projects: Project A $\rightarrow$ B $\rightarrow$ C).
-  2. **Groq** (`llama-3.3-70b-versatile`, ultra-low latency $<300\text{ms}$): Automatically engaged if Gemini returns HTTP `429` / quota exhaustion.
-  3. **OpenAI** (`gpt-4o-mini`): High-accuracy fallback.
-  4. **DeepSeek** (`deepseek-chat`): Cost-efficient background reasoning.
+- **Architecture**: Decoupled multi-project, multi-provider circuit-breaker router with intelligent cost-tiered task routing (`TaskComplexity`).
+- **Primary Brain**: **DeepSeek-V3** (`deepseek-chat`) handles conversational voice dialogue, BANT/MEDDIC reasoning, sales strategy, and proposal extraction.
+- **Intelligent Cost-Tier Routing**:
+  - `TaskComplexity.EASY` (sentiment analysis, entity classification, phone normalization): Automatically offloaded to **Google Gemini 2.5 Flash** (free tier) or **Groq** (`llama-3.1-8b-instant`) with strict $\le 250$ max token bounds, preserving DeepSeek tokens and maximizing speed.
+  - `TaskComplexity.CONVERSATION` & `COMPLEX`: Directly powered by **DeepSeek-V3** (`deepseek-chat`).
+- **Cascade Fallback Strategy (on 429 rate limit or network error)**:
+  1. **DeepSeek** (`deepseek-chat`): Primary enterprise reasoning and voice dialogue model.
+  2. **Google Gemini 2.5 Flash**: Seamless failover across up to 3 Google AI projects (Project A $\rightarrow$ B $\rightarrow$ C).
+  3. **Groq** (`llama-3.3-70b-versatile`, ultra-low latency $<300\text{ms}$): Engaged if primary models encounter rate limits.
+  4. **OpenAI** (`gpt-4o-mini`): High-accuracy fallback.
   5. **OpenRouter** (`meta-llama/llama-3.3-70b-instruct:free`): Zero-cost multi-model aggregator.
 
 ### 3.6. Consultative Sales Orchestration

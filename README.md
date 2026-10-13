@@ -56,10 +56,14 @@ Layer 5: Autonomous Action    ──► Live Telephony (Telnyx TeXML), Edge-TTS,
   $$\text{Situation} \longrightarrow \text{Problem} \longrightarrow \text{Implication} \longrightarrow \text{Need-Payoff}$$
 - Automatically extracts structured call outcomes, gatekeeper objections, and follow-up triggers into SQLite institutional memory.
 
-### 5. Multi-Provider LLM Resilience & Quota Failover ([`llm_router.py`](llm_router.py))
-- Multi-provider cascade with circuit-breaker tracking:
-  $$\text{Google Gemini 2.5 Flash} \xrightarrow{\text{429 Rate Limit}} \text{Groq (Llama-3.3-70b, <300ms)} \longrightarrow \text{OpenAI} \longrightarrow \text{DeepSeek} \longrightarrow \text{OpenRouter}$$
-- Ensures live patient telephone calls never drop due to cloud API quota exhaustion.
+### 5. Primary DeepSeek Brain & Intelligent Tiered Routing ([`llm_router.py`](llm_router.py))
+- **Primary Brain**: **DeepSeek-V3** (`deepseek-chat`) drives all conversational sales dialogues, BANT/MEDDIC assessments, and extraction tasks.
+- **Intelligent Cost-Tier Routing**:
+  - `TaskComplexity.EASY` (sentiment, categorization, formatting): Automatically offloaded to free/micro-tier models (**Gemini 2.5 Flash** / **Groq** $\le 250$ tokens) to conserve DeepSeek tokens and maximize responsiveness.
+  - `TaskComplexity.CONVERSATION` & `COMPLEX`: Directed to DeepSeek-V3.
+- **Circuit-Breaker Failover Cascade**:
+  $$\text{DeepSeek-V3} \xrightarrow{\text{429 Rate Limit}} \text{Google Gemini Flash (Projects A/B/C)} \longrightarrow \text{Groq (Llama-3.3-70b)} \longrightarrow \text{OpenAI} \longrightarrow \text{OpenRouter}$$
+- Ensures live patient telephone calls never drop due to provider outages or quota limits.
 
 ### 6. Sales Enablement Playbooks ([`playbooks/`](playbooks/))
 - [`dental-objection-playbook.md`](playbooks/dental-objection-playbook.md): LAER scripts for gatekeepers and dentists.
@@ -85,10 +89,13 @@ pip install -r requirements.txt
 ### 2. Environment Variables (`.env`)
 Create a `.env` file in the project root:
 ```env
-# Primary LLM Brain
-GEMINI_API_KEY=AIzaSy...
+# Primary Enterprise LLM Brain
+LLM_PROVIDER=DEEPSEEK
+DEEPSEEK_API_KEY=sk-...
+DEEPSEEK_MODEL=deepseek-chat
 
-# Low-Latency Quota Failover (Optional but Recommended)
+# Micro-Task Offload & Quota Failover Cascade (Recommended)
+GEMINI_API_KEY=AIzaSy...
 GROQ_API_KEY=gsk_...
 OPENAI_API_KEY=sk-...
 
