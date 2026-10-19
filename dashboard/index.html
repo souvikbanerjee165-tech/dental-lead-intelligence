@@ -3048,6 +3048,9 @@
           <button onclick="dispatchVoiceCallAction(false)" id="btn-vcall-dispatch" class="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs shadow-lg shadow-emerald-500/20 transition flex items-center gap-2 cursor-pointer">
             <i class="fa-solid fa-phone-volume"></i> <span>Launch AI Call</span>
           </button>
+          <button onclick="hangupCurrentVoiceCall()" id="btn-vcall-hangup" class="hidden px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-lg shadow-rose-500/20 transition flex items-center gap-1.5 cursor-pointer">
+            <i class="fa-solid fa-phone-slash"></i> <span>End Call</span>
+          </button>
         </div>
       </div>
     </div>
@@ -6229,10 +6232,64 @@
       }
     }
 
+    let vcallActiveSessionId = null;
+    let vcallActiveCallId = null;
+    let vcallPollInterval = null;
+    let vcallPlayedAudioUrls = new Set();
+    let vcallSecondsElapsed = 0;
+
+    function hangupCurrentVoiceCall() {
+      if (vcallPollInterval) {
+        clearInterval(vcallPollInterval);
+        vcallPollInterval = null;
+      }
+      const targetSid = vcallActiveSessionId;
+      const targetCid = vcallActiveCallId;
+      vcallActiveSessionId = null;
+      vcallActiveCallId = null;
+
+      // Update HUD
+      const statusText = document.getElementById('vcall-live-status');
+      if (statusText) statusText.innerText = 'Call Ended (Hung up by Rep)';
+      const outcomeBadge = document.getElementById('vcall-call-outcome');
+      if (outcomeBadge) {
+        outcomeBadge.innerText = 'HUNG_UP';
+        outcomeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30";
+      }
+      const hangupBtn = document.getElementById('btn-vcall-hangup');
+      if (hangupBtn) hangupBtn.classList.add('hidden');
+      const dispatchBtn = document.getElementById('btn-vcall-dispatch');
+      if (dispatchBtn) dispatchBtn.disabled = false;
+      const testBtn = document.getElementById('btn-vcall-test');
+      if (testBtn) testBtn.disabled = false;
+
+      fetch('/api/voice/call/hangup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: targetSid, call_id: targetCid })
+      }).catch(e => console.warn("Hangup error:", e));
+
+      showToast("📞 Call terminated successfully.");
+    }
+
     function closeVoiceCallModal() {
-      fetch('/api/voice/call/hangup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).catch(() => {});
+      hangupCurrentVoiceCall();
       document.getElementById('modal-voice-call').classList.add('hidden');
     }
+
+    // Safety guard: if user closes or reloads page, terminate live PSTN call
+    window.addEventListener('beforeunload', () => {
+      if (vcallActiveSessionId || vcallActiveCallId || mdialerSessionId) {
+        const payload = JSON.stringify({
+          session_id: vcallActiveSessionId || mdialerSessionId,
+          call_id: vcallActiveCallId
+        });
+        if (navigator.sendBeacon) {
+          const blob = new Blob([payload], { type: 'application/json' });
+          navigator.sendBeacon('/api/voice/call/hangup', blob);
+        }
+      }
+    });
 
     async function dispatchVoiceCallAction(isTest = false) {
       const confirmCheck = document.getElementById('vcall-confirm-check');
@@ -6248,7 +6305,9 @@
       }
 
       const btn = isTest ? document.getElementById('btn-vcall-test') : document.getElementById('btn-vcall-dispatch');
+      const otherBtn = isTest ? document.getElementById('btn-vcall-dispatch') : document.getElementById('btn-vcall-test');
       btn.disabled = true;
+      if (otherBtn) otherBtn.disabled = true;
       btn.innerHTML = `<i class="fa-solid fa-spinner animate-spin mr-1.5"></i> ${isTest ? 'Dialing Cell...' : 'Dialing Clinic...'}`;
 
       const consoleElem = document.getElementById('vcall-live-console');
@@ -6257,13 +6316,22 @@
       const statusText = document.getElementById('vcall-live-status');
       const outcomeBadge = document.getElementById('vcall-call-outcome');
       const durationElem = document.getElementById('vcall-duration');
+      const hangupBtn = document.getElementById('btn-vcall-hangup');
 
       feed.innerHTML = `
         <div class="text-slate-400 italic flex items-center gap-2">
           <i class="fa-solid fa-satellite-dish text-emerald-400 animate-pulse"></i>
-          <span>${isTest ? `Placing test call to ${phoneInput}...` : `Connecting outbound audio bridge to ${phoneInput}...`}</span>
+          <span>${isTest ? `Placing real PSTN call to ${phoneInput}...` : `Connecting outbound audio bridge to ${phoneInput}...`}</span>
         </div>
       `;
+
+      statusText.innerText = "Placing carrier call...";
+      outcomeBadge.innerText = "DIALING";
+      outcomeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 animate-pulse";
+      durationElem.innerText = "0s";
+      vcallSecondsElapsed = 0;
+      vcallPlayedAudioUrls = new Set();
+      let renderedTurnCount = 0;
 
       showToast(`📞 Placing AI call to ${phoneInput}...`);
 
@@ -6295,69 +6363,131 @@
 
         const callData = await res.json();
 
-        // Render Conversation Transcript
-        statusText.innerText = `Call Completed (${callData.call_outcome || 'MEETING_BOOKED'})`;
-        outcomeBadge.innerText = callData.call_outcome || 'MEETING_BOOKED';
-        outcomeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
-        durationElem.innerText = `${callData.duration_seconds || 90}s`;
+        // Check if sandbox simulation or live telecom call
+        if (callData.mode === 'TELNYX_LIVE' || callData.status === 'initiated' || callData.call_id) {
+          vcallActiveSessionId = callData.session_id || callData.call_id;
+          vcallActiveCallId = callData.call_id;
 
-        const transcript = callData.transcript || [];
-        if (transcript.length > 0) {
-          feed.innerHTML = transcript.map(t => {
-            const isAI = t.speaker.includes('AI') || t.speaker.includes('Specialist');
-            const bg = isAI ? 'bg-emerald-950/40 border-emerald-500/30' : 'bg-slate-900 border-slate-800';
-            const speakerColor = isAI ? 'text-emerald-400' : 'text-cyan-300';
-            const icon = isAI ? '🤖' : '👩‍💼';
-            return `
-              <div class="p-2.5 rounded-lg border ${bg} space-y-1">
-                <div class="flex items-center gap-1.5 font-bold ${speakerColor} text-[11px]">
-                  <span>${icon}</span> <span>${t.speaker}</span>
-                </div>
-                <p class="text-slate-200 text-xs leading-relaxed pl-1 select-all">${t.text}</p>
-              </div>
-            `;
-          }).join('');
-        }
+          statusText.innerText = "Ringing prospect phone...";
+          outcomeBadge.innerText = "RINGING";
+          if (hangupBtn) hangupBtn.classList.remove('hidden');
 
-        if (callData.audio_url) {
-          const engineLabel = callData.voice_engine || 'AI Speech';
-          const isKokoro = engineLabel.toLowerCase().includes('kokoro');
-          const badgeColor = isKokoro ? 'text-cyan-300 border-cyan-500/30' : 'text-emerald-300 border-emerald-500/30';
-          const audioPlayerHtml = `
-            <div class="bg-slate-950 p-2.5 rounded-xl border border-emerald-500/40 flex items-center justify-between gap-3 mb-2 shadow-md">
-              <div class="flex items-center gap-2 text-xs font-bold ${badgeColor} shrink-0">
-                <i class="fa-solid fa-volume-high text-emerald-400 text-sm animate-pulse"></i>
-                <span>${engineLabel}:</span>
-              </div>
-              <audio controls src="${callData.audio_url}" class="h-8 flex-1 max-w-sm"></audio>
-            </div>
-          `;
-          feed.innerHTML = audioPlayerHtml + feed.innerHTML;
-        }
+          // Start active polling loop to sync real-time phone turns and play speech to PC speaker
+          if (vcallPollInterval) clearInterval(vcallPollInterval);
+          vcallPollInterval = setInterval(async () => {
+            if (!vcallActiveSessionId) {
+              clearInterval(vcallPollInterval);
+              return;
+            }
+            vcallSecondsElapsed += 1;
+            durationElem.innerText = `${vcallSecondsElapsed}s`;
 
-        if (callData.call_outcome === 'MEETING_BOOKED' || callData.booked_slot) {
-          const alertBox = document.getElementById('vcall-booked-alert');
-          alertBox.classList.remove('hidden');
-          const slotElem = document.getElementById('vcall-booked-slot');
-          if (slotElem) slotElem.innerText = callData.booked_slot || "Thursday at 11:00 AM";
-          showToast("🎉 Appointment Secured! Meeting booked for Thursday at 11:00 AM.");
+            try {
+              const pollRes = await fetch(`/api/dialer/manual/session/${vcallActiveSessionId}`);
+              if (!pollRes.ok) return;
+              const sData = await pollRes.json();
+
+              if (sData.status === 'CONNECTED' && outcomeBadge.innerText === 'RINGING') {
+                statusText.innerText = "Connected — Live Conversation";
+                outcomeBadge.innerText = "CONNECTED";
+                outcomeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+              }
+
+              const transcript = sData.transcript || [];
+              if (transcript.length > renderedTurnCount) {
+                const newTurns = transcript.slice(renderedTurnCount);
+                newTurns.forEach(t => {
+                  const isAI = (t.speaker || '').includes('AI') || (t.speaker || '').includes('Specialist');
+                  const bg = isAI ? 'bg-emerald-950/40 border-emerald-500/30' : 'bg-slate-900 border-slate-800';
+                  const speakerColor = isAI ? 'text-emerald-400' : 'text-cyan-300';
+                  const icon = isAI ? '🤖' : '👩‍💼';
+                  
+                  const turnDiv = document.createElement('div');
+                  turnDiv.className = `p-2.5 rounded-lg border ${bg} space-y-1`;
+                  turnDiv.innerHTML = `
+                    <div class="flex items-center gap-1.5 font-bold ${speakerColor} text-[11px]">
+                      <span>${icon}</span> <span>${t.speaker}</span>
+                    </div>
+                    <p class="text-slate-200 text-xs leading-relaxed pl-1 select-all">${t.text}</p>
+                  `;
+                  feed.appendChild(turnDiv);
+                  feed.scrollTop = feed.scrollHeight;
+
+                  // Audio playback to rep's speakers
+                  if (t.audio_url && !vcallPlayedAudioUrls.has(t.audio_url)) {
+                    vcallPlayedAudioUrls.add(t.audio_url);
+                    try {
+                      const a = new Audio(t.audio_url);
+                      a.play().catch(e => console.debug("Audio autoplay notice:", e));
+                    } catch (e) {}
+                  }
+                });
+                renderedTurnCount = transcript.length;
+              }
+
+              // Check if meeting booked
+              if (sData.is_meeting_booked || (sData.learnings && sData.learnings.meeting_booked)) {
+                const alertBox = document.getElementById('vcall-booked-alert');
+                if (alertBox) alertBox.classList.remove('hidden');
+              }
+
+              // Check if call completed
+              if (sData.status === 'COMPLETED' || sData.status === 'HUNG_UP') {
+                clearInterval(vcallPollInterval);
+                vcallPollInterval = null;
+                statusText.innerText = "Call Concluded";
+                outcomeBadge.innerText = sData.outcome || "COMPLETED";
+                outcomeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-500/20 text-slate-300 border border-slate-500/30";
+                if (hangupBtn) hangupBtn.classList.add('hidden');
+                btn.disabled = false;
+                if (otherBtn) otherBtn.disabled = false;
+                btn.innerHTML = isTest ? `<i class="fa-solid fa-mobile-screen"></i> Call My Cell (Test)` : `<i class="fa-solid fa-phone-volume"></i> <span>Launch AI Call</span>`;
+
+                // Run coaching diagnostic
+                const transcriptText = (sData.transcript || []).map(t => `${t.speaker}: ${t.text}`).join('\n');
+                if (transcriptText) {
+                  runPostCallCoaching(transcriptText, currentVoiceCallLeadId, vcallSecondsElapsed);
+                }
+                updateGlobalStats();
+              }
+            } catch (pollErr) {
+              console.debug("Session poll notice:", pollErr);
+            }
+          }, 1000);
+
         } else {
-          showToast(`Call concluded: ${callData.call_outcome}`);
-        }
+          // Static sandbox simulation handling
+          statusText.innerText = `Call Completed (${callData.call_outcome || 'MEETING_BOOKED'})`;
+          outcomeBadge.innerText = callData.call_outcome || 'MEETING_BOOKED';
+          outcomeBadge.className = "px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+          durationElem.innerText = `${callData.duration_seconds || 90}s`;
 
-        // Post-call AI Coaching Analysis (Roadmap #9)
-        const transcriptText = (callData.transcript || []).map(t => `${t.speaker}: ${t.text}`).join('\n');
-        if (transcriptText) {
-          runPostCallCoaching(transcriptText, currentVoiceCallLeadId, callData.duration_seconds || 60);
+          const transcript = callData.transcript || [];
+          if (transcript.length > 0) {
+            feed.innerHTML = transcript.map(t => {
+              const isAI = t.speaker.includes('AI') || t.speaker.includes('Specialist');
+              const bg = isAI ? 'bg-emerald-950/40 border-emerald-500/30' : 'bg-slate-900 border-slate-800';
+              const speakerColor = isAI ? 'text-emerald-400' : 'text-cyan-300';
+              const icon = isAI ? '🤖' : '👩‍💼';
+              return `
+                <div class="p-2.5 rounded-lg border ${bg} space-y-1">
+                  <div class="flex items-center gap-1.5 font-bold ${speakerColor} text-[11px]">
+                    <span>${icon}</span> <span>${t.speaker}</span>
+                  </div>
+                  <p class="text-slate-200 text-xs leading-relaxed pl-1 select-all">${t.text}</p>
+                </div>
+              `;
+            }).join('');
+          }
+          btn.disabled = false;
+          if (otherBtn) otherBtn.disabled = false;
+          btn.innerHTML = isTest ? `<i class="fa-solid fa-mobile-screen"></i> Call My Cell (Test)` : `<i class="fa-solid fa-phone-volume"></i> <span>Launch AI Call</span>`;
         }
-
-        updateGlobalStats();
       } catch (err) {
         feed.innerHTML += `<div class="p-2.5 rounded-lg bg-rose-950/40 border border-rose-500/30 text-rose-300 text-xs mt-2">Error during call: ${err.message}</div>`;
         alert("Voice Call Error: " + err.message);
-      } finally {
         btn.disabled = false;
-        btn.innerHTML = isTest ? `<i class="fa-solid fa-mobile-screen"></i> Call My Cell (Test)` : `<i class="fa-solid fa-phone-volume"></i> <span>Launch AI Call</span>`;
+        if (otherBtn) otherBtn.disabled = false;
       }
     }
 

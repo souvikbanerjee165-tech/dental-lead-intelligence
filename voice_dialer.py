@@ -892,7 +892,7 @@ class VoiceDialerEngine:
 
     @staticmethod
     def start_telnyx_transcription(call_control_id: str, api_key: Optional[str] = None) -> bool:
-        """Enables real-time Deepgram speech-to-text on an active Telnyx call leg."""
+        """Enables real-time speech-to-text on an active Telnyx call leg with engine fallback."""
         if not call_control_id or call_control_id.startswith("mock_"):
             return False
         key = api_key or get_telnyx_api_key()
@@ -900,25 +900,31 @@ class VoiceDialerEngine:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json"
         }
-        try:
-            req = urllib.request.Request(
-                f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/transcription_start",
-                data=json.dumps({
-                    "transcription_engine": "deepgram",
-                    "transcription_engine_config": {
-                        "model": "deepgram/nova-3",
-                        "language": "en"
-                    }
-                }).encode("utf-8"),
-                headers=headers,
-                method="POST"
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                if resp.status == 200:
-                    logger.info(f"Telnyx call {call_control_id}: Live Deepgram transcription started.")
-                    return True
-        except Exception as e:
-            logger.warning(f"Failed to start Telnyx transcription on {call_control_id}: {e}")
+        configs = [
+            {"transcription_engine": "deepgram", "transcription_engine_config": {"model": "deepgram/nova-3", "language": "en"}},
+            {"transcription_engine": "google", "transcription_engine_config": {"language": "en-US"}},
+            {"language": "en"}
+        ]
+        for cfg in configs:
+            try:
+                req = urllib.request.Request(
+                    f"https://api.telnyx.com/v2/calls/{call_control_id}/actions/transcription_start",
+                    data=json.dumps(cfg).encode("utf-8"),
+                    headers=headers,
+                    method="POST"
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    if resp.status in (200, 204):
+                        logger.info(f"Telnyx call {call_control_id}: Live transcription started using {cfg.get('transcription_engine', 'native')}.")
+                        return True
+            except urllib.error.HTTPError as e:
+                # 422 usually means transcription already started or invalid engine
+                if e.code == 422:
+                    logger.info(f"Telnyx call {call_control_id} transcription already active or unsupported engine ({e.code}).")
+                else:
+                    logger.debug(f"Telnyx transcription attempt with {cfg} returned {e.code}")
+            except Exception as e:
+                logger.debug(f"Transcription engine {cfg.get('transcription_engine')} error: {e}")
         return False
 
     @classmethod
@@ -1047,22 +1053,31 @@ class VoiceDialerEngine:
                         duration_sec=0
                     )
 
-                # Only speak on answer if initial_mode is AI-led (not HUMAN_FIRST)
-                if initial_mode not in ("HUMAN_FIRST", "HUMAN_CONTROL"):
-                    hook_text = script.get("gatekeeper_hook") or "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
-                    if call_control_id and not call_control_id.startswith("mock_"):
-                        threading.Thread(
-                            target=cls._monitor_and_speak_on_answer,
-                            args=(call_control_id, hook_text, get_telnyx_api_key()),
-                            daemon=True
-                        ).start()
-                else:
-                    logger.info(f"Telnyx call {call_control_id} started in {initial_mode} mode. Bot auto-intro disabled.")
+                # Pre-register session in LiveDialerEngine so webhooks, UI, and hangup endpoints track it immediately
+                session_id = f"call_telnyx_{int(time.time())}_{abs(hash(call_control_id)) % 10000}"
+                try:
+                    from live_dialer_engine import LiveDialerEngine
+                    live_sess = LiveDialerEngine.start_manual_session(
+                        phone=target_phone,
+                        lead_id=lead.get("id"),
+                        contact_name=lead.get("name"),
+                        mode=initial_mode,
+                        carrier_mode="TELNYX",
+                        carrier_call_id=call_control_id,
+                        dispatch_carrier=False,  # Already dispatched above!
+                        db=db
+                    )
+                    session_id = live_sess.get("session_id", session_id)
+                except Exception as ex:
+                    logger.warning(f"Could not pre-register live session for {call_control_id}: {ex}")
+
+                logger.info(f"Telnyx call {call_control_id} dispatched to {target_phone}. Registered session {session_id}. Awaiting call.answered webhook for introductory speech.")
 
                 return {
                     "status": "initiated",
                     "mode": "TELNYX_LIVE",
                     "call_id": call_control_id,
+                    "session_id": session_id,
                     "target_phone": target_phone,
                     "clinic_name": lead.get("name"),
                     "doctor_name": lead.get("doctor_name"),

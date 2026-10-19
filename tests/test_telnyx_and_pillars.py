@@ -84,3 +84,42 @@ def test_sales_state_machine_calendar_tool():
     assert res["success"] is True
     assert res["status"] == "CONFIRMED"
     assert "meet.google.com" in res["meet_link"]
+
+def test_hangup_live_call_atomic_guard():
+    from live_dialer_engine import LiveDialerEngine
+
+    # 1. Register active session
+    sess = LiveDialerEngine.start_manual_session(
+        phone="+15125550199",
+        mode="AI_FIRST",
+        carrier_mode="TELNYX",
+        carrier_call_id="mock_carrier_test_leg",
+        dispatch_carrier=False
+    )
+    assert sess["status"] == "CONNECTED"
+    assert sess["carrier_call_id"] == "mock_carrier_test_leg"
+
+    # 2. Call hangup via API with empty payload (testing fallback sweep)
+    resp = client.post("/api/voice/call/hangup", json={})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "hung_up"
+
+    # 3. Verify session was marked COMPLETED
+    updated = LiveDialerEngine.get_session(sess["session_id"])
+    assert updated["status"] == "COMPLETED"
+
+def test_start_manual_session_no_duplicate_dispatch():
+    from live_dialer_engine import LiveDialerEngine
+
+    sess = LiveDialerEngine.start_manual_session(
+        phone="+15125550188",
+        mode="HUMAN_FIRST",
+        carrier_mode="TELNYX",
+        carrier_call_id="mock_existing_leg_999",
+        dispatch_carrier=False
+    )
+    assert sess["carrier_call_id"] == "mock_existing_leg_999"
+    assert sess["status"] == "CONNECTED"
+    # Verify indexable by carrier_call_id
+    assert LiveDialerEngine.get_session("mock_existing_leg_999") is not None

@@ -1847,11 +1847,13 @@ async def telnyx_webhook_handler(request: Request):
 
             initial_mode = client_state.get("initial_mode") or (matched_session.get("current_mode") if matched_session else "AI_FIRST")
             if initial_mode not in ("HUMAN_FIRST", "HUMAN_CONTROL"):
-                hook_text = "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
-                if matched_session:
-                    hook_text = matched_session.get("script", {}).get("gatekeeper_hook") or hook_text
-                send_telnyx_speak(call_control_id, hook_text)
-                notes = f"Telnyx call answered ({client_state.get('name')}). AI intro spoken with neural voice."
+                if not matched_session or not matched_session.get("answered_hook_spoken"):
+                    hook_text = "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
+                    if matched_session:
+                        hook_text = matched_session.get("script", {}).get("gatekeeper_hook") or hook_text
+                        matched_session["answered_hook_spoken"] = True
+                    send_telnyx_speak(call_control_id, hook_text)
+                    notes = f"Telnyx call answered ({client_state.get('name')}). AI intro spoken with neural voice."
             else:
                 logger.info(f"Telnyx call {call_control_id} answered in HUMAN_FIRST mode. AI keeping line open for human rep.")
                 notes = f"Telnyx call answered ({client_state.get('name')}). Human-first mode active (AI silent)."
@@ -1871,16 +1873,9 @@ async def telnyx_webhook_handler(request: Request):
             if isinstance(is_final, str):
                 is_final = is_final.lower() in ("true", "1")
 
-            # Process final transcripts or substantial speech blocks
-            if transcript and (is_final or len(transcript.split()) >= 3):
-                # Deduplication check against recent turns
-                existing_texts = [t.get("text", "") for t in (matched_session.get("transcript", []) if matched_session else [])[-3:]]
-                if transcript in existing_texts:
-                    return {"status": "skipped_duplicate"}
-
-                logger.info(f"Telnyx Phone Recipient Said: '{transcript}'")
-                
-                # If session doesn't exist yet, spin up a live session
+            # Process final transcripts or speech blocks with 2+ words
+            if transcript and (is_final or len(transcript.split()) >= 2):
+                # Ensure session exists without dispatching a new carrier call
                 if not matched_session:
                     matched_session = LiveDialerEngine.start_manual_session(
                         phone=client_state.get("phone") or "+15125550199",
@@ -1888,53 +1883,80 @@ async def telnyx_webhook_handler(request: Request):
                         contact_name=client_state.get("name"),
                         mode=client_state.get("initial_mode") or "AI_FIRST",
                         carrier_mode="TELNYX",
+                        carrier_call_id=call_control_id,
+                        dispatch_carrier=False,  # DO NOT DISPATCH A SECOND CALL!
                         db=db
                     )
-                    matched_session["carrier_call_id"] = call_control_id
-                
+
                 session_id = matched_session["session_id"]
 
-                from voice_dialer import generate_speech_audio
+                # Deduplication & Acoustic Self-Echo Filter: Check against recent turns
+                recent_ai_turns = [
+                    t.get("text", "").lower() 
+                    for t in (matched_session.get("transcript", []) or [])[-4:]
+                    if t.get("role") in ("assistant", "system") or "AI" in str(t.get("speaker"))
+                ]
+                clean_trans = transcript.lower().strip()
+                if any(clean_trans in ai_t or ai_t in clean_trans for ai_t in recent_ai_turns if len(clean_trans) > 6):
+                    logger.info(f"Filtered acoustic echo from Telnyx speaker: '{transcript}'")
+                    return {"status": "skipped_echo"}
 
-                # 1. Synthesize audio for prospect turn so the PC speaker can play it!
-                p_fn = f"prospect_{int(time.time())}_{abs(hash(transcript)) % 1000}"
-                p_audio = generate_speech_audio(text=transcript, filename=p_fn, voice_name="en-US-ChristopherNeural")
-                p_url = p_audio.get("audio_url") if p_audio else None
+                existing_prospect = [
+                    t.get("text", "") 
+                    for t in (matched_session.get("transcript", []) or [])[-3:]
+                    if t.get("role") in ("prospect", "user")
+                ]
+                if transcript in existing_prospect:
+                    return {"status": "skipped_duplicate"}
+
+                logger.info(f"Telnyx Phone Recipient Spoke: '{transcript}'")
 
                 # Ingest prospect turn into HUD and transcript
                 LiveDialerEngine.process_live_turn(
                     session_id=session_id,
                     text=transcript,
                     speaker="Receptionist (Phone)",
-                    audio_url=p_url,
                     db=db
                 )
 
-                # 2. Check if AI is in control (or AI_FIRST mode) - if so, generate response
+                # Formulate real-time tactical AI response
                 current_mode = matched_session.get("current_mode", "AI_CONTROL")
                 if current_mode in ("AI_CONTROL", "AI_FIRST"):
-                    # Formulate real-time tactical AI response
-                    ai_reply = LiveDialerEngine._generate_takeover_response(matched_session, None)
-                    logger.info(f"AI Replying to Phone: '{ai_reply}'")
+                    ai_reply = LiveDialerEngine._generate_takeover_response(matched_session, transcript)
+                    logger.info(f"AI Speaking back to phone: '{ai_reply}'")
 
-                    # Speak response back to the phone line using Neural Voice
+                    # 1. Speak response back to the phone line IMMEDIATELY to eliminate dead air
                     send_telnyx_speak(call_control_id, ai_reply)
 
-                    # Synthesize audio for AI turn so the PC speaker can play it!
-                    ai_fn = f"ai_{int(time.time())}_{abs(hash(ai_reply)) % 1000}"
-                    ai_audio = generate_speech_audio(text=ai_reply, filename=ai_fn, voice_name="en-US-AriaNeural")
-                    ai_url = ai_audio.get("audio_url") if ai_audio else None
-
-                    # Ingest AI turn into transcript
+                    # 2. Ingest AI turn into transcript
                     LiveDialerEngine.process_live_turn(
                         session_id=session_id,
                         text=ai_reply,
                         speaker="AI Growth Specialist",
-                        audio_url=ai_url,
                         db=db
                     )
+
+                    # 3. Asynchronously synthesize MP3 audio for PC browser speaker playback
+                    async def _async_synth_browser_audio(s_id: str, p_txt: str, ai_txt: str):
+                        try:
+                            from voice_dialer import generate_speech_audio
+                            p_fn = f"prospect_{int(time.time())}_{abs(hash(p_txt)) % 1000}"
+                            ai_fn = f"ai_{int(time.time())}_{abs(hash(ai_txt)) % 1000}"
+                            p_res = await asyncio.to_thread(generate_speech_audio, text=p_txt, filename=p_fn, voice_name="en-US-ChristopherNeural")
+                            ai_res = await asyncio.to_thread(generate_speech_audio, text=ai_txt, filename=ai_fn, voice_name="en-US-AriaNeural")
+                            sess = LiveDialerEngine.get_session(s_id)
+                            if sess and "transcript" in sess:
+                                for t in sess["transcript"]:
+                                    if t.get("text") == p_txt and not t.get("audio_url") and p_res:
+                                        t["audio_url"] = p_res.get("audio_url")
+                                    elif t.get("text") == ai_txt and not t.get("audio_url") and ai_res:
+                                        t["audio_url"] = ai_res.get("audio_url")
+                        except Exception as e:
+                            logger.debug(f"Async browser audio synthesis notice: {e}")
+
+                    asyncio.create_task(_async_synth_browser_audio(session_id, transcript, ai_reply))
                 else:
-                    logger.info(f"Session in {current_mode} mode. Prospect speech ingested for rep. AI holding response.")
+                    logger.info(f"Session in {current_mode} mode. Prospect speech recorded for rep. AI waiting for rep.")
 
         elif event_type == "call.hangup":
             duration = payload.get("call_duration_seconds") or payload.get("duration") or 0
@@ -3464,18 +3486,8 @@ async def hangup_live_call(req: Optional[DialerHangupRequest] = None):
     if req:
         target_id = req.session_id or req.call_id
 
-    # If no target provided, search active sessions
-    if not target_id:
-        for sid, sess in list(LiveDialerEngine._active_sessions.items()):
-            if sess.get("carrier_call_id") or sess.get("call_id"):
-                target_id = sid
-                break
-
-    if target_id:
-        res = LiveDialerEngine.hangup_session(target_id)
-        return {"status": "hung_up", "target": target_id, "detail": res}
-
-    return {"status": "ok", "message": "No active carrier session found"}
+    res = LiveDialerEngine.hangup_session(target_id)
+    return {"status": "hung_up", "target": target_id, "detail": res}
 
 
 @app.get("/api/dialer/recordings")

@@ -43,7 +43,9 @@ class LiveDialerEngine:
         mode: str = "HUMAN_FIRST",
         carrier_mode: str = "BROWSER",
         db: Optional[DatabaseManager] = None,
-        server_base_url: Optional[str] = None
+        server_base_url: Optional[str] = None,
+        carrier_call_id: Optional[str] = None,
+        dispatch_carrier: bool = True
     ) -> Dict[str, Any]:
         """
         Initializes a manual call session with instant clinic lookup and strategy briefing.
@@ -102,6 +104,8 @@ class LiveDialerEngine:
             },
             "current_mode": mode,  # 'HUMAN_FIRST' or 'AI_FIRST'
             "carrier_mode": carrier_mode,  # 'BROWSER' or 'TELNYX'
+            "carrier_call_id": carrier_call_id,
+            "call_id": carrier_call_id or session_id,
             "started_at": now_str,
             "last_active_at": now_str,
             "duration_sec": 0,
@@ -113,7 +117,7 @@ class LiveDialerEngine:
                 "ai_words": 0,
                 "prospect_words": 0
             },
-            "status": "ACTIVE"
+            "status": "CONNECTED" if carrier_call_id else "ACTIVE"
         }
 
         # Initial turn depending on mode
@@ -129,7 +133,12 @@ class LiveDialerEngine:
             session["talk_metrics"]["ai_words"] += len(hook.split())
             session["initial_hook"] = hook
 
-        if carrier_mode in ("TELNYX", "TWILIO"):
+        if carrier_call_id:
+            session["carrier_call_id"] = carrier_call_id
+            session["call_id"] = carrier_call_id
+            session["carrier_name"] = carrier_mode
+            session["status"] = "CONNECTED"
+        elif carrier_mode in ("TELNYX", "TWILIO") and dispatch_carrier:
             try:
                 from voice_dialer import VoiceDialerEngine
                 carrier_res = VoiceDialerEngine.dispatch_call(
@@ -155,7 +164,9 @@ class LiveDialerEngine:
                 session["telnyx_error"] = str(e)
 
         cls._active_sessions[session_id] = session
-        logger.info(f"Started manual dialer session {session_id} to {clean_phone} (Mode: {mode}, Carrier: {carrier_mode})")
+        if carrier_call_id:
+            cls._active_sessions[carrier_call_id] = session
+        logger.info(f"Started manual dialer session {session_id} to {clean_phone} (Mode: {mode}, Carrier: {carrier_mode}, Carrier Call ID: {carrier_call_id})")
         return session
 
     @classmethod
@@ -367,25 +378,53 @@ class LiveDialerEngine:
         }
 
     @classmethod
-    def hangup_session(cls, session_id: str) -> Dict[str, Any]:
+    def hangup_session(cls, session_id: Optional[str] = None) -> Dict[str, Any]:
         """Terminates carrier telecom call and marks active session COMPLETED."""
-        session = cls._active_sessions.get(session_id)
-        carrier_call_id = None
-        if session:
-            session["status"] = "COMPLETED"
-            carrier_call_id = session.get("carrier_call_id") or session.get("call_id")
-        
-        # Also check if session_id itself is a call_control_id
-        target_carrier_id = carrier_call_id or session_id
-        if target_carrier_id and not str(target_carrier_id).startswith("mock_"):
-            try:
-                from voice_dialer import hangup_telnyx_call
-                hangup_telnyx_call(target_carrier_id)
-                logger.info(f"Terminated carrier call {target_carrier_id} via hangup_session.")
-            except Exception as e:
-                logger.warning(f"Error hanging up call {target_carrier_id}: {e}")
+        terminated_calls = []
 
-        return {"status": "hung_up", "session_id": session_id, "carrier_call_id": target_carrier_id}
+        if session_id:
+            session = cls._active_sessions.get(session_id)
+            if session:
+                session["status"] = "COMPLETED"
+                carrier_call_id = session.get("carrier_call_id") or session.get("call_id")
+                if carrier_call_id and not str(carrier_call_id).startswith("mock_"):
+                    try:
+                        from voice_dialer import hangup_telnyx_call
+                        if hangup_telnyx_call(carrier_call_id):
+                            terminated_calls.append(carrier_call_id)
+                    except Exception as e:
+                        logger.warning(f"Error hanging up call {carrier_call_id}: {e}")
+
+            # Also check if session_id itself is a call_control_id
+            if session_id not in terminated_calls and not str(session_id).startswith("call_man_") and not str(session_id).startswith("mock_"):
+                try:
+                    from voice_dialer import hangup_telnyx_call
+                    if hangup_telnyx_call(session_id):
+                        terminated_calls.append(session_id)
+                except Exception as e:
+                    logger.warning(f"Error hanging up call target {session_id}: {e}")
+
+        # Safety sweep: if no specific session hung up or session_id was omitted, terminate any active sessions
+        if not terminated_calls or not session_id:
+            for sid, sess in list(cls._active_sessions.items()):
+                if sess.get("status") in ("ACTIVE", "CONNECTED", "DIALING"):
+                    c_id = sess.get("carrier_call_id") or sess.get("call_id")
+                    if c_id and not str(c_id).startswith("mock_") and c_id not in terminated_calls:
+                        try:
+                            from voice_dialer import hangup_telnyx_call
+                            if hangup_telnyx_call(c_id):
+                                terminated_calls.append(c_id)
+                        except Exception as e:
+                            logger.warning(f"Sweep hangup failed for {c_id}: {e}")
+                    sess["status"] = "COMPLETED"
+
+        logger.info(f"hangup_session completed. Target: {session_id}, Terminated carrier legs: {terminated_calls}")
+        return {
+            "status": "hung_up",
+            "session_id": session_id,
+            "carrier_call_id": terminated_calls[0] if terminated_calls else session_id,
+            "terminated_calls": terminated_calls
+        }
 
     @classmethod
     def finalize_call_session(
