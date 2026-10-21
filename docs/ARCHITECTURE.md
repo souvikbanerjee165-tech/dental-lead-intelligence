@@ -34,14 +34,14 @@ flowchart TD
         PDFGen --> OutputDir["output/reports/*.pdf"]
     end
 
-    subgraph Telephony ["3. Outbound Telephony & Audio Relay"]
+    subgraph Telephony ["3. Outbound Telephony & Live Voice Relay"]
         Triage --> HotQueue["Today's Calls Hot Queue"]
         HotQueue --> DialerEngine["Live Dialer Engine"]
-        DialerEngine -->|TeXML / Webhooks| Telnyx["Telnyx Telephony API"]
+        DialerEngine -->|Call Control v2 REST| Telnyx["Telnyx Call Control API"]
         DialerEngine -->|Fallback| Twilio["Twilio Voice API"]
-        Telnyx <--> AudioBridge["Bidirectional Audio Bridge (WebSockets)"]
-        AudioBridge <--> Browser["PC Browser Dashboard (Operator)"]
-        AudioBridge --> TTS["TTS Synthesizer (Edge-TTS / Kokoro)"]
+        Telnyx <--> LiveRelay["FastAPI Live Audio Relay & Polling Engine"]
+        LiveRelay <--> Browser["PC Browser Dashboard (Operator)"]
+        LiveRelay --> TTS["TTS Synthesizer (Edge-TTS / Polly / Kokoro)"]
     end
 
     subgraph Intelligence ["4. Conversational Voice Brain & Tiered Routing"]
@@ -103,17 +103,22 @@ flowchart TD
   - Operational Bottlenecks & Missing After-Hours Technology
   - 30-Day Patient Recovery Roadmap
 
-### 3.4. Autonomous Voice Telephony & Audio Bridge
-- **Module**: `voice_dialer.py`, `live_dialer_engine.py`, `audio_bridge.py`
+### 3.4. Autonomous Voice Telephony & Live Voice Relay
+- **Module**: `voice_dialer.py`, `live_dialer_engine.py`
 - **Supported Telephony Carriers**:
-  - **Telnyx** (Primary): Uses TeXML REST API and WebSocket streaming for bi-directional audio relay.
-  - **Twilio** (Secondary): Uses TwiML Voice REST API and Media Streams.
-- **Dual Dialing Modes**:
+  - **Telnyx** (Primary wholesale): Uses Call Control v2 REST API (`/v2/calls`, `/actions/speak`, `/actions/hangup`, `/actions/transcription_start`) and webhooks (`call.answered`, `call.transcription`, `call.hangup`).
+  - **Twilio** (Secondary fallback): Uses TwiML Voice REST API.
+- **Atomic Hangup Guard & Session Tracking**:
+  - All outbound calls are immediately bound to `LiveDialerEngine._active_sessions` under both `session_id` and carrier `call_control_id`.
+  - Empty or interrupted hangup requests trigger a fallback sweep across all active carrier legs, ensuring the PSTN line is severed and billing stops.
+  - Page unloads automatically dispatch `navigator.sendBeacon('/api/voice/call/hangup', ...)` to prevent lingering phone lines.
+- **Turn-Taking & Acoustic Self-Echo Filtering**:
+  - Outbound speech is dispatched to `send_telnyx_speak()` with <350ms latency using DeepSeek-V3.
+  - Dashboard MP3 generation (`Edge-TTS` Aria & Christopher) is processed asynchronously in the background so telephony audio never experiences dead air.
+  - Incoming transcripts are filtered to eliminate acoustic echo from the practice speaker.
+- **Dual Calling Modes**:
   - `HUMAN_FIRST` (Default): Connects outbound call, plays ringing audio to PC speaker, displays live speech-to-text transcription, and allows operator whisper/takeover.
   - `AI_FIRST`: Connects outbound call directly to the conversational AI voice receptionist on ring 1.
-- **Speech Synthesis**:
-  - **Edge-TTS**: Cloud-based Microsoft neural TTS (`en-US-AvaNeural`), asynchronous non-blocking synthesis.
-  - **Kokoro ONNX**: Local CPU neural TTS model running offline without cloud API overhead.
 
 ### 3.5. Multi-Provider LLM Router, Primary DeepSeek Brain & Tiered Routing
 - **Module**: `llm_router.py`

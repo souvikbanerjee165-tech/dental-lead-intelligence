@@ -1,6 +1,6 @@
 # REST & WebSocket API Reference
 
-The application exposes a high-performance FastAPI service running on port `8000` (and tunneled via Cloudflare). All endpoints accept and return JSON unless otherwise specified.
+The application exposes a high-performance FastAPI service running on port `8000` (and publicly accessible via Cloudflare Quick Tunnel). All endpoints accept and return JSON unless otherwise specified.
 
 ---
 
@@ -82,9 +82,9 @@ Dedicated endpoint returning standalone BANT and MEDDIC evaluation breakdowns.
 ---
 
 ### `GET /api/leads/{lead_id}/download-pdf-dossier`
-Generates and streams a vector PDF Opportunity Teardown dossier.
+Generates and streams a 2-page publication-grade vector PDF Opportunity Teardown.
 - **Response**: Binary stream (`application/pdf`) with `Content-Disposition: attachment; filename="dossier_{lead_id}_{date}.pdf"`.
-- Generated in ~250ms via ReportLab with zero external headless browser overhead.
+- Generated in ~250ms via ReportLab with zero external headless browser dependencies.
 
 ---
 
@@ -101,115 +101,182 @@ Updates the CRM Kanban stage of a practice.
 
 ---
 
-### `GET /api/leads/{lead_id}/battlecard`
-Generates an instant pre-call sales battlecard tailored to the target practice's detected software stack and Google review complaints.
+## 2. Telephony & Live Voice Calling
 
----
-
-## 2. Today's Calls Hot Queue & Outbound Voice
-
-### `GET /api/queue/todays-calls`
-Retrieves AI-qualified target practices ready for outbound phone outreach.
-- **Query Parameters**:
-  - `min_probability` (optional, integer, default: `65`): Minimum closing probability cutoff.
-- **Response**: Array of leads sorted by `expected_value` and `urgency_score`, with `why_now_reasons` and verified doctor names.
-
----
-
-### `POST /api/voice/dial`
-Initiates an outbound phone call to a practice.
+### `POST /api/voice/call/{lead_id}/dispatch`
+Dispatches an outbound AI phone call to a confirmed dental practice.
 - **Request Body**:
   ```json
   {
-    "lead_id": "lead_austindentalcare_httpsaustindentalcarecom",
+    "phone_override": "+15125550199",
+    "confirmed_by_user": true
+  }
+  ```
+- **Response**:
+  ```json
+  {
+    "status": "initiated",
+    "mode": "TELNYX_LIVE",
+    "call_id": "v3:vca_48a9b2...",
+    "session_id": "call_telnyx_17912389...",
+    "target_phone": "+15125550199",
+    "clinic_name": "Austin Dental Care",
+    "doctor_name": "Dr. Miller",
+    "message": "Telnyx wholesale outbound call ringing +15125550199..."
+  }
+  ```
+
+---
+
+### `POST /api/voice/call/test`
+Places a real PSTN test call to an operator/founder cell phone using the research dossier of a selected practice.
+- **Request Body**:
+  ```json
+  {
     "phone": "+15125550199",
-    "initial_mode": "HUMAN_FIRST",
-    "provider": "TELNYX"
+    "lead_id": "lead_austindentalcare_httpsaustindentalcarecom"
   }
   ```
+- **Response**: Returns `{ "status": "initiated", "call_id": "...", "session_id": "..." }`.
+
+---
+
+### `POST /api/voice/call/hangup` and `POST /api/dialer/manual/hangup`
+Commands Telnyx to immediately sever the telecom call leg on the PSTN network.
+- **Request Body** (both parameters optional):
+  ```json
+  {
+    "session_id": "call_telnyx_17912389...",
+    "call_id": "v3:vca_48a9b2..."
+  }
+  ```
+- **Atomic Hangup Guard**: If `session_id` and `call_id` are omitted (e.g., empty `{}` or beacon on page unload), the engine performs an atomic safety sweep across all active sessions and severs any live carrier lines.
 - **Response**:
   ```json
   {
-    "success": true,
-    "call_id": "call_20261013_182947_a1b2",
-    "status": "DIALING",
-    "provider": "TELNYX"
-  }
-  ```
-
----
-
-### `POST /api/voice/hangup`
-Terminates an ongoing phone call via carrier REST API.
-- **Request Body**:
-  ```json
-  {
-    "call_id": "call_20261013_182947_a1b2"
-  }
-  ```
-
----
-
-### `GET /api/voice/status`
-Returns real-time telephony subsystem health, active carrier configuration, and webhook connectivity status.
-
----
-
-## 3. WebSockets & Telephony Webhooks
-
-### `WebSocket /api/voice/stream/{call_id}`
-Establishes bidirectional streaming between the telephony carrier/server and the operator dashboard:
-- Client $\rightarrow$ Server:
-  - Audio chunk packets (16kHz PCM base64 encoded)
-  - Control events (`{"action": "HANDOVER_TO_AI"}`, `{"action": "WHISPER", "text": "..."}`)
-- Server $\rightarrow$ Client:
-  - Line status updates (`RINGING`, `CONNECTED`, `ENDED`)
-  - Live real-time speech transcription (`party`: `RECEPTIONIST` | `AI_AGENT` | `OPERATOR`)
-  - Inbound audio frames to play through browser speaker.
-
----
-
-### `POST /api/voice/webhook/telnyx`
-Receives TeXML webhook events from Telnyx when outbound calls connect or progress. Returns dynamic XML directing call audio into the bidirectional media stream.
-
----
-
-### `POST /api/voice/webhook/twilio`
-Receives TwiML voice webhook events from Twilio. Returns `<Response><Connect><Stream url="..."/></Connect></Response>`.
-
----
-
-## 4. Multi-Provider LLM Router & Telemetry
-
-### `GET /api/settings/llm-provider`
-Returns active LLM provider, configured projects, and real-time circuit-breaker statistics.
-- **Response**:
-  ```json
-  {
-    "active_provider": "GEMINI",
-    "gemini_projects_configured": 2,
-    "providers": {
-      "GEMINI": { "configured": true, "model": "gemini-2.5-flash" },
-      "GROQ": { "configured": true, "model": "llama-3.3-70b-versatile" },
-      "OPENAI": { "configured": true, "model": "gpt-4o-mini" },
-      "DEEPSEEK": { "configured": false, "model": "deepseek-chat" },
-      "OPENROUTER": { "configured": false, "model": "meta-llama/llama-3.3-70b-instruct:free" }
-    },
-    "circuit_breakers": {
-      "GEMINI_PROJECT_A": { "status": "AVAILABLE", "requests": 142, "rate_limit_429_count": 0, "latency_p50_ms": 280 },
-      "GROQ": { "status": "AVAILABLE", "requests": 8, "rate_limit_429_count": 0, "latency_p50_ms": 190 }
+    "status": "hung_up",
+    "target": "call_telnyx_17912389...",
+    "detail": {
+      "status": "hung_up",
+      "terminated_calls": ["v3:vca_48a9b2..."]
     }
   }
   ```
 
 ---
 
-### `POST /api/settings/llm-provider`
-Dynamically switches the active LLM brain at runtime.
+### `GET /api/dialer/manual/session/{session_id}`
+Returns live session state, updated transcript turns, talk metrics, audio URLs, and call status (`ACTIVE`, `CONNECTED`, `COMPLETED`, `HUNG_UP`).
+- **Response**:
+  ```json
+  {
+    "session_id": "call_telnyx_17912389...",
+    "status": "CONNECTED",
+    "phone_number": "+15125550199",
+    "clinic_name": "Austin Dental Care",
+    "transcript": [
+      {
+        "speaker": "AI Growth Specialist",
+        "role": "assistant",
+        "text": "Hi, good morning! Who handles weekend scheduling for Austin Dental Care?",
+        "audio_url": "/output/calls/ai_17912390.mp3"
+      },
+      {
+        "speaker": "Receptionist (Phone)",
+        "role": "prospect",
+        "text": "Yes, our office manager Sarah handles that on Mondays.",
+        "audio_url": "/output/calls/prospect_17912392.mp3"
+      }
+    ],
+    "talk_metrics": { "human_words": 0, "ai_words": 14, "prospect_words": 10 }
+  }
+  ```
+
+---
+
+### `POST /api/dialer/manual/ai-takeover`
+Hands over live call control from Human Operator to AI. Generates immediate contextual speech turn.
 - **Request Body**:
   ```json
   {
-    "provider": "GROQ"
+    "session_id": "call_telnyx_17912389...",
+    "user_hint": "Ask for Sarah's direct email"
   }
   ```
-- Valid providers: `GEMINI`, `GROQ`, `OPENAI`, `DEEPSEEK`, `OPENROUTER`.
+
+---
+
+### `POST /api/dialer/manual/human-takeover`
+Hands over live call control from AI back to Human Operator. Halts AI speech playback.
+- **Request Body**:
+  ```json
+  {
+    "session_id": "call_telnyx_17912389...",
+    "reason": "Rep took back microphone control"
+  }
+  ```
+
+---
+
+### `POST /api/voice/webhook/telnyx`
+Inbound Call Control v2 webhook receiver from Telnyx:
+- `call.answered`: Begins transcription and speaks the consultative opening hook.
+- `call.transcription`: Ingests prospect speech, filters acoustic echo, triggers DeepSeek-V3 spoken response, and generates browser playback audio asynchronously.
+- `call.hangup`: Finalizes duration, logs outcome (`CALL_COMPLETED` or `CALL_DROPPED`), and closes active session.
+
+---
+
+## 3. Multi-Provider LLM Router & Tiered Cost Routing
+
+### `GET /api/settings/llm-provider`
+Returns active primary LLM provider, configured projects, and circuit-breaker telemetry.
+- **Response**:
+  ```json
+  {
+    "active_provider": "DEEPSEEK",
+    "gemini_projects_configured": 1,
+    "providers": {
+      "DEEPSEEK": { "configured": true, "model": "deepseek-chat" },
+      "GEMINI": { "configured": true, "model": "gemini-2.5-flash" },
+      "GROQ": { "configured": false, "model": "llama-3.3-70b-versatile" },
+      "OPENAI": { "configured": false, "model": "gpt-4o-mini" },
+      "OPENROUTER": { "configured": false, "model": "meta-llama/llama-3.3-70b-instruct:free" }
+    },
+    "circuit_breakers": {
+      "DEEPSEEK": { "status": "AVAILABLE", "requests": 24, "rate_limit_429_count": 0 },
+      "GEMINI_PROJECT_A": { "status": "AVAILABLE", "requests": 62, "rate_limit_429_count": 0 }
+    }
+  }
+  ```
+
+### Task Complexity Routing Table
+
+| Complexity Tier | Target Provider | Max Tokens | Description |
+| :--- | :--- | :--- | :--- |
+| `TaskComplexity.EASY` | Google Gemini 2.5 Flash / Groq | $\le 250$ | Sentiment scoring, entity extraction, string sanitization ($0 free tier) |
+| `TaskComplexity.CONVERSATION` | DeepSeek-V3 (`deepseek-chat`) | Dynamic | Live phone dialogue turns, objection rebuttals |
+| `TaskComplexity.COMPLEX` | DeepSeek-V3 (`deepseek-chat`) | Full context | BANT/MEDDIC reasoning, financial loss models, executive teardowns |
+
+---
+
+## 4. Calendar & WhatsApp Tools
+
+### `GET /api/calendar/slots`
+Retrieves available demo booking slots for the next $N$ business days.
+- **Query Parameters**: `days` (integer, default: `5`).
+
+### `POST /api/calendar/book`
+Locks in an executive demo appointment and generates a Google Meet link.
+- **Request Body**:
+  ```json
+  {
+    "lead_id": "lead_austindentalcare",
+    "slot": "Thursday at 11:00 AM",
+    "clinic_name": "Austin Dental Care",
+    "doctor_name": "Dr. Miller",
+    "phone": "+15125550199"
+  }
+  ```
+
+### `POST /api/whatsapp/turn`
+Generates consultative WhatsApp pitch message and direct `https://wa.me/...` click-to-chat URL.

@@ -44,12 +44,14 @@ Layer 5: Autonomous Action    ──► Live Telephony (Telnyx TeXML), Edge-TTS,
 - Zero headless browser or Playwright dependencies — completely crash-proof and memory-efficient.
 - Features radar qualification breakdown, chair-time loss calculations, and a 30-Day Recovery Roadmap.
 
-### 3. Autonomous Outbound Telephony & Audio Relay ([`live_dialer_engine.py`](live_dialer_engine.py), [`audio_bridge.py`](audio_bridge.py))
-- Outbound calling through Telnyx TeXML (with Twilio fallback).
+### 3. Autonomous Outbound Telephony & Live Voice Relay ([`live_dialer_engine.py`](live_dialer_engine.py), [`voice_dialer.py`](voice_dialer.py))
+- Outbound calling through Telnyx Call Control v2 REST API (with Twilio fallback).
+- **Atomic Hangup Guard**: Guaranteed line severance on call completion, modal close, or browser unload (via `beforeunload` beacon and fallback sweep).
+- **Acoustic Self-Echo Filtering**: Prevents AI from replying to its own voice playback on the phone line.
+- **Sub-Second Voice Loop**: Spoken responses dispatched via DeepSeek-V3 in <350ms, with non-blocking background MP3 generation for web dashboard audio.
 - **Dual Calling Modes**:
-  - `HUMAN_FIRST`: Rings prospect, relays live call audio to PC speaker, transcribes in real-time, and supports operator whisper/takeover.
+  - `HUMAN_FIRST`: Rings prospect, displays live speech-to-text transcription, and allows operator whisper/takeover.
   - `AI_FIRST`: Conversational AI agent greets contact immediately on pickup.
-- **Speech Synthesis**: Ultra-clear Microsoft Edge-TTS (`en-US-AvaNeural`) and local offline Kokoro ONNX.
 
 ### 4. Consultative SPIN Selling Voice Brain ([`empathy_voice_prompts.py`](empathy_voice_prompts.py))
 - Bypasses gatekeeper friction using consultative SPIN Selling:
