@@ -1,0 +1,16 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+test_*.db
+storage.db.bak*
+.env
+.env.local
+output/
+cloudflared.exe
+*.log
+*.mp3
+*.wav
