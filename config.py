@@ -6,7 +6,9 @@ load_dotenv()
 
 # Base directories
 BASE_DIR = Path(__file__).resolve().parent
-if os.getenv("VERCEL"):
+if os.getenv("STORAGE_DIR"):
+    OUTPUT_DIR = Path(os.getenv("STORAGE_DIR")) / "output"
+elif os.getenv("VERCEL"):
     OUTPUT_DIR = Path("/tmp/output")
 else:
     OUTPUT_DIR = BASE_DIR / "output"
@@ -41,4 +43,3 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "DEEPSEEK").upper()
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-

@@ -107,7 +107,95 @@ class WebsiteAuditor:
         scored = self._calculate_scores(raw_lead, audit_result, evidence_graph)
         scored.content_hash = content_hash
         self.db.save_scored_lead(scored, scored.findings)
+        self._auto_enrich_ehr_and_npi(lead_id, raw_lead, scored)
         return scored
+
+    def _auto_enrich_ehr_and_npi(self, lead_id: str, raw_lead: RawLead, scored: ScoredLead):
+        """Automatically enriches audited leads with verified US Federal CMS NPI credentials and EHR/PMS detection."""
+        try:
+            from ehr_sniffer import EHRSniffer
+            from npi_registry import NPIRegistryEnricher
+
+            # 1. Detect EHR / PMS from tech stack or website
+            detected_ehr = None
+            if scored.audit and scored.audit.tech_stack:
+                all_tech = " ".join(scored.audit.tech_stack.summary_list()).lower()
+                if "dentrix" in all_tech:
+                    detected_ehr = "Dentrix (Henry Schein)"
+                elif "eaglesoft" in all_tech:
+                    detected_ehr = "Eaglesoft (Patterson Dental)"
+                elif "open dental" in all_tech or "opendental" in all_tech:
+                    detected_ehr = "Open Dental"
+                elif "curve" in all_tech:
+                    detected_ehr = "Curve Dental"
+                elif "nexhealth" in all_tech:
+                    detected_ehr = "NexHealth"
+                elif "weave" in all_tech:
+                    detected_ehr = "Weave"
+
+            # 2. Parse Doctor Name & City/State for US CMS NPI Registry lookup
+            raw_doc = scored.doctor_name or (scored.audit.doctor_name if scored.audit else None) or ""
+            clean_doc = raw_doc.split(",")[0].replace("Dr.", "").replace("Dr", "").strip()
+            first_name, last_name = None, None
+            if clean_doc:
+                parts = clean_doc.split()
+                if len(parts) >= 2:
+                    first_name = parts[0]
+                    last_name = parts[-1]
+                elif len(parts) == 1:
+                    last_name = parts[0]
+
+            raw_addr = raw_lead.address or ""
+            city, state = None, None
+            if "," in raw_addr:
+                addr_parts = [p.strip() for p in raw_addr.split(",")]
+                if len(addr_parts) >= 2:
+                    city = addr_parts[-2]
+                    state_chunk = addr_parts[-1].strip().split()
+                    if state_chunk and len(state_chunk[0]) == 2:
+                        state = state_chunk[0].upper()
+
+            npi_result = NPIRegistryEnricher.lookup_provider(
+                first_name=first_name,
+                last_name=last_name,
+                organization_name=raw_lead.name if not clean_doc else None,
+                city=city,
+                state=state
+            )
+
+            # Fallback: if doctor-name lookup yielded no match, query by organization name + city/state
+            if not npi_result.get("found") and raw_lead.name:
+                npi_result = NPIRegistryEnricher.lookup_provider(
+                    organization_name=raw_lead.name,
+                    city=city,
+                    state=state
+                )
+
+            npi_num = npi_result.get("npi_number")
+            verified_doc = npi_result.get("doctor_name")
+            credential = npi_result.get("credential")
+
+            self.db.update_lead_ehr_and_npi(
+                lead_id=lead_id,
+                detected_ehr=detected_ehr,
+                npi_number=npi_num,
+                npi_data=npi_result if npi_result.get("found") else None
+            )
+
+            # Backfill verified doctor name if website did not list it
+            if verified_doc and verified_doc != "Dental Practice" and not scored.doctor_name:
+                doc_with_cred = f"{verified_doc}, {credential}" if credential and credential not in verified_doc else verified_doc
+                scored.doctor_name = doc_with_cred
+                if scored.audit:
+                    scored.audit.doctor_name = doc_with_cred
+                with self.db._get_connection() as conn:
+                    conn.execute(
+                        "UPDATE leads SET doctor_name = COALESCE(NULLIF(doctor_name, ''), ?), decision_maker_role = COALESCE(NULLIF(decision_maker_role, ''), 'NPI Verified Principal Dentist') WHERE id = ?",
+                        (doc_with_cred, lead_id)
+                    )
+                    conn.commit()
+        except Exception:
+            pass
 
     async def _crawl_and_analyze(self, website_url: str) -> Tuple[WebsiteAuditResult, EvidenceGraph, str]:
         """Crawl website, match declarative YAML fingerprints, and construct Evidence Graph."""

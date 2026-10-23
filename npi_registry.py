@@ -45,7 +45,15 @@ class NPIRegistryEnricher:
             params["last_name"] = last_name.strip()
         if organization_name and not (first_name or last_name):
             # Clean common suffixes for cleaner search
-            clean_org = organization_name.replace("LLC", "").replace("Inc", "").replace("PLLC", "").strip()
+            clean_org = (
+                organization_name.replace("LLC", "")
+                .replace("Inc", "")
+                .replace("PLLC", "")
+                .replace("P.A.", "")
+                .replace("DDS", "")
+                .replace("DMD", "")
+                .strip(" ,.-")
+            )
             params["organization_name"] = clean_org[:50]
         if city:
             params["city"] = city.strip()
@@ -90,11 +98,28 @@ class NPIRegistryEnricher:
             primary_tax = next((t for t in taxonomies if t.get("primary")), taxonomies[0] if taxonomies else {})
             specialty_desc = primary_tax.get("desc", "General Dental Practice")
 
-            # Format name and credential
+            # Format name and credential (supports both Type 1 Individual and Type 2 Organization Authorized Official)
             doc_first = basic.get("first_name", "")
             doc_last = basic.get("last_name", "")
-            credential = basic.get("credential", "DDS")
-            full_name = f"Dr. {doc_first} {doc_last}".strip() if doc_last else basic.get("organization_name", "Dental Practice")
+            auth_first = basic.get("authorized_official_first_name", "")
+            auth_last = basic.get("authorized_official_last_name", "")
+            credential = (
+                basic.get("credential")
+                or basic.get("authorized_official_credential")
+                or "DDS"
+            )
+
+            if doc_last:
+                full_name = f"Dr. {doc_first.title()} {doc_last.title()}".strip()
+                doc_first, doc_last = doc_first.title(), doc_last.title()
+            elif auth_last:
+                full_name = f"Dr. {auth_first.title()} {auth_last.title()}".strip()
+                doc_first, doc_last = auth_first.title(), auth_last.title()
+            else:
+                full_name = basic.get("organization_name", "Dental Practice")
+
+            addresses = match.get("addresses", [{}])
+            loc_addr = next((a for a in addresses if a.get("address_purpose") == "LOCATION"), addresses[0] if addresses else {})
 
             return {
                 "found": True,
@@ -106,9 +131,11 @@ class NPIRegistryEnricher:
                 "credential": credential or "DDS",
                 "specialty": specialty_desc,
                 "license_state": primary_tax.get("state", state),
+                "license_number": primary_tax.get("license"),
                 "gender": basic.get("gender"),
                 "enumeration_date": basic.get("enumeration_date"),
-                "address": match.get("addresses", [{}])[0].get("address_1"),
+                "address": loc_addr.get("address_1"),
+                "phone": loc_addr.get("telephone_number"),
                 "summary": f"Verified NPI #{match.get('number')} — {full_name}, {credential} ({specialty_desc})"
             }
 

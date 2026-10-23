@@ -12,7 +12,20 @@ from config import BASE_DIR
 from models import ScoredLead, RawLead
 from evidence import Finding
 
-if os.getenv("VERCEL"):
+if os.getenv("DB_PATH"):
+    DB_PATH = Path(os.getenv("DB_PATH"))
+    DB_PATH.parent.mkdir(exist_ok=True, parents=True)
+elif os.getenv("STORAGE_DIR"):
+    storage_root = Path(os.getenv("STORAGE_DIR"))
+    storage_root.mkdir(exist_ok=True, parents=True)
+    DB_PATH = storage_root / "storage.db"
+    seed_db = BASE_DIR / "storage.db"
+    if seed_db.exists() and not DB_PATH.exists():
+        try:
+            shutil.copyfile(seed_db, DB_PATH)
+        except Exception:
+            pass
+elif os.getenv("VERCEL"):
     DB_PATH = Path("/tmp/storage.db")
     seed_db = BASE_DIR / "storage.db"
     if seed_db.exists() and not DB_PATH.exists():

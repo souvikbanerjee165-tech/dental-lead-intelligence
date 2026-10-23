@@ -4,7 +4,7 @@ FROM python:3.11-slim
 # Prevent Python from writing .pyc files and enable unbuffered logging
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
-ENV PORT=8000
+ENV PORT=8080
 
 WORKDIR /app
 
@@ -24,14 +24,14 @@ RUN playwright install chromium --with-deps || true
 # Copy application codebase
 COPY . .
 
-# Ensure storage directory exists
-RUN mkdir -p /app/output
+# Ensure storage & volume mount directories exist
+RUN mkdir -p /app/output /app/data
 
-EXPOSE 8000
+EXPOSE 8080
 
 # Healthcheck for zero-downtime rolling deploys
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/system/health || curl -f http://localhost:${PORT}/api/health || exit 1
 
-# Start FastAPI application
-CMD uvicorn app:app --host 0.0.0.0 --port ${PORT}
+# Start FastAPI application (respecting Cloud Run dynamic $PORT)
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}"]

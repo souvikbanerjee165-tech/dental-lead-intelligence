@@ -198,7 +198,7 @@ class AgentDoctorMatcher:
                 doc_name = None
                 doc_role = None
 
-                # Attempt heuristic extraction from clinic name or bio
+                # 1. Attempt heuristic extraction if clinic name explicitly contains Dr. / DDS / DMD
                 words = name.split()
                 if any(w in name.lower() for w in ["dr.", "dr ", "dds", "dmd"]):
                     for idx, w in enumerate(words):
@@ -207,8 +207,34 @@ class AgentDoctorMatcher:
                             doc_role = "Principal Dentist / Owner"
                             break
 
+                # 2. Query US Federal CMS NPI Registry by organization name and city/state for real doctor credentials
                 if not doc_name:
-                    doc_name = f"Dr. {words[0]}" if len(words) > 0 and "dental" not in words[0].lower() else "Practice Principal"
+                    try:
+                        from npi_registry import NPIRegistryEnricher
+                        raw_addr = c.get("address") or ""
+                        city, state = None, None
+                        if "," in raw_addr:
+                            parts = [p.strip() for p in raw_addr.split(",")]
+                            if len(parts) >= 2:
+                                city = parts[-2]
+                                st_chunk = parts[-1].strip().split()
+                                if st_chunk and len(st_chunk[0]) == 2:
+                                    state = st_chunk[0].upper()
+                        npi_res = NPIRegistryEnricher.lookup_provider(
+                            organization_name=name,
+                            city=city,
+                            state=state
+                        )
+                        if npi_res.get("found") and npi_res.get("doctor_name") and npi_res.get("doctor_name") != "Dental Practice":
+                            cred = npi_res.get("credential") or "DDS"
+                            doc_name = f"{npi_res['doctor_name']}, {cred}" if cred not in npi_res["doctor_name"] else npi_res["doctor_name"]
+                            doc_role = f"NPI Verified ({npi_res.get('specialty', 'General Dentist')})"
+                            db.update_lead_ehr_and_npi(lead_id=lead_id, npi_number=npi_res.get("npi_number"), npi_data=npi_res)
+                    except Exception:
+                        pass
+
+                if not doc_name:
+                    doc_name = "Practice Owner"
                     doc_role = "Owner & Lead Clinician"
 
                 # Calculate Closing Probability & 5 drivers

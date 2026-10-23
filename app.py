@@ -72,7 +72,9 @@ logger = logging.getLogger("app")
 BASE_DIR = Path(__file__).resolve().parent
 DASHBOARD_DIR = BASE_DIR / "dashboard"
 DASHBOARD_DIR.mkdir(exist_ok=True, parents=True)
-if os.getenv("VERCEL"):
+if os.getenv("STORAGE_DIR"):
+    OUTPUT_DIR = Path(os.getenv("STORAGE_DIR")) / "output"
+elif os.getenv("VERCEL"):
     OUTPUT_DIR = Path("/tmp/output")
 else:
     OUTPUT_DIR = BASE_DIR / "output"
