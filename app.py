@@ -355,6 +355,7 @@ class TimelineEventCreateRequest(BaseModel):
 class DaemonToggleRequest(BaseModel):
     enable: bool = True
     interval_hours: float = 6.0
+    limit_per_cycle: int = 8
 
 # --- Phase 3: Final 4 Roadmap Models ---
 class CoachAnalyzeRequest(BaseModel):
@@ -2394,8 +2395,8 @@ async def get_daemon_status():
 async def toggle_daemon(req: DaemonToggleRequest):
     if req.enable:
         status = await AutonomousScheduler.start_daemon(
-            interval_hours=req.interval_hours,
-            limit_per_cycle=req.limit_per_cycle,
+            interval_hours=getattr(req, "interval_hours", 6.0) or 6.0,
+            limit_per_cycle=getattr(req, "limit_per_cycle", 8) or 8,
             headless=True,
             db=db
         )
