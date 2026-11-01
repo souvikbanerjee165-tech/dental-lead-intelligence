@@ -92,6 +92,10 @@ class WhatsAppDemoEngine:
         clinic = assets["clinic_name"]
         doc = assets["doctor_name"]
         city = assets["city"]
+        from security import sanitize_for_html
+        clinic = sanitize_for_html(clinic)
+        doc = sanitize_for_html(doc)
+        city = sanitize_for_html(city)
 
         return f"""<!DOCTYPE html>
 <html lang="en">

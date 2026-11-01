@@ -90,7 +90,7 @@ class ClinicResearcher:
         )
 
         # SSRF & Internal Network Protection
-        from security import validate_external_url
+        from security import validate_external_url, make_ssrf_redirect_hook
         is_safe, safe_or_reason = validate_external_url(url)
         if not is_safe:
             logger.warning(f"Blocked unsafe URL in ClinicResearcher ({url}): {safe_or_reason}")
@@ -101,7 +101,7 @@ class ClinicResearcher:
         team_html = ""
         crawled_urls = [url]
 
-        async with httpx.AsyncClient(headers=headers, timeout=12.0, follow_redirects=True, verify=False) as client:
+        async with httpx.AsyncClient(headers=headers, timeout=12.0, follow_redirects=True, event_hooks={"response": [make_ssrf_redirect_hook()]}, verify=False) as client:
             # 1. Fetch Homepage
             try:
                 r_home = await client.get(url)

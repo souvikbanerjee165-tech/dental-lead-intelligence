@@ -6,6 +6,7 @@ brute-force login lockout, and cryptographic webhook verification.
 """
 
 import os
+import html
 import time
 import hmac
 import base64
@@ -119,6 +120,42 @@ def validate_external_url(url: str) -> Tuple[bool, str]:
 
     return True, clean_url
 
+# ==============================================================================
+# XSS Sanitization & HTML Escaping Shield
+# ==============================================================================
+
+def sanitize_for_html(val: Any) -> str:
+    """Escapes HTML special characters (&, <, >, ", ') to eliminate Stored & Reflected XSS."""
+    if val is None:
+        return ""
+    return html.escape(str(val), quote=True)
+
+
+def sanitize_dict_for_html(data: Dict[str, Any], keys: Optional[Any] = None) -> Dict[str, Any]:
+    """Returns a copy of the dictionary with string values escaped for safe HTML interpolation."""
+    out = dict(data)
+    target_keys = keys if keys is not None else list(out.keys())
+    for k in target_keys:
+        if k in out and isinstance(out[k], str):
+            out[k] = sanitize_for_html(out[k])
+    return out
+
+
+def make_ssrf_redirect_hook():
+    """
+    HTTPX event hook that intercepts 3xx redirect responses and validates the destination URL
+    against the SSRF shield before following the redirect hop.
+    """
+    async def _check_redirect(response):
+        if response.is_redirect and "location" in response.headers:
+            raw_target = response.headers["location"]
+            target_url = str(response.url.join(raw_target))
+            is_safe, reason = validate_external_url(target_url)
+            if not is_safe:
+                logger.warning(f"Blocked SSRF redirect hop to '{target_url}': {reason}")
+                raise PermissionError(f"SSRF redirect hop blocked: {reason}")
+    return _check_redirect
+
 
 # ==============================================================================
 # 2. Sliding-Window Rate Limiter & Brute-Force Lockout Middleware
@@ -197,6 +234,54 @@ HEAVY_ENDPOINT_PREFIXES = (
     "/api/scheduler/trigger-morning-run",
 )
 
+
+
+# ==============================================================================
+# Request Body Size Limit Middleware (DoS & Memory Exhaustion Guard)
+# ==============================================================================
+
+class PayloadSizeLimitMiddleware(BaseHTTPMiddleware):
+    """
+    Guards server memory against DoS attacks via oversized request bodies.
+    Enforces a strict 64 KB limit on lightweight/auth/chat endpoints,
+    and a 10 MB limit on general API routes.
+    """
+    MAX_LIGHTWEIGHT_BYTES = 64 * 1024       # 64 KB
+    MAX_GENERAL_BYTES = 10 * 1024 * 1024    # 10 MB
+
+    LIGHTWEIGHT_PATHS = {
+        "/api/auth/login",
+        "/api/whatsapp/turn",
+        "/api/whatsapp/sandbox/inbound",
+        "/api/leads/fast-scrape",
+        "/api/scheduler/cron-tick",
+    }
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        max_bytes = self.MAX_LIGHTWEIGHT_BYTES if path in self.LIGHTWEIGHT_PATHS else self.MAX_GENERAL_BYTES
+
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                length = int(content_length)
+                if length > max_bytes:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": f"Request body too large. Maximum allowed size is {max_bytes} bytes."}
+                    )
+            except ValueError:
+                pass
+        elif request.method in ("POST", "PUT", "PATCH") and path.startswith("/api/"):
+            # Check body for chunked or missing content-length
+            body = await request.body()
+            if len(body) > max_bytes:
+                return JSONResponse(
+                    status_code=413,
+                    content={"detail": f"Request body too large. Maximum allowed size is {max_bytes} bytes."}
+                )
+
+        return await call_next(request)
 
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """Enforces brute-force login protection and API sliding-window rate limits."""

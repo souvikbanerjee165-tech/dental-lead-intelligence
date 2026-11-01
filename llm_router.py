@@ -540,20 +540,42 @@ CRITICAL CONVERSATIONAL & CLINICAL RULES (LIVE PHONE CALL):
     def _call_gemini_with_key(cls, key: str, prompt: str, system_prompt: Optional[str], model: Optional[str], temp: float, max_tokens: int) -> str:
         from google import genai
         from google.genai import types
+        import random
 
         client = genai.Client(api_key=key, http_options=types.HttpOptions(timeout=10000))
         target_model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+        candidate_models = [target_model]
+        for fallback in ("gemini-flash-lite-latest", "gemini-2.5-flash", "gemini-1.5-flash"):
+            if fallback not in candidate_models:
+                candidate_models.append(fallback)
+
         full_content = f"System: {system_prompt}\n\nUser: {prompt}" if system_prompt else prompt
 
-        resp = client.models.generate_content(
-            model=target_model,
-            contents=full_content,
-            config=types.GenerateContentConfig(
-                temperature=temp,
-                max_output_tokens=max_tokens
-            )
-        )
-        return resp.text.strip() if resp.text else ""
+        last_exc = None
+        for m in candidate_models:
+            for attempt in range(2):
+                try:
+                    resp = client.models.generate_content(
+                        model=m,
+                        contents=full_content,
+                        config=types.GenerateContentConfig(
+                            temperature=temp,
+                            max_output_tokens=max_tokens
+                        )
+                    )
+                    return resp.text.strip() if resp.text else ""
+                except Exception as e:
+                    last_exc = e
+                    err_str = str(e)
+                    is_transient = "429" in err_str or "503" in err_str or "quota" in err_str.lower()
+                    if is_transient and attempt == 0:
+                        backoff = 0.5 + random.uniform(0.1, 0.4)
+                        time.sleep(backoff)
+                        continue
+                    break
+        if last_exc:
+            raise last_exc
+        return ""
 
     @classmethod
     def _call_openai(cls, prompt: str, system_prompt: Optional[str], model: Optional[str], temp: float, max_tokens: int) -> str:

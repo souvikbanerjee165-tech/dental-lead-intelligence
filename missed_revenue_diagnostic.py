@@ -146,6 +146,10 @@ class MissedRevenueDiagnosticEngine:
     def render_diagnostic_html(cls, lead: Dict[str, Any]) -> str:
         """Renders an executive-grade, mobile-responsive HTML diagnostic report."""
         d = cls.generate_diagnostic_data(lead)
+        from security import sanitize_for_html
+        d_clean_clinic = sanitize_for_html(d["clinic_name"])
+        d_clean_doc = sanitize_for_html(d["doctor_display"])
+        d_clean_city = sanitize_for_html(d["city"])
 
         findings_html = ""
         for f in d["findings"]:
@@ -167,7 +171,7 @@ class MissedRevenueDiagnosticEngine:
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Practice Revenue Diagnostic | {d['clinic_name']}</title>
+    <title>Practice Revenue Diagnostic | {d_clean_clinic}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -185,8 +189,8 @@ class MissedRevenueDiagnosticEngine:
                 </span>
                 <span class="text-xs text-slate-400">{d['generated_at']}</span>
             </div>
-            <h1 class="text-2xl font-extrabold text-white mt-3">{d['clinic_name']}</h1>
-            <p class="text-xs text-slate-400 mt-1">Prepared for {d['doctor_display']} & Clinical Management &bull; {d['city']}</p>
+            <h1 class="text-2xl font-extrabold text-white mt-3">{d_clean_clinic}</h1>
+            <p class="text-xs text-slate-400 mt-1">Prepared for {d_clean_doc} & Clinical Management &bull; {d_clean_city}</p>
         </div>
 
         <div class="p-6 space-y-6">
@@ -204,7 +208,7 @@ class MissedRevenueDiagnosticEngine:
                     </div>
                 </div>
                 <p class="text-xs text-rose-300/80 mt-3 pt-3 border-t border-rose-900/40 leading-relaxed">
-                    Based on your verified {d['rating']}★ reputation ({d['review_count']} reviews) in {d['city']}, an estimated 
+                    Based on your verified {d['rating']}★ reputation ({d['review_count']} reviews) in {d_clean_city}, an estimated 
                     <strong>{d['est_missed_patients_monthly']} new patient inquiries</strong> occur each month outside standard clinic hours with zero automated intake.
                 </p>
             </div>
@@ -235,12 +239,12 @@ class MissedRevenueDiagnosticEngine:
 
             <!-- Call to Action -->
             <div class="p-5 rounded-2xl bg-gradient-to-r from-teal-950/60 to-slate-900 border border-teal-500/30 text-center">
-                <h4 class="text-sm font-bold text-white">Review the Interactive Prototype for {d['clinic_name']}</h4>
+                <h4 class="text-sm font-bold text-white">Review the Interactive Prototype for {d_clean_clinic}</h4>
                 <p class="text-xs text-slate-400 mt-1 max-w-md mx-auto">
                     We have configured a private interactive intake prototype demonstrating how your after-hours patients are captured.
                 </p>
                 <div class="mt-4 flex justify-center gap-3">
-                    <a href="mailto:growth@dentalintakepartners.com?subject=Walkthrough%20for%20{urllib.parse.quote(d['clinic_name'])}" 
+                    <a href="mailto:growth@dentalintakepartners.com?subject=Walkthrough%20for%20{urllib.parse.quote(d_clean_clinic)}" 
                        class="px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs transition shadow-lg shadow-teal-500/20">
                         Schedule 7-Minute Screen Share
                     </a>
@@ -251,7 +255,7 @@ class MissedRevenueDiagnosticEngine:
 
         <!-- Footer -->
         <div class="p-4 bg-slate-950 border-t border-slate-800 text-center text-[10px] text-slate-500">
-            Dental Intake Intelligence &bull; Strictly Confidential &bull; Generated for {d['clinic_name']}
+            Dental Intake Intelligence &bull; Strictly Confidential &bull; Generated for {d_clean_clinic}
         </div>
 
     </div>

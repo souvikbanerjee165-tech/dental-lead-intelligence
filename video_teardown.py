@@ -69,6 +69,9 @@ class VideoTeardownEngine:
         lead_id = meta["lead_id"]
         clinic_name = meta["clinic_name"]
         doc_display = meta["doctor_name"]
+        from security import sanitize_for_html
+        clinic_name = sanitize_for_html(clinic_name)
+        doc_display = sanitize_for_html(doc_display)
         leakage = meta["monthly_leakage"]
         audio_sting_url = f"/output/stings/sting_{lead_id}.wav"
 

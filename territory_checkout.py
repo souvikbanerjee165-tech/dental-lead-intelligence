@@ -94,6 +94,9 @@ class TerritoryCheckoutEngine:
         raw_doc = lead_dict.get("doctor_name") or "Doctor"
         clean_doc = raw_doc.replace("Dr.", "").replace("Dr", "").strip()
         doc_display = f"Dr. {clean_doc}" if clean_doc else "the Practice Owner"
+        from security import sanitize_for_html
+        clinic_name = sanitize_for_html(clinic_name)
+        doc_display = sanitize_for_html(doc_display)
         
         territory_cert_id = f"CERT-TX-{uuid.uuid4().hex[:8].upper()}"
 
@@ -220,6 +223,10 @@ class TerritoryCheckoutEngine:
         clean_doc = raw_doc.replace("Dr.", "").replace("Dr", "").strip()
         doc_display = f"Dr. {clean_doc}" if clean_doc else "Practice Owner"
         address = lead_dict.get("address") or "Austin, TX"
+        from security import sanitize_for_html
+        clinic_name = sanitize_for_html(clinic_name)
+        doc_display = sanitize_for_html(doc_display)
+        address = sanitize_for_html(address)
         today_date = datetime.now().strftime("%B %d, %Y")
         cert_num = f"SLA-2026-{lead_id[:6].upper()}"
 

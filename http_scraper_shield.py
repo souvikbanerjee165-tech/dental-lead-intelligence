@@ -81,7 +81,7 @@ class HttpScraperShield:
         if not clean_url.startswith(("http://", "https://")):
             clean_url = "https://" + clean_url
 
-        from security import validate_external_url
+        from security import validate_external_url, make_ssrf_redirect_hook
         is_safe, safe_or_reason = validate_external_url(clean_url)
         if not is_safe:
             return {"success": False, "error": f"SSRF_BLOCKED: {safe_or_reason}"}
@@ -102,6 +102,7 @@ class HttpScraperShield:
                 headers=headers,
                 timeout=httpx.Timeout(timeout, connect=4.0),
                 follow_redirects=True,
+                event_hooks={"response": [make_ssrf_redirect_hook()]},
                 verify=False
             ) as client:
                 resp = await client.get(clean_url)

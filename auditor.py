@@ -207,7 +207,7 @@ class WebsiteAuditor:
         graph = EvidenceGraph()
 
         # SSRF & Internal Network Protection
-        from security import validate_external_url
+        from security import validate_external_url, make_ssrf_redirect_hook
         is_safe_url, safe_or_reason = validate_external_url(website_url)
         if not is_safe_url:
             graph.add_evidence(EvidenceItem(
@@ -228,6 +228,7 @@ class WebsiteAuditor:
                 headers=self.client_headers,
                 timeout=self.timeout,
                 follow_redirects=True,
+                event_hooks={"response": [make_ssrf_redirect_hook()]},
                 verify=False
             ) as client:
                 response = await client.get(website_url)

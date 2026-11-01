@@ -12,6 +12,7 @@ import urllib.parse
 
 from whatsapp_demo_engine import WhatsAppDemoEngine
 from mystery_shopper import MysteryShopperAuditor
+from security import sanitize_for_html
 
 
 class PitchPortalEngine:
@@ -71,6 +72,17 @@ class PitchPortalEngine:
         trapped_hygiene_rev = hygiene_data["trapped_chart_value"]
         month1_hygiene_cash = hygiene_data["month1_cash_injection"]
         hygiene_roi = hygiene_data["month1_roi_multiplier"]
+
+        # XSS Sanitization Shield
+        clinic_name = sanitize_for_html(clinic_name)
+        doc_display = sanitize_for_html(doc_display)
+        address = sanitize_for_html(address)
+        city = sanitize_for_html(city)
+        detected_ehr = sanitize_for_html(detected_ehr)
+        npi_number = sanitize_for_html(npi_number)
+        test_time = sanitize_for_html(test_time)
+        rep_phone = sanitize_for_html(rep_phone)
+        rep_email = sanitize_for_html(rep_email)
 
         return f"""<!DOCTYPE html>
 <html lang="en">

@@ -5,6 +5,7 @@ FROM python:3.11-slim
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PORT=8080
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
 
@@ -18,14 +19,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Install Playwright browser binaries and system libraries
-RUN playwright install chromium --with-deps || true
+# Create unprivileged system user and directories
+RUN useradd -m -u 10001 -U appuser && \
+    mkdir -p /app/output /app/data /ms-playwright && \
+    chown -R appuser:appuser /app /ms-playwright
 
-# Copy application codebase
+# Install Playwright browser binaries and system libraries into /ms-playwright
+RUN playwright install chromium --with-deps || true && \
+    chown -R appuser:appuser /ms-playwright
+
+# Copy application codebase and grant ownership
 COPY . .
+RUN chown -R appuser:appuser /app
 
-# Ensure storage & volume mount directories exist
-RUN mkdir -p /app/output /app/data
+# Switch to unprivileged user
+USER appuser
 
 EXPOSE 8080
 
@@ -33,5 +41,5 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${PORT}/api/system/health || curl -f http://localhost:${PORT}/api/health || exit 1
 
-# Start FastAPI application (respecting Cloud Run dynamic $PORT)
-CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080}"]
+# Start FastAPI application with proxy headers
+CMD ["sh", "-c", "uvicorn app:app --host 0.0.0.0 --port ${PORT:-8080} --proxy-headers --forwarded-allow-ips='*'"]

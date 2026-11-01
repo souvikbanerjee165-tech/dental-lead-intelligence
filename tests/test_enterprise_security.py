@@ -273,3 +273,81 @@ def test_serverless_cron_tick_secret_protection(monkeypatch):
     assert body["status"] == "completed"
     assert body["mode"] == "serverless_cron_tick"
     assert body["summary"]["total_discovered"] == 2
+
+
+# ==============================================================================
+# Phase 2: XSS Sanitization, Redirect SSRF & Payload Protection Tests
+# ==============================================================================
+
+def test_xss_sanitization_in_public_portals():
+    """Verifies that malicious scripts embedded in lead data are escaped in public HTML portals."""
+    xss_lead_id = "lead_xss_test_999"
+    malicious_data = {
+        "id": xss_lead_id,
+        "name": "<script>alert('XSS_CLINIC')</script>",
+        "doctor_name": "Dr. <img src=x onerror=alert('XSS_DOC')>",
+        "address": "123 Main St <iframe src=evil.com>, Austin, TX",
+        "phone": "+1 512 555 0199",
+        "rating": 4.9,
+        "review_count": 50,
+        "missed_rev_min": 3500,
+        "missed_rev_max": 7200
+    }
+    db.save_lead(malicious_data)
+
+    # 1. Pitch portal
+    r_pitch = client.get(f"/pitch/{xss_lead_id}")
+    assert r_pitch.status_code == 200
+    assert "<script>alert('XSS_CLINIC')</script>" not in r_pitch.text
+    assert "&lt;script&gt;alert(&#x27;XSS_CLINIC&#x27;)&lt;/script&gt;" in r_pitch.text
+
+    # 2. Demo simulator
+    r_demo = client.get(f"/demo/{xss_lead_id}")
+    assert r_demo.status_code == 200
+    assert "<script>alert('XSS_CLINIC')</script>" not in r_demo.text
+
+    # 3. Diagnostic report
+    r_diag = client.get(f"/diagnostic/{xss_lead_id}")
+    assert r_diag.status_code == 200
+    assert "<script>alert('XSS_CLINIC')</script>" not in r_diag.text
+
+
+def test_payload_size_limit_middleware():
+    """Verifies that oversized payloads are rejected with 413 Payload Too Large."""
+    # Lightweight endpoint has a 64 KB limit
+    oversized_body = {"password": "A" * 70000, "username": "admin"}
+    r = client.post("/api/auth/login", json=oversized_body)
+    assert r.status_code == 413
+    assert "too large" in r.json()["detail"].lower()
+
+
+def test_auth_cookie_issuance_and_logout():
+    """Verifies that login issues a session_token cookie and logout clears it."""
+    valid_pass = auth_manager.get_configured_password()
+    r_login = client.post("/api/auth/login", json={"username": "admin", "password": valid_pass})
+    assert r_login.status_code == 200
+    assert "session_token" in r_login.cookies
+
+    # Verify logout clears cookie
+    r_logout = client.post("/api/auth/logout")
+    assert r_logout.status_code == 200
+    assert r_logout.json()["status"] == "success"
+
+
+def test_ssrf_redirect_hop_protection():
+    """Verifies that 3xx redirects to internal or cloud metadata IPs are intercepted and blocked."""
+    from security import make_ssrf_redirect_hook
+    import asyncio
+    import httpx
+
+    hook = make_ssrf_redirect_hook()
+    req = httpx.Request("GET", "https://clinic.example.com")
+    resp_malicious = httpx.Response(
+        status_code=302,
+        headers={"location": "http://169.254.169.254/computeMetadata/v1/"},
+        request=req
+    )
+
+    with pytest.raises(PermissionError) as exc_info:
+        asyncio.run(hook(resp_malicious))
+    assert "SSRF redirect hop blocked" in str(exc_info.value)

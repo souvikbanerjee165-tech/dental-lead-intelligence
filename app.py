@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 import os
 import re
 import json
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Query, Request, Body
+from fastapi import FastAPI, Response, HTTPException, BackgroundTasks, Query, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse, HTMLResponse
@@ -40,7 +41,7 @@ from health_monitor import SystemHealthMonitor
 from cost_tracker import CostTelemetryTracker
 from settings_manager import SettingsManager
 from security import (
-    SecurityHeadersMiddleware, RateLimitMiddleware, AuthEnforcementMiddleware,
+    SecurityHeadersMiddleware, RateLimitMiddleware, AuthEnforcementMiddleware, PayloadSizeLimitMiddleware,
     validate_startup_security, validate_external_url, verify_twilio_signature,
     verify_telnyx_webhook, human_jitter_delay, compress_image_if_possible
 )
@@ -133,7 +134,26 @@ def capture_screenshot_sync(url: str, save_path: Path) -> bool:
             return pool.submit(lambda: asyncio.run(capture_website_screenshot(url, save_path))).result(timeout=20)
     return asyncio.run(capture_website_screenshot(url, save_path))
 
-app = FastAPI(title="Dental WhatsApp Growth & Lead Intelligence API", version="2.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Modern lifespan handler: validates security, pre-warms models, and flushes SQLite WAL on shutdown."""
+    validate_startup_security()
+    from voice_dialer import get_kokoro_model
+    asyncio.create_task(asyncio.to_thread(get_kokoro_model))
+    yield
+    logger.info("Executing graceful application shutdown...")
+    try:
+        from scheduler import AutonomousScheduler
+        AutonomousScheduler.stop_daemon()
+    except Exception:
+        pass
+    try:
+        with db._get_connection() as conn:
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE);")
+    except Exception as e:
+        logger.warning(f"WAL checkpoint on shutdown: {e}")
+
+app = FastAPI(title="Dental WhatsApp Growth & Lead Intelligence API", version="2.0.0", lifespan=lifespan)
 
 _allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
@@ -145,14 +165,10 @@ app.add_middleware(
 )
 app.add_middleware(AuthEnforcementMiddleware)
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(PayloadSizeLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
-@app.on_event("startup")
-async def startup_event():
-    """Pre-warm local Kokoro ONNX model and validate security."""
-    validate_startup_security()
-    from voice_dialer import get_kokoro_model
-    asyncio.create_task(asyncio.to_thread(get_kokoro_model))
+# Lifespan managed via FastAPI(lifespan=lifespan)
 
 # Mount static directories
 app.mount("/output", StaticFiles(directory=str(OUTPUT_DIR)), name="output")
@@ -3070,8 +3086,8 @@ async def get_system_security_status():
 # --- v1.1 Enterprise Authentication & Audit Logging Endpoints ---
 
 @app.post("/api/auth/login")
-async def login(req: LoginRequest):
-    """Verifies master credentials and issues a signed session token."""
+async def login(req: LoginRequest, response: Response):
+    """Verifies master credentials, issues a signed session token, and sets a secure HttpOnly cookie."""
     expected_pass = auth_manager.get_configured_password()
     if not auth_manager.verify_password(req.password, expected_pass):
         audit_logger.log_event("login_failed", module="auth", level="WARNING", metadata={"username": req.username})
@@ -3079,7 +3095,22 @@ async def login(req: LoginRequest):
 
     token = auth_manager.create_session_token(username=req.username)
     audit_logger.log_event("login_success", module="auth", level="INFO", metadata={"username": req.username})
+    is_prod = bool(os.getenv("PRODUCTION") or os.getenv("K_SERVICE"))
+    response.set_cookie(
+        key="session_token",
+        value=token,
+        httponly=True,
+        samesite="lax",
+        secure=is_prod,
+        max_age=86400 * 7
+    )
     return {"status": "success", "session_token": token, "username": req.username}
+
+@app.post("/api/auth/logout")
+async def logout(response: Response):
+    """Clears the session cookie."""
+    response.delete_cookie(key="session_token", samesite="lax")
+    return {"status": "success", "message": "Logged out successfully"}
 
 @app.get("/api/auth/status")
 async def auth_status(request: Request):
