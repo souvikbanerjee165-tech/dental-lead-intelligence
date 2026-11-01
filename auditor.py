@@ -206,6 +206,23 @@ class WebsiteAuditor:
         start_time = time.time()
         graph = EvidenceGraph()
 
+        # SSRF & Internal Network Protection
+        from security import validate_external_url
+        is_safe_url, safe_or_reason = validate_external_url(website_url)
+        if not is_safe_url:
+            graph.add_evidence(EvidenceItem(
+                evidence_type="security_ssrf_block",
+                source=website_url,
+                snippet=f"Blocked by SSRF Guard: {safe_or_reason}",
+                confidence=1.0
+            ))
+            return WebsiteAuditResult(
+                reachable=False,
+                status_code=403,
+                has_ssl=has_ssl,
+                load_time_seconds=0.0
+            ), graph, ""
+
         try:
             async with httpx.AsyncClient(
                 headers=self.client_headers,

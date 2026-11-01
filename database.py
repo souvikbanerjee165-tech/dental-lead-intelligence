@@ -50,6 +50,8 @@ class DatabaseManager:
             conn.execute("PRAGMA journal_mode=WAL;")
             conn.execute("PRAGMA synchronous=NORMAL;")
             conn.execute("PRAGMA busy_timeout=30000;")
+            conn.execute("PRAGMA temp_store=MEMORY;")
+            conn.execute("PRAGMA mmap_size=268435456;")
         except Exception:
             pass
         conn.create_function("clean_digits", 1, lambda s: re.sub(r"\D", "", s) if s else "")
@@ -652,6 +654,19 @@ class DatabaseManager:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_timeline_lead_ts ON opportunity_timeline(lead_id, timestamp);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_triggers_lead_ts ON trigger_events(lead_id, detected_at);")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_audits_lead_ts ON audits(lead_id, timestamp);")
+            # 28. Persistent Background Search Jobs Table (Cloud Run Scale-to-Zero Resilience)
+            cursor.execute("""
+            CREATE TABLE IF NOT EXISTS search_jobs (
+                job_id TEXT PRIMARY KEY,
+                query TEXT,
+                status TEXT NOT NULL DEFAULT 'running',
+                progress INTEGER DEFAULT 0,
+                message TEXT,
+                payload_json TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            """)
             conn.commit()
 
         # Initialize multi-tenant isolation schema (Roadmap #10)
@@ -2786,7 +2801,60 @@ class DatabaseManager:
             row = cursor.fetchone()
             return row["cnt"] if row else 0
 
+    # ================= Persistent Search Job State (Scale-to-Zero Resilience) =================
 
+    def save_search_job(self, job_id: str, job_data: Dict[str, Any]) -> bool:
+        """Persists background discovery job state to SQLite so jobs survive scale-to-zero container restarts."""
+        now_str = datetime.now().isoformat()
+        query = str(job_data.get("query", ""))
+        status = str(job_data.get("status", "running"))
+        progress = int(job_data.get("progress", 0))
+        message = str(job_data.get("message", ""))
+        payload_json = json.dumps(job_data, default=str)
+        for attempt in range(3):
+            try:
+                with self._get_connection() as conn:
+                    conn.execute("""
+                    INSERT INTO search_jobs (job_id, query, status, progress, message, payload_json, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(job_id) DO UPDATE SET
+                        status = excluded.status,
+                        progress = excluded.progress,
+                        message = excluded.message,
+                        payload_json = excluded.payload_json,
+                        updated_at = excluded.updated_at;
+                    """, (job_id, query, status, progress, message, payload_json, now_str, now_str))
+                    conn.commit()
+                return True
+            except sqlite3.OperationalError:
+                time.sleep(0.1 * (attempt + 1))
+            except Exception:
+                return False
+        return False
 
-
+    def get_search_job(self, job_id: str) -> Optional[Dict[str, Any]]:
+        """Retrieves a persisted background discovery job from SQLite."""
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT * FROM search_jobs WHERE job_id = ? LIMIT 1;", (job_id,))
+                row = cursor.fetchone()
+                if not row:
+                    return None
+                if row["payload_json"]:
+                    try:
+                        return json.loads(row["payload_json"])
+                    except Exception:
+                        pass
+                return {
+                    "job_id": row["job_id"],
+                    "query": row["query"],
+                    "status": row["status"],
+                    "progress": row["progress"],
+                    "message": row["message"],
+                    "logs": [],
+                    "discovered_leads": []
+                }
+        except Exception:
+            return None
 

@@ -39,7 +39,11 @@ from backup_manager import BackupManager
 from health_monitor import SystemHealthMonitor
 from cost_tracker import CostTelemetryTracker
 from settings_manager import SettingsManager
-from security import SecurityHeadersMiddleware, validate_startup_security, human_jitter_delay, compress_image_if_possible
+from security import (
+    SecurityHeadersMiddleware, RateLimitMiddleware, AuthEnforcementMiddleware,
+    validate_startup_security, validate_external_url, verify_twilio_signature,
+    verify_telnyx_webhook, human_jitter_delay, compress_image_if_possible
+)
 from auth_manager import auth_manager, verify_auth_dependency
 from structured_logger import audit_logger, SecretMaskingLogFilter
 from dental_caller_persona import DentalCallerPersona
@@ -84,13 +88,22 @@ OUTPUT_DIR.mkdir(exist_ok=True, parents=True)
 (OUTPUT_DIR / "screenshots").mkdir(exist_ok=True, parents=True)
 (OUTPUT_DIR / "stings").mkdir(exist_ok=True, parents=True)
 
-def capture_screenshot_sync(url: str, save_path: Path) -> bool:
-    target_url = url if (url.startswith("http://") or url.startswith("https://")) else f"https://{url}"
+_SCREENSHOT_SEMAPHORE = asyncio.Semaphore(2)
+
+async def capture_website_screenshot(url: str, save_path: Path) -> bool:
+    """Asynchronously captures a clinic homepage screenshot with SSRF defense and bounded concurrency (max 2 browsers)."""
+    is_safe, target_url = validate_external_url(url)
+    if not is_safe:
+        logger.warning(f"Screenshot blocked by SSRF Guard ({url}): {target_url}")
+        return False
     try:
         from playwright.async_api import async_playwright
-        async def _capture():
+        async with _SCREENSHOT_SEMAPHORE:
             async with async_playwright() as p:
-                browser = await p.chromium.launch(headless=True)
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"]
+                )
                 context = await browser.new_context(
                     viewport={"width": 1280, "height": 800},
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -98,26 +111,40 @@ def capture_screenshot_sync(url: str, save_path: Path) -> bool:
                 page = await context.new_page()
                 try:
                     await page.goto(target_url, timeout=12000, wait_until="domcontentloaded")
-                    await asyncio.sleep(1.0)
+                    await asyncio.sleep(0.8)
                     await page.screenshot(path=str(save_path), full_page=False, quality=80, type="jpeg")
+                    compress_image_if_possible(save_path)
                     return True
                 except Exception:
                     return False
                 finally:
                     await browser.close()
-        return asyncio.run(_capture())
     except Exception:
         return False
 
+def capture_screenshot_sync(url: str, save_path: Path) -> bool:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+            return pool.submit(lambda: asyncio.run(capture_website_screenshot(url, save_path))).result(timeout=20)
+    return asyncio.run(capture_website_screenshot(url, save_path))
+
 app = FastAPI(title="Dental WhatsApp Growth & Lead Intelligence API", version="2.0.0")
 
+_allowed_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins or ["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(AuthEnforcementMiddleware)
+app.add_middleware(RateLimitMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 
 @app.on_event("startup")
@@ -1813,9 +1840,14 @@ Return STRICTLY a JSON object with:
 
 @app.post("/api/voice/webhook/telnyx")
 async def telnyx_webhook_handler(request: Request):
-    """Handles inbound Call Control webhooks from Telnyx."""
+    """Handles inbound Call Control webhooks from Telnyx with timestamp/signature verification."""
+    raw_body = await request.body()
+    ok_sig, reason = verify_telnyx_webhook(request.headers, raw_body)
+    if not ok_sig:
+        logger.warning(f"Rejected Telnyx webhook: {reason}")
+        raise HTTPException(status_code=403, detail=reason)
     try:
-        data = await request.json()
+        data = json.loads(raw_body.decode("utf-8") if raw_body else "{}")
         event_type = data.get("data", {}).get("event_type")
         payload = data.get("data", {}).get("payload", {})
         call_control_id = payload.get("call_control_id")
@@ -1982,9 +2014,18 @@ async def telnyx_webhook_handler(request: Request):
 
 @app.post("/api/voice/webhook/twilio")
 async def twilio_webhook_handler(request: Request):
-    """Handles inbound Call Control & Status webhooks from Twilio."""
+    """Handles inbound Call Control & Status webhooks from Twilio with HMAC-SHA1 verification when configured."""
+    raw_body = (await request.body()).decode("utf-8", errors="ignore")
+    form = dict(urllib.parse.parse_qsl(raw_body, keep_blank_values=True))
+    strict_webhooks = os.getenv("STRICT_WEBHOOK_VERIFY", "false").lower() in ("1", "true", "yes")
+    twilio_sig = request.headers.get("X-Twilio-Signature")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+    if (strict_webhooks or twilio_sig) and auth_token:
+        valid_sig = verify_twilio_signature(str(request.url), dict(form), twilio_sig or "", auth_token)
+        if not valid_sig:
+            logger.warning("Rejected Twilio webhook: invalid X-Twilio-Signature")
+            raise HTTPException(status_code=403, detail="Invalid X-Twilio-Signature")
     try:
-        form = await request.form()
         call_sid = form.get("CallSid")
         call_status = form.get("CallStatus")
         from_num = form.get("From")
@@ -2062,9 +2103,14 @@ async def update_telephony_settings(payload: Dict[str, Any] = Body(...)):
                 updates[env_var] = val
                 os.environ[env_var] = val
 
-    env_lines.update(updates)
-    out_lines = [f"{k}={v}" for k, v in env_lines.items()]
-    env_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+    # Only write to local .env in local development (never write plaintext .env in Cloud Run / production containers)
+    if not (os.getenv("K_SERVICE") or os.getenv("PRODUCTION") or os.getenv("VERCEL")):
+        try:
+            env_lines.update(updates)
+            out_lines = [f"{k}={v}" for k, v in env_lines.items()]
+            env_file.write_text("\n".join(out_lines) + "\n", encoding="utf-8")
+        except Exception:
+            pass
 
     # Sync to settings_mgr as well
     settings_dict = {}
@@ -2404,6 +2450,47 @@ async def toggle_daemon(req: DaemonToggleRequest):
         status = AutonomousScheduler.stop_daemon()
     return status
 
+class CronTickRequest(BaseModel):
+    territory_id: Optional[str] = None
+    limit: int = 5
+    category: str = "Dentists"
+
+@app.post("/api/scheduler/cron-tick")
+async def serverless_cron_tick(request: Request, req: Optional[CronTickRequest] = None):
+    """
+    Serverless-native Cron Endpoint for Google Cloud Scheduler.
+    Wakes up a scale-to-zero Cloud Run container, executes 1 bounded territory harvest cycle,
+    persists leads to SQLite, and returns JSON so the container can scale back down to $0.
+    """
+    configured_secret = os.getenv("CRON_SECRET", "").strip()
+    if configured_secret:
+        provided_secret = (
+            request.headers.get("x-cron-secret")
+            or request.headers.get("X-Cron-Secret")
+            or ""
+        ).strip()
+        if provided_secret != configured_secret:
+            raise HTTPException(status_code=403, detail="Invalid or missing X-Cron-Secret header")
+
+    t_id = req.territory_id if req else None
+    lim = max(1, min((req.limit if req else 5), 20))
+    cat = (req.category if req else "Dentists") or "Dentists"
+
+    summary = await AutonomousScheduler.run_autonomous_cycle(
+        territory_id=t_id,
+        category=cat,
+        limit=lim,
+        headless=True,
+        db=db
+    )
+    audit_logger.log_event(
+        "serverless_cron_tick_completed",
+        module="scheduler",
+        level="INFO",
+        metadata={"territory": summary.get("city_query"), "discovered": summary.get("total_discovered")}
+    )
+    return {"status": "completed", "mode": "serverless_cron_tick", "summary": summary}
+
 # --- AI Revenue OS Endpoints (Conversion Trinity) ---
 
 @app.get("/api/queue/top-urgent")
@@ -2626,6 +2713,11 @@ async def generate_proposal(req: ProposalRequest):
             name = lead.get("name", name)
             url = lead.get("website", url)
 
+    if url:
+        is_safe, reason = validate_external_url(url)
+        if not is_safe:
+            raise HTTPException(status_code=400, detail=f"URL blocked by SSRF security policy: {reason}")
+
     try:
         from clinic_researcher import ClinicResearcher
         result = await ClinicResearcher.research_and_generate(
@@ -2802,16 +2894,19 @@ async def run_search_background_task(job_id: str, query: str, limit: int, genera
 
             job["progress"] = int(35 + (i + 1) * step_increment)
             job["discovered_leads"] = completed_leads
+            db.save_search_job(job_id, job)
 
         job["status"] = "completed"
         job["message"] = f"Search complete! Discovered and analyzed {len(completed_leads)} dental practices."
         job["progress"] = 100
         job["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Discovery & intelligence run complete. {len(completed_leads)} practices ready.")
+        db.save_search_job(job_id, job)
 
     except Exception as e:
         job["status"] = "error"
         job["message"] = f"Search encountered an issue: {str(e)}"
         job["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] ERROR: {str(e)}")
+        db.save_search_job(job_id, job)
 
 @app.post("/api/search/start")
 async def start_search(req: SearchRequest, background_tasks: BackgroundTasks):
@@ -2829,6 +2924,7 @@ async def start_search(req: SearchRequest, background_tasks: BackgroundTasks):
         "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Initializing search for '{req.query}'..."],
         "discovered_leads": []
     }
+    db.save_search_job(job_id, active_jobs[job_id])
 
     background_tasks.add_task(
         run_search_background_task,
@@ -2843,9 +2939,13 @@ async def start_search(req: SearchRequest, background_tasks: BackgroundTasks):
 
 @app.get("/api/search/status/{job_id}")
 async def get_search_status(job_id: str):
-    if job_id not in active_jobs:
-        raise HTTPException(status_code=404, detail="Job ID not found")
-    return active_jobs[job_id]
+    if job_id in active_jobs:
+        return active_jobs[job_id]
+    persisted = db.get_search_job(job_id)
+    if persisted:
+        active_jobs[job_id] = persisted
+        return persisted
+    raise HTTPException(status_code=404, detail="Job ID not found")
 
 # --- v1.0 Hardening & System Endpoints ---
 
@@ -3600,17 +3700,20 @@ async def sniff_ehr_and_npi_for_lead(lead_id: str):
     website = lead.get("website") or ""
     html_content = ""
     if website:
-        try:
-            import urllib.request
-            target_url = website if website.startswith("http") else f"https://{website}"
-            req = urllib.request.Request(
-                target_url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            )
-            with urllib.request.urlopen(req, timeout=5) as resp:
-                html_content = resp.read().decode("utf-8", errors="ignore")
-        except Exception as e:
-            logger.info(f"Direct HTML fetch for tech sniffer failed ({e}), using domain heuristics.")
+        is_safe, target_url = validate_external_url(website)
+        if is_safe:
+            try:
+                import urllib.request
+                req = urllib.request.Request(
+                    target_url,
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    html_content = resp.read().decode("utf-8", errors="ignore")
+            except Exception as e:
+                logger.info(f"Direct HTML fetch for tech sniffer failed ({e}), using domain heuristics.")
+        else:
+            logger.warning(f"Tech sniffer blocked unsafe URL ({website}): {target_url}")
 
     ehr_results = EHRSniffer.sniff_html(html_content, website_url=website)
     
@@ -4039,6 +4142,9 @@ class FastScrapeRequest(BaseModel):
 @app.post("/api/leads/fast-scrape")
 async def fast_scrape_clinic_endpoint(req: FastScrapeRequest):
     """Fast-path HTTP scraper: pulls doctors, phones, emails, and booking widgets in <1s (low RAM)."""
+    is_safe, reason = validate_external_url(req.url)
+    if not is_safe:
+        raise HTTPException(status_code=400, detail=f"URL blocked by SSRF security policy: {reason}")
     return await HttpScraperShield.fast_scrape_clinic(req.url, timeout=req.timeout)
 
 

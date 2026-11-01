@@ -89,6 +89,13 @@ class ClinicResearcher:
             has_ssl=has_ssl
         )
 
+        # SSRF & Internal Network Protection
+        from security import validate_external_url
+        is_safe, safe_or_reason = validate_external_url(url)
+        if not is_safe:
+            logger.warning(f"Blocked unsafe URL in ClinicResearcher ({url}): {safe_or_reason}")
+            return profile
+
         t0 = time.time()
         home_html = ""
         team_html = ""

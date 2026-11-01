@@ -81,6 +81,11 @@ class HttpScraperShield:
         if not clean_url.startswith(("http://", "https://")):
             clean_url = "https://" + clean_url
 
+        from security import validate_external_url
+        is_safe, safe_or_reason = validate_external_url(clean_url)
+        if not is_safe:
+            return {"success": False, "error": f"SSRF_BLOCKED: {safe_or_reason}"}
+
         headers = {
             "User-Agent": USER_AGENT,
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
