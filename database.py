@@ -1459,6 +1459,56 @@ class DatabaseManager:
             conn.commit()
             return lead_id
 
+    def upsert_synced_lead(self, lead_data: Dict[str, Any]) -> Tuple[str, bool]:
+        """
+        Idempotently inserts or updates all matching lead columns from a synced record (e.g. Cloud Run).
+        Safely serializes nested JSON/lists and preserves existing data.
+        Returns (lead_id, is_new).
+        """
+        lead_id = lead_data.get("id") or self._make_lead_id(
+            lead_data.get("name", "Dental Practice"),
+            lead_data.get("website") or lead_data.get("url") or ""
+        )
+        now_str = datetime.now().isoformat()
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT id FROM leads WHERE id = ?", (lead_id,))
+            exists = cursor.fetchone() is not None
+
+            # Dynamically retrieve existing table columns
+            cursor.execute("PRAGMA table_info(leads)")
+            table_cols = {row[1] for row in cursor.fetchall()}
+
+            # Filter and prepare payload
+            record = {}
+            for col in table_cols:
+                if col in lead_data and lead_data[col] is not None:
+                    val = lead_data[col]
+                    if isinstance(val, (dict, list)):
+                        val = json.dumps(val)
+                    record[col] = val
+
+            record["id"] = lead_id
+            if "last_updated" not in record or not record["last_updated"]:
+                record["last_updated"] = now_str
+            if not exists and ("first_seen" not in record or not record["first_seen"]):
+                record["first_seen"] = now_str
+
+            cols = list(record.keys())
+            placeholders = ", ".join(["?"] * len(cols))
+            col_names = ", ".join(cols)
+            update_clauses = ", ".join([f"{c} = excluded.{c}" for c in cols if c != "id"])
+
+            sql = f"""
+            INSERT INTO leads ({col_names})
+            VALUES ({placeholders})
+            ON CONFLICT(id) DO UPDATE SET {update_clauses}
+            """
+            cursor.execute(sql, [record[c] for c in cols])
+            conn.commit()
+            return lead_id, not exists
+
     def save_audit(self, lead_id_or_data: Any, audit_data: Optional[Dict[str, Any]] = None) -> str:
         """Saves or updates an audit record from a raw dictionary (supports both signatures)."""
         if isinstance(lead_id_or_data, str) and isinstance(audit_data, dict):

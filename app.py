@@ -3030,24 +3030,49 @@ class LLMProviderUpdateRequest(BaseModel):
     openai_api_key: Optional[str] = None
     deepseek_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    groq_api_key: Optional[str] = None
+    openrouter_api_key: Optional[str] = None
     openai_model: Optional[str] = None
     deepseek_model: Optional[str] = None
     gemini_model: Optional[str] = None
+    groq_model: Optional[str] = None
+    openrouter_model: Optional[str] = None
+    lm_studio_base_url: Optional[str] = None
+    lm_studio_model: Optional[str] = None
 
 @app.get("/api/llm/status")
 async def get_llm_status():
-    """Returns active LLM provider, available models, and readiness status across OpenAI, DeepSeek, and Gemini."""
+    """Returns active LLM provider, available models, and readiness status across LM Studio, Gemini, DeepSeek, OpenAI, Groq."""
     from llm_router import LLMRouter
     return LLMRouter.get_provider_status()
 
 @app.post("/api/llm/provider")
 async def update_llm_provider(req: LLMProviderUpdateRequest):
-    """Dynamically switches active LLM provider (OPENAI / DEEPSEEK / GEMINI) and updates API keys."""
-    from llm_router import LLMRouter, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GEMINI
+    """Dynamically switches active LLM provider (LM_STUDIO / GEMINI / DEEPSEEK / OPENAI / GROQ / OPENROUTER) and updates API keys."""
+    from llm_router import (
+        LLMRouter,
+        PROVIDER_LM_STUDIO,
+        PROVIDER_OPENAI,
+        PROVIDER_DEEPSEEK,
+        PROVIDER_GEMINI,
+        PROVIDER_GROQ,
+        PROVIDER_OPENROUTER
+    )
     
     p = req.provider.upper().strip()
-    if p not in (PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GEMINI):
-        raise HTTPException(status_code=400, detail=f"Invalid provider: {req.provider}. Must be OPENAI, DEEPSEEK, or GEMINI.")
+    valid_providers = (
+        PROVIDER_LM_STUDIO,
+        PROVIDER_GEMINI,
+        PROVIDER_DEEPSEEK,
+        PROVIDER_OPENAI,
+        PROVIDER_GROQ,
+        PROVIDER_OPENROUTER
+    )
+    if p not in valid_providers:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid provider: {req.provider}. Must be one of {', '.join(valid_providers)}."
+        )
     
     updates = {"llm_provider": p}
     if req.openai_api_key and req.openai_api_key.strip():
@@ -3057,6 +3082,17 @@ async def update_llm_provider(req: LLMProviderUpdateRequest):
     if req.gemini_api_key and req.gemini_api_key.strip():
         os.environ["GEMINI_API_KEY"] = req.gemini_api_key.strip()
         os.environ["GOOGLE_API_KEY"] = req.gemini_api_key.strip()
+    if req.groq_api_key and req.groq_api_key.strip():
+        os.environ["GROQ_API_KEY"] = req.groq_api_key.strip()
+    if req.openrouter_api_key and req.openrouter_api_key.strip():
+        os.environ["OPENROUTER_API_KEY"] = req.openrouter_api_key.strip()
+
+    if req.lm_studio_base_url:
+        os.environ["LM_STUDIO_BASE_URL"] = req.lm_studio_base_url.strip()
+        updates["lm_studio_base_url"] = req.lm_studio_base_url.strip()
+    if req.lm_studio_model:
+        os.environ["LM_STUDIO_MODEL"] = req.lm_studio_model.strip()
+        updates["lm_studio_model"] = req.lm_studio_model.strip()
         
     if req.openai_model:
         os.environ["OPENAI_MODEL"] = req.openai_model
@@ -3067,6 +3103,12 @@ async def update_llm_provider(req: LLMProviderUpdateRequest):
     if req.gemini_model:
         os.environ["GEMINI_MODEL"] = req.gemini_model
         updates["gemini_model"] = req.gemini_model
+    if req.groq_model:
+        os.environ["GROQ_MODEL"] = req.groq_model
+        updates["groq_model"] = req.groq_model
+    if req.openrouter_model:
+        os.environ["OPENROUTER_MODEL"] = req.openrouter_model
+        updates["openrouter_model"] = req.openrouter_model
 
     settings_mgr.update_settings(updates)
     LLMRouter.set_provider(p)
@@ -3076,6 +3118,90 @@ async def update_llm_provider(req: LLMProviderUpdateRequest):
         "status": "success",
         "active_provider": p,
         "details": LLMRouter.get_provider_status()
+    }
+
+
+class CloudSyncRequest(BaseModel):
+    cloud_url: Optional[str] = "https://dental-lead-engine-240706308332.us-central1.run.app"
+    api_key: Optional[str] = None
+    session_token: Optional[str] = None
+    limit: int = 500
+
+
+@app.post("/api/sync/pull-from-cloud")
+async def pull_leads_from_cloud(req: Optional[CloudSyncRequest] = None):
+    """
+    Pulls harvested leads from the deployed GCP Cloud Run service into local storage.db.
+    Preserves all data locally before the 55-day GCP trial ends.
+    """
+    if req is None:
+        req = CloudSyncRequest()
+        
+    cloud_url = (req.cloud_url or "https://dental-lead-engine-240706308332.us-central1.run.app").strip().rstrip("/")
+    
+    if not (cloud_url.startswith("https://") or cloud_url.startswith("http://127.0.0.1") or cloud_url.startswith("http://localhost")):
+        raise HTTPException(status_code=400, detail="Cloud URL must use HTTPS protocol")
+        
+    endpoint = f"{cloud_url}/api/leads?limit={max(1, min(req.limit, 2000))}"
+    headers = {"User-Agent": "LeadGenSyncClient/2.0 (Local-PC-Sync)"}
+    if req.session_token:
+        headers["x-session-token"] = req.session_token
+    elif req.api_key:
+        headers["Authorization"] = f"Bearer {req.api_key}"
+        
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.get(endpoint, headers=headers)
+            if resp.status_code == 401:
+                raise HTTPException(status_code=401, detail="Authentication failed on remote Cloud Run service. Provide valid session_token or api_key.")
+            if resp.status_code != 200:
+                raise HTTPException(status_code=resp.status_code, detail=f"Remote Cloud Run returned status {resp.status_code}: {resp.text[:200]}")
+            data = resp.json()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Failed to connect to Cloud Run service: {exc}")
+        raise HTTPException(status_code=502, detail=f"Failed to connect to Cloud Run service at {cloud_url}: {str(exc)}")
+
+    leads_list = data if isinstance(data, list) else data.get("leads", [])
+    
+    new_count = 0
+    updated_count = 0
+    errors = 0
+    
+    for lead_data in leads_list:
+        try:
+            _, is_new = db.upsert_synced_lead(lead_data)
+            if is_new:
+                new_count += 1
+            else:
+                updated_count += 1
+        except Exception as e:
+            logger.warning(f"Error syncing lead record: {e}")
+            errors += 1
+
+    audit_logger.log_event(
+        "cloud_sync_completed",
+        module="sync",
+        level="INFO",
+        metadata={
+            "cloud_url": cloud_url,
+            "leads_received": len(leads_list),
+            "new_leads": new_count,
+            "updated_leads": updated_count,
+            "errors": errors
+        }
+    )
+
+    return {
+        "status": "success",
+        "cloud_url": cloud_url,
+        "leads_received": len(leads_list),
+        "new_leads_saved": new_count,
+        "existing_leads_updated": updated_count,
+        "errors": errors,
+        "timestamp": datetime.now().isoformat()
     }
 
 @app.get("/api/system/security")

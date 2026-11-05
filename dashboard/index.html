@@ -117,6 +117,12 @@
         <span>Voice Studio ($0)</span>
       </button>
 
+      <!-- Cloud Sync Button (Preserves GCP Cloud Run leads before trial ends) -->
+      <button onclick="triggerCloudLeadSync()" id="btn-cloud-sync" title="Sync leads harvested on GCP Cloud Run into local storage.db ($0 Permanent Storage)" class="hidden sm:flex bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold px-3 py-1.5 rounded-lg border border-sky-400/40 items-center gap-1.5 transition shadow cursor-pointer text-xs">
+        <i class="fa-solid fa-cloud-arrow-down text-sky-200" id="icon-cloud-sync"></i>
+        <span id="text-cloud-sync">Pull Cloud Leads</span>
+      </button>
+
       <!-- 3. "More" Dropdown Menu Toggle -->
       <div class="relative">
         <button id="btn-nav-more" onclick="toggleNavMoreDropdown(event)" title="Additional Tools &amp; Automation Controls" class="bg-slate-800 hover:bg-slate-750 text-slate-200 font-semibold px-2.5 py-1.5 rounded-lg border border-slate-700 flex items-center gap-1.5 transition cursor-pointer">
@@ -147,6 +153,14 @@
                 <span id="nav-harvester-text" class="font-bold text-blue-300 text-xs">6:00 AM</span>
               </div>
               <span class="text-[10px] text-blue-400 font-semibold flex items-center gap-1">Scan <i class="fa-solid fa-arrow-right text-[8px]"></i></span>
+            </div>
+            <div id="nav-sync-widget" onclick="triggerCloudLeadSync(); closeNavMoreDropdown();" class="bg-slate-800/90 p-2 rounded-xl border border-sky-500/30 flex items-center justify-between cursor-pointer hover:bg-slate-750 transition" title="Sync leads from GCP Cloud Run">
+              <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-cloud-arrow-down text-sky-400"></i>
+                <span class="text-slate-300 font-medium text-xs">GCP Lead Sync:</span>
+                <span class="font-bold text-sky-300 text-xs">Pull Leads</span>
+              </div>
+              <span class="text-[10px] text-sky-400 font-semibold flex items-center gap-1">Sync <i class="fa-solid fa-arrow-down text-[8px]"></i></span>
             </div>
           </div>
 
@@ -1772,7 +1786,20 @@
             </div>
 
             <!-- Provider Selection Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              <!-- LM Studio Option ($0 Local RTX 3060) -->
+              <label class="p-3 rounded-xl border border-slate-700 bg-slate-950 hover:border-emerald-500 cursor-pointer flex flex-col justify-between transition relative overflow-hidden group">
+                <div class="flex items-center justify-between mb-1.5">
+                  <div class="flex items-center gap-2">
+                    <input type="radio" name="llm-provider-radio" value="LM_STUDIO" class="text-emerald-500" onchange="onLLMProviderChange('LM_STUDIO')">
+                    <span class="font-bold text-white text-xs">LM Studio (Local)</span>
+                  </div>
+                  <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold uppercase">$0 Local GPU</span>
+                </div>
+                <p class="text-[10px] text-slate-300 leading-tight">RTX 3060 • 12GB VRAM. 100% free, private, zero token limits. Auto-fallback to Gemini/DeepSeek.</p>
+                <span id="lmstudio-status-tag" class="text-[9px] text-amber-400 mt-2 block font-mono">Checking local port 1234...</span>
+              </label>
+
               <!-- Gemini Option (100% Free / Google AI Pro) -->
               <label class="p-3 rounded-xl border border-slate-700 bg-slate-950 hover:border-purple-500 cursor-pointer flex flex-col justify-between transition relative overflow-hidden group">
                 <div class="flex items-center justify-between mb-1.5">
@@ -1814,7 +1841,17 @@
             </div>
 
             <!-- API Keys Section -->
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-slate-800 text-xs">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 pt-2 border-t border-slate-800 text-xs">
+              <div>
+                <label class="text-[11px] text-slate-400 font-semibold flex items-center justify-between mb-1">
+                  <span>LM Studio Local URL (RTX 3060)</span>
+                  <span id="lmstudio-endpoint-status" class="text-[10px] text-slate-400">Offline</span>
+                </label>
+                <div class="relative">
+                  <input type="text" id="input-lmstudio-url" placeholder="http://127.0.0.1:1234/v1" value="http://127.0.0.1:1234/v1" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs">
+                </div>
+              </div>
+
               <div>
                 <label class="text-[11px] text-slate-400 font-semibold flex items-center justify-between mb-1">
                   <span>Google Gemini Key ($0 Free)</span>
@@ -8836,6 +8873,20 @@
           const radio = document.querySelector(`input[name="llm-provider-radio"][value="${active}"]`);
           if (radio) radio.checked = true;
 
+          const lmTag = document.getElementById('lmstudio-status-tag');
+          const lmEndpoint = document.getElementById('lmstudio-endpoint-status');
+          if (data.lm_studio_online) {
+            if (lmTag) lmTag.innerHTML = '<span class="text-emerald-400 font-bold"><i class="fa-solid fa-circle-check"></i> RTX 3060 Online (Port 1234)</span>';
+            if (lmEndpoint) lmEndpoint.innerHTML = '<span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> Online</span>';
+          } else {
+            if (lmTag) lmTag.innerHTML = '<span class="text-amber-400 font-bold"><i class="fa-solid fa-circle-exclamation"></i> Offline (Start Server in LM Studio)</span>';
+            if (lmEndpoint) lmEndpoint.innerHTML = '<span class="text-slate-400 font-mono">Offline</span>';
+          }
+          if (data.providers?.LM_STUDIO?.base_url) {
+            const lmInput = document.getElementById('input-lmstudio-url');
+            if (lmInput && !lmInput.value) lmInput.value = data.providers.LM_STUDIO.base_url;
+          }
+
           const geminiStatus = document.getElementById('gemini-key-status');
           if (geminiStatus) {
             geminiStatus.innerHTML = data.providers.GEMINI?.configured 
@@ -9101,6 +9152,7 @@
       const geminiKey = document.getElementById('input-gemini-key')?.value.trim();
       const openaiKey = document.getElementById('input-openai-key')?.value.trim();
       const deepseekKey = document.getElementById('input-deepseek-key')?.value.trim();
+      const lmStudioUrl = document.getElementById('input-lmstudio-url')?.value.trim();
 
       fetch('/api/llm/provider', {
         method: 'POST',
@@ -9109,7 +9161,8 @@
           provider: provider,
           gemini_api_key: geminiKey || undefined,
           openai_api_key: openaiKey || undefined,
-          deepseek_api_key: deepseekKey || undefined
+          deepseek_api_key: deepseekKey || undefined,
+          lm_studio_base_url: lmStudioUrl || undefined
         })
       })
         .then(r => r.json())

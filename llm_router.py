@@ -25,6 +25,7 @@ from database import DatabaseManager
 logger = logging.getLogger("llm_router")
 
 # Provider Constants
+PROVIDER_LM_STUDIO = "LM_STUDIO"
 PROVIDER_GEMINI = "GEMINI"
 PROVIDER_OPENAI = "OPENAI"
 PROVIDER_DEEPSEEK = "DEEPSEEK"
@@ -33,6 +34,7 @@ PROVIDER_OPENROUTER = "OPENROUTER"
 
 # Default Model Mapping
 DEFAULT_MODELS = {
+    PROVIDER_LM_STUDIO: "local-model",
     PROVIDER_GEMINI: "gemini-2.5-flash",
     PROVIDER_OPENAI: "gpt-4o-mini",
     PROVIDER_DEEPSEEK: "deepseek-chat",
@@ -41,6 +43,7 @@ DEFAULT_MODELS = {
 }
 
 # Base URLs
+LM_STUDIO_BASE_URL = os.getenv("LM_STUDIO_BASE_URL", "http://127.0.0.1:1234/v1")
 DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 GROQ_BASE_URL = os.getenv("GROQ_BASE_URL", "https://api.groq.com/openai/v1")
@@ -137,6 +140,7 @@ class ProviderHealthTracker:
 
 # Global Trackers
 _TRACKERS: Dict[str, ProviderHealthTracker] = {
+    "LM_STUDIO": ProviderHealthTracker("LM_STUDIO"),
     "GEMINI_PROJECT_A": ProviderHealthTracker("GEMINI_PROJECT_A"),
     "GEMINI_PROJECT_B": ProviderHealthTracker("GEMINI_PROJECT_B"),
     "GEMINI_PROJECT_C": ProviderHealthTracker("GEMINI_PROJECT_C"),
@@ -151,6 +155,36 @@ class LLMRouter:
     """Manages multi-provider LLM routing, project-level fallback, and health telemetry."""
 
     _runtime_provider: Optional[str] = None
+
+    @classmethod
+    def is_lm_studio_online(cls, base_url: Optional[str] = None) -> bool:
+        """Checks if LM Studio local server is active and responding on PC."""
+        raw_url = base_url or os.getenv("LM_STUDIO_BASE_URL") or "http://127.0.0.1:1234/v1"
+        url = raw_url.rstrip("/") + "/models"
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "Dental-Growth-Engine"})
+            with urllib.request.urlopen(req, timeout=0.8) as resp:
+                return resp.status == 200
+        except Exception:
+            return False
+
+    @classmethod
+    def get_lm_studio_models(cls, base_url: Optional[str] = None) -> List[str]:
+        """Retrieves list of models currently loaded or available in LM Studio."""
+        raw_url = base_url or os.getenv("LM_STUDIO_BASE_URL") or "http://127.0.0.1:1234/v1"
+        url = raw_url.rstrip("/") + "/models"
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "Dental-Growth-Engine"})
+            with urllib.request.urlopen(req, timeout=1.0) as resp:
+                if resp.status == 200:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    return [m.get("id") for m in data.get("data", []) if m.get("id")]
+        except Exception:
+            pass
+        return []
+
 
     @classmethod
     def get_gemini_keys(cls) -> List[Tuple[str, str]]:
@@ -188,8 +222,12 @@ class LLMRouter:
             pass
 
         env_provider = os.getenv("LLM_PROVIDER", "").upper()
-        if env_provider in (PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_OPENROUTER):
+        if env_provider in (PROVIDER_LM_STUDIO, PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_OPENROUTER):
             return env_provider
+
+        # Auto-Detect: If LM Studio is active locally on RTX 3060, route to it for $0.00!
+        if cls.is_lm_studio_online():
+            return PROVIDER_LM_STUDIO
 
         # Default to DeepSeek as Primary Brain if configured
         if os.getenv("DEEPSEEK_API_KEY"):
@@ -209,7 +247,7 @@ class LLMRouter:
     def set_provider(cls, provider: str) -> str:
         """Dynamically updates active provider at runtime."""
         p_upper = provider.upper().strip()
-        valid_providers = (PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_OPENROUTER)
+        valid_providers = (PROVIDER_LM_STUDIO, PROVIDER_GEMINI, PROVIDER_OPENAI, PROVIDER_DEEPSEEK, PROVIDER_GROQ, PROVIDER_OPENROUTER)
         if p_upper not in valid_providers:
             raise ValueError(f"Unsupported LLM provider: {provider}. Must be one of: {', '.join(valid_providers)}.")
         cls._runtime_provider = p_upper
@@ -231,10 +269,22 @@ class LLMRouter:
         groq_key = os.getenv("GROQ_API_KEY", "")
         openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
 
+        lm_online = cls.is_lm_studio_online()
+        lm_models = cls.get_lm_studio_models() if lm_online else []
+
         return {
             "active_provider": active,
+            "lm_studio_online": lm_online,
             "gemini_projects_configured": len(gemini_keys),
             "providers": {
+                PROVIDER_LM_STUDIO: {
+                    "configured": True,
+                    "online": lm_online,
+                    "base_url": os.getenv("LM_STUDIO_BASE_URL", "http://127.0.0.1:1234/v1"),
+                    "model": os.getenv("LM_STUDIO_MODEL", DEFAULT_MODELS[PROVIDER_LM_STUDIO]),
+                    "available_models": lm_models,
+                    "telemetry": _TRACKERS["LM_STUDIO"].to_dict()
+                },
                 PROVIDER_GEMINI: {
                     "configured": len(gemini_keys) > 0,
                     "projects": [lbl for lbl, _ in gemini_keys],
@@ -321,6 +371,23 @@ class LLMRouter:
                     pass
 
         # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        # 0. Local Engine: Try LM Studio (RTX 3060 Zero-Cost GPU)
+        # -------------------------------------------------------------
+        lm_tracker = _TRACKERS.get("LM_STUDIO")
+        if (target == PROVIDER_LM_STUDIO or (target is None and cls.is_lm_studio_online())) and lm_tracker and lm_tracker.is_usable():
+            try:
+                res = cls._call_lm_studio(prompt, system_prompt, model, temperature, max_tokens)
+                if res:
+                    elapsed = int((time.time() - t0) * 1000)
+                    lm_tracker.record_success(latency_ms=elapsed, tokens=len(res.split()) * 2)
+                    logger.info(f"Generated via Local LM Studio RTX 3060 ($0.00 cost, {elapsed}ms)")
+                    return res
+            except Exception as e:
+                err_str = str(e)
+                lm_tracker.record_error(err_str)
+                logger.warning(f"Local LM Studio failed ({err_str}). Cascading to cloud LLM fallback...")
+
         # 1. Primary Model: Try DeepSeek First if target is DEEPSEEK
         # -------------------------------------------------------------
         deepseek_tracker = _TRACKERS.get("DEEPSEEK")
@@ -535,6 +602,26 @@ CRITICAL CONVERSATIONAL & CLINICAL RULES (LIVE PHONE CALL):
         }
 
     # ================= Provider Implementations =================
+
+    @classmethod
+    def _call_lm_studio(cls, prompt: str, system_prompt: Optional[str], model: Optional[str], temp: float, max_tokens: int) -> str:
+        from openai import OpenAI
+        base_url = os.getenv("LM_STUDIO_BASE_URL", "http://127.0.0.1:1234/v1")
+        client = OpenAI(base_url=base_url, api_key="lm-studio", timeout=45.0)
+        target_model = model or os.getenv("LM_STUDIO_MODEL") or "local-model"
+
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = client.chat.completions.create(
+            model=target_model,
+            messages=messages,
+            temperature=temp,
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message.content.strip() if response.choices else ""
 
     @classmethod
     def _call_gemini_with_key(cls, key: str, prompt: str, system_prompt: Optional[str], model: Optional[str], temp: float, max_tokens: int) -> str:
