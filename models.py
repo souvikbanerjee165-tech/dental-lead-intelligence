@@ -2,7 +2,7 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field
 
 class RawLead(BaseModel):
-    """Lead extracted from Google Maps."""
+    """Lead extracted from Google Maps / Places API."""
     name: str
     category: Optional[str] = None
     rating: Optional[float] = None
@@ -13,6 +13,12 @@ class RawLead(BaseModel):
     maps_url: Optional[str] = None
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    business_status: Optional[str] = "OPERATIONAL"
+    opening_hours_summary: Optional[str] = None
+    closed_fridays: Optional[bool] = False
+    closed_weekends: Optional[bool] = True
+    weekly_closed_hours: Optional[int] = 128
+    is_dso: Optional[bool] = False
 
 class TechStackDetail(BaseModel):
     """Categorized technology stack fingerprint."""

@@ -1,6 +1,6 @@
 """
 Deposit Lock & 3-Mile Territory Exclusivity Checkout Engine.
-Secures $1,500 turnkey installation deposits and $399/mo ongoing retainers for dental practices.
+Secures $1,200 turnkey installation deposits and $497/mo ongoing retainers for dental practices.
 Enforces a strict 3-mile exclusivity radius (only 1 dental clinic per territory),
 locks out local competitors, logs deals in CRM, and generates legally compliant SLAs.
 """
@@ -18,10 +18,10 @@ logger = logging.getLogger("territory_checkout")
 
 
 class TerritoryCheckoutEngine:
-    """Manages $1,500 turnkey installation deposits, territory locks, and SLA agreements."""
+    """Manages $1,200 turnkey installation deposits, territory locks, and SLA agreements."""
 
-    SETUP_FEE_USD = 1500.0
-    MONTHLY_MAINTENANCE_USD = 399.0
+    SETUP_FEE_USD = 1200.0
+    MONTHLY_MAINTENANCE_USD = 497.0
     TERRITORY_RADIUS_MILES = 3.0
 
     @classmethod
@@ -114,7 +114,7 @@ class TerritoryCheckoutEngine:
             "break_even_guarantee_text": (
                 "Single-Patient Break-Even Guarantee: If your WhatsApp patient triage system fails to recover "
                 "at least 1 emergency or elective patient ($1,250+ value) within your first 30 days, "
-                "we will refund 100% of your $1,500 turnkey setup fee with zero hassle."
+                "we will refund 100% of your $1,200 turnkey setup fee with zero hassle."
             ),
             "stripe_checkout_url": stripe_mock_checkout_url,
             "agreement_url": agreement_url,
@@ -129,7 +129,7 @@ class TerritoryCheckoutEngine:
         db: Optional[DatabaseManager] = None
     ) -> Dict[str, Any]:
         """
-        Records the $1,500 turnkey setup deposit payment, marks territory locked in database,
+        Records the $1,200 turnkey setup deposit payment, marks territory locked in database,
         advances CRM stage to 'WON', logs deal ARR/MRR, and creates audit timeline entries.
         """
         db = db or DatabaseManager()
@@ -171,10 +171,10 @@ class TerritoryCheckoutEngine:
                 db=db,
                 lead_id=lead_id,
                 event_type="TERRITORY_LOCKED_WON",
-                title="🏆 DEAL WON: $1,500 Setup Deposit Paid & Territory Locked!",
+                title="🏆 DEAL WON: $1,200 Setup Deposit Paid & Territory Locked!",
                 description=(
-                    f"Successfully secured $1,500 turnkey installation deposit for {clinic_name}. "
-                    f"3-Mile radius territory locked against local competitors. $399/mo maintenance active."
+                    f"Successfully secured $1,200 turnkey installation deposit for {clinic_name}. "
+                    f"3-Mile radius territory locked against local competitors. $497/mo maintenance active."
                 ),
                 actor="SALES_REP",
                 metadata={"payment_ref": tx_id, "setup_fee": cls.SETUP_FEE_USD, "mrr": cls.MONTHLY_MAINTENANCE_USD},
@@ -289,14 +289,14 @@ class TerritoryCheckoutEngine:
     <div class="space-y-1">
       <h3 class="font-bold text-white text-sm">3. Financial Terms & Schedule</h3>
       <ul class="list-disc pl-5 space-y-1">
-        <li><strong>Turnkey Installation Deposit:</strong> $1,500.00 USD (one-time setup fee).</li>
-        <li><strong>Monthly Maintenance & Infrastructure Retainer:</strong> $399.00 USD / month (commencing 30 days following installation).</li>
+        <li><strong>Turnkey Installation Deposit:</strong> $1,200.00 USD (one-time setup fee).</li>
+        <li><strong>Monthly Maintenance & Infrastructure Retainer:</strong> $497.00 USD / month (commencing 30 days following installation).</li>
       </ul>
     </div>
 
     <div class="space-y-1">
       <h3 class="font-bold text-emerald-400 text-sm">4. Single-Patient Break-Even Performance Guarantee</h3>
-      <p>If the system fails to recover and book at least one (1) new patient appointment valued at $1,250 or greater within the initial thirty (30) days of live operation, Client may request and receive a 100% refund of the $1,500 turnkey installation deposit.</p>
+      <p>If the system fails to recover and book at least one (1) new patient appointment valued at $1,250 or greater within the initial thirty (30) days of live operation, Client may request and receive a 100% refund of the $1,200 turnkey installation deposit.</p>
     </div>
 
     <div class="space-y-1">

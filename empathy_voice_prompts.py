@@ -202,9 +202,9 @@ class EmpathyVoicePromptEngine:
             ]
         },
         "price_expensive_deposit": {
-            "keywords": ["$1,500", "expensive", "cost", "how much", "fees", "retainer", "pricing", "$399", "deposit"],
+            "keywords": ["$1,200", "expensive", "cost", "how much", "fees", "retainer", "pricing", "$497", "deposit"],
             "variations": [
-                "Let us examine the unit economics directly. In a general practice, a single restorative emergency case—such as a root canal and crown build-up—averages twelve hundred and fifty dollars. Recovering just one patient covers the entire setup. Under our formal SLA at /agreement/{lead_id}, we back this with a Single-Patient Break-Even Guarantee: if the system fails to book at least one patient valued at $1,250+ in your first 30 days, we refund 100% of your $1,500 deposit with zero friction.",
+                "Let us examine the unit economics directly. In a general practice, a single restorative emergency case—such as a root canal and crown build-up—averages twelve hundred and fifty dollars. Recovering just one patient covers the entire setup. Under our formal SLA at /agreement/{lead_id}, we back this with a Single-Patient Break-Even Guarantee: if the system fails to book at least one patient valued at $1,250+ in your first 30 days, we refund 100% of your $1,200 deposit with zero friction.",
                 "It is a flat fifteen hundred dollars turnkey installation and three ninety-nine monthly maintenance retainer. If it recovers just one single emergency crown a month, it pays for itself 3 times over, backed by our 100% money-back SLA guarantee."
             ]
         },
@@ -293,7 +293,7 @@ You adopt a calm, clinical cadence, deploy conversational disconfirmation, and s
    "Hello Dr. {doc}, I noticed your team was just reviewing the after-hours emergency patient teardown on screen—did that interactive WhatsApp preview make sense?"
 2. 3-Mile Exclusivity Radius: Only ONE practice per 3-mile postal boundary can secure the system.
 3. 60-Second Video Teardown: Reference the 8:14 PM cracked-tooth voicemail drop and 5-second WhatsApp recovery.
-4. Single-Patient Break-Even Guarantee: Backed by digital SLA at /agreement/{lead_id} ($1,500 setup + $399/mo; 100% refund if we don't book >=1 patient valued at $1,250+ in 30 days).
+4. Single-Patient Break-Even Guarantee: Backed by digital SLA at /agreement/{lead_id} ($1,200 setup + $497/mo; 100% refund if we don't book >=1 patient valued at $1,250+ in 30 days).
 
 ### FRONT-DESK TRIAGE TACTICS:
 - If receptionist defers: "Understood, clinical care in the operatory comes first. This is regarding the practice's after-hours intake audit generated this morning. Does the office manager or {doc} oversee schedule capacity?"

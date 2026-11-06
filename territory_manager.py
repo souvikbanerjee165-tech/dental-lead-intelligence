@@ -11,6 +11,12 @@ from pydantic import BaseModel
 TOP_US_DENTAL_MARKETS = [
     # Tier 1: High-Density Affluent Metros & Suburbs
     {"city": "Scottsdale", "state": "AZ", "metro": "Phoenix", "population": 258000, "affluence_tier": "VERY_HIGH", "avg_clinics": 210},
+    {"city": "Toronto", "state": "ON", "metro": "Greater Toronto Area", "population": 2930000, "affluence_tier": "VERY_HIGH", "avg_clinics": 950},
+    {"city": "Vancouver", "state": "BC", "metro": "Metro Vancouver", "population": 675000, "affluence_tier": "VERY_HIGH", "avg_clinics": 480},
+    {"city": "Calgary", "state": "AB", "metro": "Calgary", "population": 1336000, "affluence_tier": "VERY_HIGH", "avg_clinics": 440},
+    {"city": "Oakville", "state": "ON", "metro": "Greater Toronto Area", "population": 213000, "affluence_tier": "ULTRA_HIGH", "avg_clinics": 165},
+    {"city": "Mississauga", "state": "ON", "metro": "Greater Toronto Area", "population": 717000, "affluence_tier": "HIGH", "avg_clinics": 360},
+    {"city": "Ottawa", "state": "ON", "metro": "Ottawa-Gatineau", "population": 1017000, "affluence_tier": "HIGH", "avg_clinics": 380},
     {"city": "Austin", "state": "TX", "metro": "Austin", "population": 978000, "affluence_tier": "HIGH", "avg_clinics": 450},
     {"city": "Plano", "state": "TX", "metro": "Dallas", "population": 288000, "affluence_tier": "VERY_HIGH", "avg_clinics": 230},
     {"city": "Boca Raton", "state": "FL", "metro": "Miami", "population": 99000, "affluence_tier": "VERY_HIGH", "avg_clinics": 180},

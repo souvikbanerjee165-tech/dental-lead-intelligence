@@ -147,7 +147,7 @@ class PreCallDossierCompiler:
         trapped_hygiene_val = dormant_charts * 225
         month1_reactivations = int(dormant_charts * 0.14)
         month1_cash_injection = month1_reactivations * 225
-        setup_roi_x = round((month1_cash_injection - 1500) / 1500, 1)
+        setup_roi_x = round((month1_cash_injection - 1200) / 1200, 1)
 
         dossier = {
             "lead_id": lead_id,

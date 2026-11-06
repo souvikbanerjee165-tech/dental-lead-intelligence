@@ -63,7 +63,7 @@ class VideoTeardownEngine:
         """
         Renders a full-screen, cinema-dark video landing page at `/video/{lead_id}`
         with play/pause controls, synchronized Voicemail Sting audio, animated triage demo,
-        and instant 1-click 'Lock Territory ($1,500)' CTA.
+        and instant 1-click 'Lock Territory ($1,200)' CTA.
         """
         meta = cls.generate_video_metadata(lead_dict, base_app_url=base_app_url)
         lead_id = meta["lead_id"]
@@ -182,12 +182,12 @@ class VideoTeardownEngine:
     <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
       <div>
         <h3 class="text-base font-extrabold text-white">Lock This Missed Call System for Your Practice</h3>
-        <p class="text-xs text-slate-400 mt-0.5">Exclusive to 1 dental practice in your 3-mile radius &bull; $1,500 turnkey setup with 30-day single-patient guarantee.</p>
+        <p class="text-xs text-slate-400 mt-0.5">Exclusive to 1 dental practice in your 3-mile radius &bull; $1,200 turnkey setup with 30-day single-patient guarantee.</p>
       </div>
       <div class="flex items-center gap-3 w-full sm:w-auto shrink-0 flex-wrap">
         <a href="/pitch/{lead_id}#book-walkthrough" class="flex-1 sm:flex-none px-6 py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg transition flex items-center justify-center gap-2">
           <i class="fa-solid fa-lock"></i>
-          <span>Lock 3-Mile Territory ($1,500)</span>
+          <span>Lock 3-Mile Territory ($1,200)</span>
         </a>
         <a href="/agreement/{lead_id}" class="px-4 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-1.5" target="_blank">
           <i class="fa-solid fa-file-contract text-emerald-400"></i>

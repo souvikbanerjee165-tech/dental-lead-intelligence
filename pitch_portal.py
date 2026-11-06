@@ -2,7 +2,7 @@
 Executive Practice Teardown & One-Page Pitch Portal Engine.
 Renders hyper-personalized, high-converting public audit landing pages at `/pitch/{lead_id}`
 for dental practice owners, complete with revenue leakage calculations, embedded WhatsApp simulator,
-competitor poaching alerts, and single-patient break-even guarantee ($1,500 setup + $399/mo).
+competitor poaching alerts, and single-patient break-even guarantee ($1,200 setup + $497/mo).
 """
 
 import json
@@ -231,7 +231,7 @@ class PitchPortalEngine:
       <div class="p-3.5 rounded-xl bg-slate-950/90 border border-slate-800 text-xs text-slate-300 space-y-1">
         <div class="font-bold text-indigo-300">Why WhatsApp Out-Performs Front-Desk Calling:</div>
         <p class="text-[11px] text-slate-400 leading-relaxed">
-          Front-desk phone calls reach voicemail 82% of the time. Postcards are discarded. WhatsApp broadcast recall delivers a <strong>98% open rate</strong> with 1-tap chair self-scheduling. Recovering just 10% of your overdue hygiene charts covers our entire $1,500 turnkey installation within the first 14 days.
+          Front-desk phone calls reach voicemail 82% of the time. Postcards are discarded. WhatsApp broadcast recall delivers a <strong>98% open rate</strong> with 1-tap chair self-scheduling. Recovering just 10% of your overdue hygiene charts covers our entire $1,200 turnkey installation within the first 14 days.
         </p>
       </div>
     </div>
@@ -332,7 +332,7 @@ class PitchPortalEngine:
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
         <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
           <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Turnkey Installation</span>
-          <div class="text-4xl font-black text-white font-mono">$1,500 <span class="text-xs text-slate-500 font-sans font-normal">one-time</span></div>
+          <div class="text-4xl font-black text-white font-mono">$1,200 <span class="text-xs text-slate-500 font-sans font-normal">one-time</span></div>
           <ul class="text-xs text-slate-300 space-y-2 pt-2">
             <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Full custom triage conversational AI tailored to clinic</li>
             <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Local phone number routing & after-hours trigger setup</li>
@@ -343,7 +343,7 @@ class PitchPortalEngine:
         <div class="bg-slate-950 p-6 rounded-2xl border border-emerald-500/40 space-y-3 relative overflow-hidden">
           <div class="absolute top-3 right-3 px-2 py-0.5 rounded text-[9px] font-black bg-emerald-500 text-slate-950 uppercase">Zero-Risk</div>
           <span class="text-xs font-bold text-emerald-400 uppercase tracking-wider block">Ongoing 24/7 Hosting & Updates</span>
-          <div class="text-4xl font-black text-emerald-400 font-mono">$399 <span class="text-xs text-slate-400 font-sans font-normal">/month</span></div>
+          <div class="text-4xl font-black text-emerald-400 font-mono">$497 <span class="text-xs text-slate-400 font-sans font-normal">/month</span></div>
           <ul class="text-xs text-slate-300 space-y-2 pt-2">
             <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Unlimited patient intake conversations & SMS recovery</li>
             <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> 24/7 emergency monitoring & weekend failover</li>
@@ -357,7 +357,7 @@ class PitchPortalEngine:
         <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button onclick="lockPracticeTerritoryDeposit()" id="btn-lock-territory-portal" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/25 transition cursor-pointer flex items-center justify-center gap-2">
             <i class="fa-solid fa-lock"></i>
-            <span>Lock 3-Mile Exclusive Territory & Setup ($1,500)</span>
+            <span>Lock 3-Mile Exclusive Territory & Setup ($1,200)</span>
           </button>
           <a href="{calendar_link}" target="_blank" class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-2">
             <i class="fa-solid fa-calendar-check"></i>

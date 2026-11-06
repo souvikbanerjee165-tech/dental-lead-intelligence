@@ -109,17 +109,43 @@ class AIQualifier:
         opportunity_score: int,
         estimated_monthly_leakage: int
     ) -> Optional[AIQualificationResult]:
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or os.getenv("DEEPSEEK_API_KEY")
         if not api_key:
             return None
 
+        # Zero-Waste Sieve: Never spend LLM tokens on corporate DSOs, missing phones, or tiny clinics
         try:
-            from google import genai
-            client = genai.Client(api_key=api_key)
+            from google_places_client import GooglePlacesClient
+            if GooglePlacesClient.is_corporate_dso(name, website) or not phone or reviews < 10:
+                return None
+        except Exception:
+            pass
 
+        # Check SQLite Qualification Cache first ($0.00 cost on repeat evaluations)
+        cache_key = f"{lead_id}::{reviews}::{opportunity_score}"
+        try:
+            import sqlite3
+            from config import BASE_DIR
+            db_file = str(BASE_DIR / "storage.db")
+            with sqlite3.connect(db_file, timeout=5.0) as conn:
+                conn.execute("""
+                CREATE TABLE IF NOT EXISTS llm_qualification_cache (
+                    cache_key TEXT PRIMARY KEY,
+                    result_json TEXT,
+                    created_at TEXT
+                )
+                """)
+                row = conn.execute("SELECT result_json FROM llm_qualification_cache WHERE cache_key = ?", (cache_key,)).fetchone()
+                if row and row[0]:
+                    cached_data = json.loads(row[0])
+                    return AIQualificationResult(**cached_data)
+        except Exception:
+            pass
+
+        try:
             prompt = f"""
-You are an elite B2B SaaS Sales Director selling a 24/7 AI WhatsApp Receptionist & Automated Patient Booking System ($497/mo retainer) to dental clinics.
-Your solo founder has limited time and can only call top-tier, high-probability prospects.
+You are an elite B2B SaaS Sales Director selling a 24/7 AI Front Desk (Missed-Call Revenue Recovery Agent) at $1,200 turnkey installation + $497/month to US & Canadian dental practices.
+Your solo founder wants to close 10 paying dental clients in 60 days and only wants to call high-intent independent dentists who will buy.
 
 Analyze this dental clinic:
 - Practice Name: {name}
@@ -127,9 +153,9 @@ Analyze this dental clinic:
 - Google Rating: {rating} stars ({reviews} reviews)
 - Website: {website or "None"}
 - Phone: {phone}
-- Detected Technologies: {', '.join(technologies) if technologies else "No modern chat or booking widgets detected"}
+- Detected Technologies: {', '.join(technologies) if technologies else "No modern 24/7 AI receptionist or instant booking detected"}
 - Technical Opportunity Score: {opportunity_score}/100
-- Estimated Monthly Revenue Leakage: ${estimated_monthly_leakage}/month
+- Estimated Monthly Missed-Call Revenue Leakage: ${estimated_monthly_leakage}/month
 
 Answer these questions:
 1. Would you personally spend 30 minutes calling this dentist? ("YES" or "NO")
@@ -137,7 +163,7 @@ Answer these questions:
 3. What is the Pain Level? ("CRITICAL", "HIGH", "MODERATE", "LOW")
 4. What is the Decision Accessibility? ("DIRECT_DOCTOR", "OFFICE_MANAGER", "GATEKEEPER_WALL")
 5. What is the Practice Structure? ("INDEPENDENT_OWNER", "MULTI_LOCATION", "CORPORATE_DSO")
-6. List 3 specific buying triggers / psychological pain points.
+6. List 3 specific buying triggers / psychological pain points why they need an AI Front Desk ($1,200 setup + $497/mo).
 7. Provide a concise 2-sentence sales manager verdict.
 
 Respond ONLY with valid JSON matching this schema:
@@ -155,12 +181,29 @@ Respond ONLY with valid JSON matching this schema:
   "sales_manager_verdict": "Verdict text."
 }}
 """
-            response = client.models.generate_content(
-                model='gemini-2.5-flash',
-                contents=prompt,
-            )
+            raw_text = ""
+            gemini_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+            if gemini_key and not gemini_key.startswith("mock_"):
+                try:
+                    from google import genai
+                    client = genai.Client(api_key=gemini_key)
+                    response = client.models.generate_content(
+                        model='gemini-2.5-flash',
+                        contents=prompt,
+                    )
+                    raw_text = (response.text or "").strip()
+                except Exception as ge:
+                    logger.debug(f"Direct Gemini call fallback to LLMRouter: {ge}")
 
-            raw_text = response.text.strip()
+            if not raw_text:
+                from llm_router import LLMRouter, TaskComplexity
+                raw_text = LLMRouter.generate_text(
+                    prompt=prompt,
+                    temperature=0.2,
+                    max_tokens=450,
+                    complexity=TaskComplexity.EASY
+                ).strip()
+
             # Clean markdown codeblocks
             if raw_text.startswith("```json"):
                 raw_text = raw_text[7:]
@@ -172,7 +215,7 @@ Respond ONLY with valid JSON matching this schema:
             data = json.loads(raw_text.strip())
             prob = int(data.get("buying_probability_pct", 75))
 
-            return AIQualificationResult(
+            result_obj = AIQualificationResult(
                 lead_id=lead_id,
                 business_name=name,
                 would_spend_30min_calling=data.get("would_spend_30min_calling", "YES" if prob >= 75 else "NO"),
@@ -184,8 +227,26 @@ Respond ONLY with valid JSON matching this schema:
                 sales_manager_verdict=data.get("sales_manager_verdict", f"High fit prospect with ~${estimated_monthly_leakage}/mo missed revenue."),
                 is_a_tier=prob >= 80
             )
+
+            # Persist to SQLite cache so we never pay twice for this lead
+            try:
+                import sqlite3
+                from datetime import datetime
+                from config import BASE_DIR
+                db_file = str(BASE_DIR / "storage.db")
+                payload_str = json.dumps(result_obj.model_dump() if hasattr(result_obj, "model_dump") else result_obj.dict())
+                with sqlite3.connect(db_file, timeout=5.0) as conn:
+                    conn.execute(
+                        "INSERT OR REPLACE INTO llm_qualification_cache (cache_key, result_json, created_at) VALUES (?, ?, ?)",
+                        (cache_key, payload_str, datetime.now().isoformat())
+                    )
+                    conn.commit()
+            except Exception:
+                pass
+
+            return result_obj
         except Exception as e:
-            logger.warning(f"Gemini qualification fallback engaged: {e}")
+            logger.warning(f"LLM qualification fallback engaged: {e}")
             return None
 
     @classmethod

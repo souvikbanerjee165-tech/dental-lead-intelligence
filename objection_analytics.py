@@ -52,7 +52,7 @@ class ObjectionAnalyticsEngine:
                 "frequency_count": 14,
                 "frequency_pct": 14.0,
                 "win_rate_pct": 57.1,
-                "recommended_rebuttal": "It's a flat $1,500 turnkey setup and $399/month — if it captures just one single filling or emergency crown each month, it pays for itself 5x over.",
+                "recommended_rebuttal": "It's a flat $1,200 turnkey setup and $497/month — if it captures just one single filling or emergency crown each month, it pays for itself 5x over.",
                 "effectiveness_score": 9.5
             }
         ]
@@ -86,6 +86,6 @@ class ObjectionAnalyticsEngine:
             "tactical_insights": [
                 "Positioning the WhatsApp tool as 'Dentrix Coexistence' rather than a replacement lifted response rates by +44%.",
                 "Asking for the Office Manager's direct first name bypassed the receptionist email brush-off in 68% of attempts.",
-                "Anchoring against a single $1,500 emergency crown case disarmed pricing concerns in under 10 seconds."
+                "Anchoring against a single $1,200 emergency crown case disarmed pricing concerns in under 10 seconds."
             ]
         }

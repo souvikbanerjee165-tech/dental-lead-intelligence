@@ -101,7 +101,7 @@ class DentalCallerPersona:
             {
                 "objection": "How much does it cost?",
                 "rebuttal": (
-                    f"It's a flat $1,500 turnkey installation and $399 a month for ongoing maintenance and support. "
+                    f"It's a flat $1,200 turnkey installation and $497 a month for ongoing maintenance and support. "
                     f"Recovering just one single emergency crown or filling each month covers the entire maintenance fee multiple times over. "
                     f"Would you be open to a 10-minute preview on Thursday?"
                 )

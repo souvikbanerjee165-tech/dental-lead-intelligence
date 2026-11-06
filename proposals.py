@@ -113,8 +113,8 @@ class ProposalGenerator:
                 tier=1,
                 name=packages_data[0].get("name", "24/7 AI Patient Intake"),
                 tagline=packages_data[0].get("tagline", "Eliminate after-hours patient bounce with instant conversational intake"),
-                setup_fee=float(packages_data[0].get("setup_fee", 1500)),
-                monthly_retainer=float(packages_data[0].get("monthly_retainer", 397)),
+                setup_fee=float(packages_data[0].get("setup_fee", 1200)),
+                monthly_retainer=float(packages_data[0].get("monthly_retainer", 497)),
                 deliverables=packages_data[0].get("deliverables", [
                     f"Custom 24/7 AI Receptionist calibrated for {lead_name}'s procedures",
                     "Instant SMS dispatch to office manager on hot patient inquiries",
@@ -161,8 +161,8 @@ class ProposalGenerator:
                 tier=1,
                 name="24/7 AI Patient Intake",
                 tagline="Instant missed-call auto-textback, WhatsApp patient intake & after-hours triage",
-                setup_fee=1500.0,
-                monthly_retainer=399.0,
+                setup_fee=1200.0,
+                monthly_retainer=497.0,
                 deliverables=[
                     f"Custom 24/7 WhatsApp Conversational Patient Assistant calibrated for {lead_name}",
                     "Instant Missed-Call Auto-Recovery & Textback on WhatsApp in under 5 seconds",
@@ -618,7 +618,7 @@ def generate_tiered_sales_proposal(lead: Dict[str, Any], custom_discount_pct: fl
         "tier": "Bronze",
         "name": "24/7 AI Patient Intake",
         "tagline": "Eliminate after-hours bounce and capture emergency inquiries 24/7",
-        "setup_fee": 1500,
+        "setup_fee": 1200,
         "monthly_retainer": 397,
         "recommended": False,
         "deliverables": [

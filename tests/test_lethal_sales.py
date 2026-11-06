@@ -67,8 +67,8 @@ def test_pitch_portal_engine_renders_valid_html(sample_lead):
     assert "<!DOCTYPE html>" in html
     assert "Barton Springs Dental Studio" in html
     assert "Dr. Marcus Vance" in html
-    assert "$1,500" in html
-    assert "$399" in html
+    assert "$1,200" in html
+    assert "$497" in html
     assert "Dental Practice Intelligence Audit" in html
     assert "/api/pitch/" in html  # Tracking beacon included
     assert "simulator" in html.lower()
@@ -79,7 +79,7 @@ def test_pitch_portal_handles_fallback_gracefully():
     html = PitchPortalEngine.render_pitch_page_html(fallback_lead)
     assert "<!DOCTYPE html>" in html
     assert "Solo Clinic" in html
-    assert "$1,500" in html
+    assert "$1,200" in html
 
 
 # -------------------------------------------------------------
@@ -196,7 +196,7 @@ def test_get_executive_pitch_portal_endpoint(test_client, sample_lead):
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "Barton Springs Dental Studio" in resp.text
-    assert "$1,500" in resp.text
+    assert "$1,200" in resp.text
 
 
 def test_post_pitch_portal_viewed_endpoint(test_client, sample_lead):
@@ -289,8 +289,8 @@ def test_territory_availability_and_deposit_lock(sample_lead, db):
 
     # Create checkout payload
     payload = TerritoryCheckoutEngine.create_checkout_payload(sample_lead)
-    assert payload["setup_fee_usd"] == 1500.0
-    assert payload["monthly_fee_usd"] == 399.0
+    assert payload["setup_fee_usd"] == 1200.0
+    assert payload["monthly_fee_usd"] == 497.0
     assert "Single-Patient Break-Even Guarantee" in payload["break_even_guarantee_text"]
 
     # Lock territory deposit
@@ -300,22 +300,22 @@ def test_territory_availability_and_deposit_lock(sample_lead, db):
         db=db
     )
     assert result["status"] == "LOCKED"
-    assert result["setup_deposit_usd"] == 1500.0
-    assert result["monthly_maintenance_usd"] == 399.0
+    assert result["setup_deposit_usd"] == 1200.0
+    assert result["monthly_maintenance_usd"] == 497.0
     assert result["stage"] == "WON"
 
     # Verify updated database record
     updated = db.get_lead(sample_lead["id"])
     assert updated["territory_locked"] == 1
-    assert updated["deposit_paid"] >= 1500.0
+    assert updated["deposit_paid"] >= 1200.0
     assert updated["stage"] == "WON"
 
     # Verify formal digital SLA agreement HTML
     sla_html = TerritoryCheckoutEngine.render_digital_sla_html(sample_lead)
     assert "<!DOCTYPE html>" in sla_html
     assert "Barton Springs Dental Studio" in sla_html
-    assert "$1,500" in sla_html
-    assert "$399" in sla_html
+    assert "$1,200" in sla_html
+    assert "$497" in sla_html
     assert "Single-Patient Break-Even" in sla_html
 
 
@@ -334,7 +334,7 @@ def test_video_teardown_metadata_and_cinema_player(sample_lead):
     html = VideoTeardownEngine.render_video_player_page_html(sample_lead)
     assert "<!DOCTYPE html>" in html
     assert "Barton Springs Dental Studio" in html
-    assert "$1,500" in html
+    assert "$1,200" in html
     assert "/pitch/" in html
     assert "/agreement/" in html
 
@@ -349,7 +349,7 @@ def test_dormant_hygiene_recall_calculator(sample_lead):
     assert metrics["dormant_hygiene_charts"] > 0
     assert metrics["trapped_chart_value"] > 0
     assert metrics["month1_cash_injection"] > 10000
-    assert metrics["setup_fee_usd"] == 1500.0
+    assert metrics["setup_fee_usd"] == 1200.0
     assert metrics["month1_roi_multiplier"] > 5.0
     assert len(metrics["broadcast_scripts"]) == 3
     assert "Dr. Marcus Vance" in metrics["sales_pitch_quote"]
@@ -387,14 +387,14 @@ def test_fastapi_territory_and_agreement_endpoints(test_client, sample_lead):
     intent_resp = test_client.get(f"/api/leads/{sample_lead['id']}/checkout-intent")
     assert intent_resp.status_code == 200
     intent_data = intent_resp.json()
-    assert intent_data["setup_fee_usd"] == 1500.0
+    assert intent_data["setup_fee_usd"] == 1200.0
 
     # Digital SLA Agreement page
     sla_resp = test_client.get(f"/agreement/{sample_lead['id']}")
     assert sla_resp.status_code == 200
     assert "text/html" in sla_resp.headers["content-type"]
     assert "Barton Springs Dental Studio" in sla_resp.text
-    assert "$1,500" in sla_resp.text
+    assert "$1,200" in sla_resp.text
 
     # Lock deposit
     lock_resp = test_client.post(

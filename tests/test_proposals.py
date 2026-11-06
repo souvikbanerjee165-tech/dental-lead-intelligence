@@ -42,6 +42,6 @@ def test_proposal_generation(tmp_path):
     assert "24/7 AI Patient Intake" in content
     assert "Frictionless Self-Scheduling" in content
     assert "Practice Growth Engine" in content
-    assert "$1,500" in content
+    assert "$1,200" in content
     assert "$2,500" in content
     assert "$4,500" in content

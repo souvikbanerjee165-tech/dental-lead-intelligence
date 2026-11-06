@@ -2,7 +2,7 @@
 Dormant Hygiene Chart Reactivation & Cash Injection Calculator.
 Calculates trapped preventative revenue in overdue dental patient charts (6+ months no cleaning).
 Demonstrates that a 3-touch WhatsApp broadcast recall sequence generates $15,000–$40,000 in immediate
-cash flow in Month 1, providing 15x–25x ROI on the $1,500 turnkey setup before capturing a single emergency.
+cash flow in Month 1, providing 15x–25x ROI on the $1,200 turnkey setup before capturing a single emergency.
 """
 
 from typing import Dict, Any, List
@@ -47,7 +47,7 @@ class HygieneRecallCalculator:
         reactivated_patients = int(dormant_charts * (cls.CONVERSION_RATE_PCT / 100.0))
         month1_cash_injection = int(reactivated_patients * cls.AVG_HYGIENE_VISIT_VALUE_USD)
         
-        setup_fee = 1500.0
+        setup_fee = 1200.0
         roi_multiplier = round(month1_cash_injection / setup_fee, 1)
 
         # 3-Touch High-Converting Broadcast Recall Sequence
@@ -86,7 +86,7 @@ class HygieneRecallCalculator:
             f"Dr. {clean_doc}, beyond missed calls, {clinic_name} currently has an estimated {dormant_charts:,} dormant patient charts "
             f"who haven't had a hygiene cleaning in 6+ months. That represents ${trapped_chart_value:,} in dormant preventative production. "
             f"With our turnkey 3-touch WhatsApp recall broadcast, recovering just {reactivated_patients} of those patients injects "
-            f"${month1_cash_injection:,} in new production into your chairs in Month 1—paying for our $1,500 turnkey setup {roi_multiplier}x over."
+            f"${month1_cash_injection:,} in new production into your chairs in Month 1—paying for our $1,200 turnkey setup {roi_multiplier}x over."
         )
 
         return {

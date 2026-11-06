@@ -52,7 +52,7 @@ CADENCE_STEPS = [
         "day_offset": 6,
         "channel": "PROPOSAL",
         "title": "Touch 5: 1-Click Interactive Proposal & ROI Guarantee",
-        "objective": "Send $1,500 setup + $399/mo client proposal highlighting 1-patient break-even guarantee.",
+        "objective": "Send $1,200 setup + $497/mo client proposal highlighting 1-patient break-even guarantee.",
         "action_type": "SEND_PROPOSAL",
         "badge_color": "amber"
     }

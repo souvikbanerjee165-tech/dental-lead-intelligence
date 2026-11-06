@@ -16,8 +16,8 @@ class ROICalculator:
         estimated_missed_calls_monthly: int = 15,
         after_hours_inquiry_ratio: float = 0.38,
         conversion_recovery_rate: float = 0.32,
-        monthly_software_cost: float = 399.0,
-        setup_fee: float = 1500.0
+        monthly_software_cost: float = 497.0,
+        setup_fee: float = 1200.0
     ) -> Dict[str, Any]:
         """
         Computes empirical annual revenue loss and projected recovery ROI.

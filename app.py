@@ -3030,6 +3030,7 @@ class LLMProviderUpdateRequest(BaseModel):
     openai_api_key: Optional[str] = None
     deepseek_api_key: Optional[str] = None
     gemini_api_key: Optional[str] = None
+    google_places_api_key: Optional[str] = None
     groq_api_key: Optional[str] = None
     openrouter_api_key: Optional[str] = None
     openai_model: Optional[str] = None
@@ -3042,9 +3043,14 @@ class LLMProviderUpdateRequest(BaseModel):
 
 @app.get("/api/llm/status")
 async def get_llm_status():
-    """Returns active LLM provider, available models, and readiness status across LM Studio, Gemini, DeepSeek, OpenAI, Groq."""
+    """Returns active LLM provider, Google Places readiness, and zero-waste cache telemetry."""
     from llm_router import LLMRouter
-    return LLMRouter.get_provider_status()
+    from google_places_client import GooglePlacesClient
+    status = LLMRouter.get_provider_status()
+    places_client = GooglePlacesClient()
+    status["google_places_configured"] = places_client.is_configured()
+    status["places_telemetry"] = GooglePlacesClient.get_telemetry()
+    return status
 
 @app.post("/api/llm/provider")
 async def update_llm_provider(req: LLMProviderUpdateRequest):
@@ -3082,6 +3088,9 @@ async def update_llm_provider(req: LLMProviderUpdateRequest):
     if req.gemini_api_key and req.gemini_api_key.strip():
         os.environ["GEMINI_API_KEY"] = req.gemini_api_key.strip()
         os.environ["GOOGLE_API_KEY"] = req.gemini_api_key.strip()
+    if req.google_places_api_key and req.google_places_api_key.strip():
+        os.environ["GOOGLE_PLACES_API_KEY"] = req.google_places_api_key.strip()
+        updates["google_places_api_key"] = req.google_places_api_key.strip()
     if req.groq_api_key and req.groq_api_key.strip():
         os.environ["GROQ_API_KEY"] = req.groq_api_key.strip()
     if req.openrouter_api_key and req.openrouter_api_key.strip():
@@ -4358,6 +4367,68 @@ async def stop_autopilot():
 async def reset_autopilot():
     """Resets overnight autopilot state to zero."""
     return OvernightAutopilot.reset_state()
+
+
+# --- High-Intent Dentist Pinpointer & Ready-to-Close Playbook ($1,200 Setup + $497/Mo) ---
+from high_intent_pinpointer import HighIntentPinpointer
+
+
+@app.get("/api/leads/{lead_id}/closer-sheet")
+async def get_lead_closer_sheet(lead_id: str, request: Request):
+    """
+    Returns the complete 1-Screen Ready-to-Close Command Pack for a dental practice:
+    7-Factor High-Intent Score, $1,200+$497/mo Unit Economics, Gatekeeper Bypass,
+    20s Doctor Opener, 4 Word-for-Word Objection Rebuttals, and 1-Click Live Call SMS link.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Apex Dental Studio", "address": "Austin, TX", "rating": 4.8, "review_count": 95}
+    base_url = str(request.base_url).rstrip("/")
+    return HighIntentPinpointer.score_and_compile(lead, db=db, base_app_url=base_url)
+
+
+@app.get("/api/high-intent/top-targets")
+async def get_high_intent_top_targets(request: Request, limit: int = 25):
+    """
+    Scans all practices in storage.db, filters out Corporate DSOs, ranks by the 7-Factor
+    High-Intent Score, and returns the top dentists most likely to buy the $1,200 + $497/mo
+    AI Front Desk right now, along with progress toward the 10-Client Goal.
+    """
+    base_url = str(request.base_url).rstrip("/")
+    all_leads = db.list_all_leads()
+    won_leads = [l for l in all_leads if (l.get("stage") or "").upper() == "WON" or l.get("territory_locked")]
+    won_count = len(won_leads)
+
+    scored_targets = []
+    for l in all_leads:
+        if (l.get("stage") or "").upper() in ("WON", "LOST"):
+            continue
+        pack = HighIntentPinpointer.score_and_compile(l, db=db, base_app_url=base_url)
+        if pack.get("is_dso"):
+            continue
+        scored_targets.append(pack)
+
+    scored_targets.sort(key=lambda x: x["high_intent_score"], reverse=True)
+    top_list = scored_targets[:max(1, min(limit, 100))]
+
+    return {
+        "goal_tracker": {
+            "target_clients": 10,
+            "timeframe_days": 60,
+            "current_won_clients": won_count,
+            "remaining_clients_needed": max(0, 10 - won_count),
+            "setup_fee_usd": 1200,
+            "monthly_retainer_usd": 497,
+            "target_upfront_cash_usd": 12000,
+            "target_mrr_usd": 4970,
+            "target_arr_usd": 59640,
+            "current_upfront_cash_usd": won_count * 1200,
+            "current_mrr_usd": won_count * 497
+        },
+        "total_qualified_independent_dentists": len(scored_targets),
+        "prime_a_plus_count": sum(1 for t in scored_targets if t["high_intent_score"] >= 85),
+        "top_targets": top_list
+    }
 
 
 if __name__ == "__main__":

@@ -117,6 +117,12 @@
         <span>Voice Studio ($0)</span>
       </button>
 
+      <!-- High-Intent Closer Sheet ($1,200 + $497/mo) Button -->
+      <button onclick="openHighIntentCloserModal()" id="btn-high-intent-closer" title="Open 10-Client Goal Tracker & High-Intent Dentist Call Playbooks ($1,200 Setup + $497/mo)" class="hidden sm:flex bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black px-3 py-1.5 rounded-lg border border-emerald-400/50 items-center gap-1.5 transition shadow-lg shadow-emerald-500/10 cursor-pointer text-xs">
+        <i class="fa-solid fa-crosshairs text-emerald-200"></i>
+        <span>High-Intent Closer ($1.2k + $497)</span>
+      </button>
+
       <!-- Cloud Sync Button (Preserves GCP Cloud Run leads before trial ends) -->
       <button onclick="triggerCloudLeadSync()" id="btn-cloud-sync" title="Sync leads harvested on GCP Cloud Run into local storage.db ($0 Permanent Storage)" class="hidden sm:flex bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white font-bold px-3 py-1.5 rounded-lg border border-sky-400/40 items-center gap-1.5 transition shadow cursor-pointer text-xs">
         <i class="fa-solid fa-cloud-arrow-down text-sky-200" id="icon-cloud-sync"></i>
@@ -1874,11 +1880,21 @@
 
               <div>
                 <label class="text-[11px] text-slate-400 font-semibold flex items-center justify-between mb-1">
-                  <span>DeepSeek API Key (sk-...)</span>
+                  <span>DeepSeek API Key ($1.50 Credit)</span>
                   <span id="deepseek-key-status" class="text-[10px] text-slate-400">Not set</span>
                 </label>
                 <div class="relative">
                   <input type="password" id="input-deepseek-key" placeholder="Enter sk-... to use DeepSeek-V3" class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-blue-500 text-xs">
+                </div>
+              </div>
+
+              <div class="md:col-span-2 lg:col-span-4 pt-1">
+                <label class="text-[11px] text-emerald-400 font-semibold flex items-center justify-between mb-1">
+                  <span><i class="fa-solid fa-map-location-dot mr-1"></i> Google Cloud Places API Key (Zero-Waste 14-Day Cached Discovery + DSO Filter)</span>
+                  <span id="places-key-status" class="text-[10px] text-slate-400">Checking...</span>
+                </label>
+                <div class="relative">
+                  <input type="password" id="input-places-key" placeholder="Enter AIzaSy... Google Places API Key (or uses Gemini/Google API Key automatically)" class="w-full bg-slate-950 border border-emerald-500/40 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-emerald-500 text-xs">
                 </div>
               </div>
             </div>
@@ -8907,6 +8923,14 @@
               ? `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> Configured</span>` 
               : `<span class="text-amber-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Key Needed</span>`;
           }
+
+          const placesStatus = document.getElementById('places-key-status');
+          if (placesStatus) {
+            const pTel = data.places_telemetry || {};
+            placesStatus.innerHTML = data.google_places_configured
+              ? `<span class="text-emerald-400 font-bold"><i class="fa-solid fa-check"></i> Active (${pTel.cache_hits || 0} Cache Hits • ${pTel.dso_filtered_out || 0} DSOs Skipped)</span>`
+              : `<span class="text-amber-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> Add Places Key for Instant Discovery</span>`;
+          }
         })
         .catch(() => {});
 
@@ -9152,6 +9176,7 @@
       const geminiKey = document.getElementById('input-gemini-key')?.value.trim();
       const openaiKey = document.getElementById('input-openai-key')?.value.trim();
       const deepseekKey = document.getElementById('input-deepseek-key')?.value.trim();
+      const placesKey = document.getElementById('input-places-key')?.value.trim();
       const lmStudioUrl = document.getElementById('input-lmstudio-url')?.value.trim();
 
       fetch('/api/llm/provider', {
@@ -9162,6 +9187,7 @@
           gemini_api_key: geminiKey || undefined,
           openai_api_key: openaiKey || undefined,
           deepseek_api_key: deepseekKey || undefined,
+          google_places_api_key: placesKey || undefined,
           lm_studio_base_url: lmStudioUrl || undefined
         })
       })
@@ -9189,8 +9215,8 @@
       const cities = document.getElementById('settings-target-cities').value.split(',').map(s => s.trim()).filter(Boolean);
       const minReviews = parseInt(document.getElementById('settings-min-reviews').value) || 15;
       const minProb = parseInt(document.getElementById('settings-min-buying-prob').value) || 65;
-      const caseVal = parseInt(document.getElementById('settings-case-value').value) || 900;
-      const fee = parseInt(document.getElementById('settings-monthly-fee').value) || 299;
+      const caseVal = parseInt(document.getElementById('settings-case-value').value) || 1200;
+      const fee = parseInt(document.getElementById('settings-monthly-fee').value) || 497;
 
       fetch('/api/settings', {
         method: 'POST',
