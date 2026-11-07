@@ -39,7 +39,7 @@ class AIDoorOpenerEngine:
     def generate_sdr_campaign_assets(
         cls,
         lead_dict: Dict[str, Any],
-        base_app_url: str = "http://34.71.56.145:8000"
+        base_app_url: str = os.getenv("BASE_APP_URL", "https://dental.34.71.56.145.sslip.io")
     ) -> Dict[str, Any]:
         """
         Builds the 30-second conversational opening, gatekeeper rebuttal, and SMS payload.
@@ -179,7 +179,7 @@ class AIDoorOpenerEngine:
         cls,
         lead_dict: Dict[str, Any],
         to_phone: Optional[str] = None,
-        base_app_url: str = "http://34.71.56.145:8000",
+        base_app_url: str = os.getenv("BASE_APP_URL", "https://dental.34.71.56.145.sslip.io"),
         db: Optional[DatabaseManager] = None
     ) -> Dict[str, Any]:
         """
