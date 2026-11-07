@@ -331,8 +331,14 @@ class PitchPortalEngine:
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl mx-auto">
         <div class="bg-slate-950 p-6 rounded-2xl border border-slate-800 space-y-3">
-          <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Turnkey Installation</span>
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Turnkey Installation</span>
+            <span class="px-2 py-0.5 rounded text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">Deferred / $0 Day 1</span>
+          </div>
           <div class="text-4xl font-black text-white font-mono">$1,200 <span class="text-xs text-slate-500 font-sans font-normal">one-time</span></div>
+          <div class="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300 font-medium leading-relaxed">
+            🛡️ <strong>Earned Setup Guarantee:</strong> Pay $0 installation upfront today. The $1,200 fee is only settled after our AI captures your first high-value patient ($1,200+ case value). If 0 patients are captured in 30 days, you owe $0 setup fee.
+          </div>
           <ul class="text-xs text-slate-300 space-y-2 pt-2">
             <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Full custom triage conversational AI tailored to clinic</li>
             <li class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-400"></i> Local phone number routing & after-hours trigger setup</li>
@@ -357,7 +363,7 @@ class PitchPortalEngine:
         <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
           <button onclick="lockPracticeTerritoryDeposit()" id="btn-lock-territory-portal" class="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-sm shadow-xl shadow-emerald-500/25 transition cursor-pointer flex items-center justify-center gap-2">
             <i class="fa-solid fa-lock"></i>
-            <span>Lock 3-Mile Exclusive Territory & Setup ($1,200)</span>
+            <span>Lock 3-Mile Territory ($0 Upfront Pilot)</span>
           </button>
           <a href="{calendar_link}" target="_blank" class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-2">
             <i class="fa-solid fa-calendar-check"></i>

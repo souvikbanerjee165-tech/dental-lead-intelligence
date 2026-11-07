@@ -4165,6 +4165,112 @@ async def dismiss_radar_active_viewer(lead_id: str):
     return {"status": "dismissed", "lead_id": lead_id}
 
 
+# --- Hand-Raisers & Speed-to-Lead Filter Endpoints ---
+
+@app.get("/api/hand-raisers")
+async def get_hand_raisers(request: Request):
+    """
+    Returns exclusively high-intent prospects who have signaled active engagement:
+    1. Actively viewing their teardown portal right now (in-memory radar)
+    2. Previously clicked/opened their portal (pitch_view_count > 0 in database)
+    3. Marked as INTERESTED or contact_status as CLICKED/REPLIED.
+    Gives the sales rep the exact phone number, dollar leakage, and 20s speed-to-lead hook.
+    """
+    base_url = str(request.base_url).rstrip("/")
+    live_active = LiveInterceptRadar.get_active_viewers(max_age_seconds=1800, db=db)
+    live_ids = {v["lead_id"]: v for v in live_active}
+
+    all_leads = db.list_all_leads()
+    hand_raisers = []
+
+    for lead in all_leads:
+        lead_id = lead.get("id")
+        view_count = int(lead.get("pitch_view_count") or 0)
+        stage = (lead.get("stage") or "").upper()
+        contact_status = (lead.get("contact_status") or "").upper()
+        last_viewed = lead.get("last_pitch_viewed_at")
+
+        is_currently_live = lead_id in live_ids
+        if not (is_currently_live or view_count > 0 or stage in ("INTERESTED", "CALL_SCHEDULED") or contact_status in ("CLICKED", "REPLIED")):
+            continue
+
+        closer_pack = HighIntentPinpointer.score_and_compile(lead, db=db, base_app_url=base_url)
+        live_data = live_ids.get(lead_id, {})
+
+        time_label = "Active Now 🔥" if is_currently_live else (last_viewed[:16].replace("T", " ") if last_viewed else "Recent Hand-Raiser")
+
+        hand_raisers.append({
+            "lead_id": lead_id,
+            "clinic_name": closer_pack["clinic_name"],
+            "doctor_display": closer_pack["doctor_display"],
+            "doctor_salutation": closer_pack["doctor_salutation"],
+            "phone": closer_pack["phone"],
+            "city": closer_pack["city"],
+            "region": closer_pack["region"],
+            "is_canada": closer_pack["is_canada"],
+            "currency_label": closer_pack["currency_label"],
+            "high_intent_score": closer_pack["high_intent_score"],
+            "intent_grade": closer_pack["intent_grade"],
+            "intent_badge": closer_pack["intent_badge"],
+            "view_count": max(view_count, live_data.get("view_count", 1)),
+            "is_live_now": is_currently_live,
+            "time_label": time_label,
+            "monthly_leaked_usd": closer_pack["unit_economics"]["monthly_leaked_revenue_usd"],
+            "monthly_recovered_usd": closer_pack["unit_economics"]["monthly_recovered_revenue_usd"],
+            "speed_to_lead_hook": str(closer_pack["call_playbook"].get("step2_doctor_opener_20s", "")),
+            "gatekeeper_opener": str(closer_pack["call_playbook"].get("step1_gatekeeper_bypass", "")),
+            "pitch_portal_url": closer_pack["call_playbook"]["pitch_portal_url"],
+            "whatsapp_url": closer_pack["call_playbook"]["whatsapp_one_click_url"],
+            "stage": stage or "HAND_RAISER"
+        })
+
+    hand_raisers.sort(key=lambda x: (x["is_live_now"], x["view_count"], x["high_intent_score"]), reverse=True)
+
+    return {
+        "total_hand_raisers": len(hand_raisers),
+        "live_intercepts_count": len(live_active),
+        "hand_raisers": hand_raisers
+    }
+
+
+@app.post("/api/hand-raisers/test-trigger/{lead_id}")
+async def trigger_test_hand_raiser(lead_id: str, request: Request):
+    """
+    Simulates a doctor clicking their teardown pitch link to test the live radar and mobile push.
+    """
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15"
+    event = LiveInterceptRadar.record_view(
+        lead_id=lead_id,
+        client_ip=client_ip,
+        user_agent=user_agent,
+        db=db
+    )
+    return {"status": "ok", "message": f"Simulated live click on {lead_id}", "event": event}
+
+
+@app.get("/manifest.json")
+async def get_pwa_manifest():
+    manifest_path = DASHBOARD_DIR / "manifest.json"
+    if manifest_path.exists():
+        return FileResponse(manifest_path, media_type="application/manifest+json")
+    return JSONResponse({
+        "name": "LeadRadar Dental",
+        "short_name": "LeadRadar",
+        "start_url": "/mobile",
+        "display": "standalone"
+    })
+
+
+@app.get("/mobile", response_class=HTMLResponse)
+async def render_mobile_view(request: Request):
+    """
+    Serves the standalone iPhone-optimized PWA Mobile Cockpit.
+    """
+    base_url = str(request.base_url).rstrip("/")
+    return HTMLResponse(content=render_mobile_dashboard_html(base_url=base_url))
+
+
 # --- Weapon 2: Deposit Lock & Territory Exclusivity Checkout Endpoints ---
 
 @app.get("/api/leads/{lead_id}/territory-status")
@@ -4371,6 +4477,7 @@ async def reset_autopilot():
 
 # --- High-Intent Dentist Pinpointer & Ready-to-Close Playbook ($1,200 Setup + $497/Mo) ---
 from high_intent_pinpointer import HighIntentPinpointer
+from mobile_dashboard import render_mobile_dashboard_html
 
 
 @app.get("/api/leads/{lead_id}/closer-sheet")
