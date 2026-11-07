@@ -1,6 +1,6 @@
 """
 Mobile-First iPhone PWA Dashboard for On-the-Go Lead Intercepts & Calling.
-Optimized for mobile Safari, standalone home-screen shortcut, and 1-touch phone calling.
+Optimized for mobile Safari, standalone home-screen shortcut, and 1-touch AI SDR dispatch.
 """
 
 def render_mobile_dashboard_html(base_url: str = "") -> str:
@@ -42,6 +42,14 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
 </head>
 <body class="safe-top safe-bottom flex flex-col min-h-screen">
 
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed top-4 left-4 right-4 z-50 transform -translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
+    <div id="toast-inner" class="bg-slate-900 border border-emerald-500/80 rounded-2xl p-3.5 shadow-2xl flex items-center gap-3">
+      <i id="toast-icon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+      <div class="flex-1 text-xs text-white font-medium" id="toast-msg">Alert</div>
+    </div>
+  </div>
+
   <!-- Top Sticky Header -->
   <header class="sticky top-0 z-40 bg-slate-950/90 backdrop-blur-md border-b border-slate-800/80 px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-2.5">
@@ -52,7 +60,7 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
         <h1 class="text-base font-black tracking-tight leading-none text-white">Lead<span class="text-emerald-400">Radar</span></h1>
         <div class="flex items-center gap-1.5 pt-0.5">
           <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot inline-block"></span>
-          <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Live Intercept Active</span>
+          <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Live Intercept & AI SDR</span>
         </div>
       </div>
     </div>
@@ -109,7 +117,7 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
     <div class="w-full bg-slate-900 border-t border-slate-700 rounded-t-3xl p-5 space-y-4 max-h-[85vh] overflow-y-auto safe-bottom">
       <div class="flex items-center justify-between border-b border-slate-800 pb-3">
         <div>
-          <span class="text-[10px] uppercase font-bold text-emerald-400">20-Second Call Script</span>
+          <span class="text-[10px] uppercase font-bold text-emerald-400">Door-Opener & Playbook</span>
           <h3 class="text-sm font-black text-white" id="modal-clinic-name">Clinic Name</h3>
         </div>
         <button onclick="closeScriptModal()" class="w-8 h-8 rounded-full bg-slate-800 text-slate-400 flex items-center justify-center">
@@ -119,19 +127,36 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
 
       <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
         <div class="text-[11px] font-bold text-amber-400 flex items-center gap-1.5">
-          <i class="fa-solid fa-bolt"></i> Speed-to-Lead Opener:
+          <i class="fa-solid fa-bolt"></i> Speed-to-Lead 20s Opener:
         </div>
         <p class="text-xs text-slate-200 leading-relaxed font-mono" id="modal-script-text">
           "Hey Dr. [Name]! I noticed your team was just reviewing the after-hours emergency patient teardown for [Clinic]..."
         </p>
       </div>
 
-      <div class="space-y-2">
-        <a id="modal-btn-call" href="#" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25">
-          <i class="fa-solid fa-phone"></i> Call Doctor Now
+      <div class="bg-slate-950 border border-slate-800 rounded-xl p-3.5 space-y-2">
+        <div class="text-[11px] font-bold text-indigo-400 flex items-center gap-1.5">
+          <i class="fa-solid fa-shield-halved"></i> Gatekeeper Bypass Rebuttal:
+        </div>
+        <p class="text-xs text-slate-300 leading-relaxed font-mono" id="modal-gatekeeper-text">
+          "We audit after-hours revenue loss for local independent practices. We noticed emergency weekend calls hit voicemail..."
+        </p>
+      </div>
+
+      <div class="space-y-2 pt-1">
+        <a id="modal-btn-call" href="#" class="w-full py-3.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/25 active:scale-95 transition">
+          <i class="fa-solid fa-phone"></i> Call Doctor Directly
         </a>
-        <a id="modal-btn-wa" href="#" target="_blank" class="w-full py-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2">
-          <i class="fa-brands fa-whatsapp text-emerald-400"></i> Text Live Simulator
+        <div class="grid grid-cols-2 gap-2">
+          <button id="modal-btn-ai-call" onclick="" class="py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow">
+            <i class="fa-solid fa-robot"></i> AI SDR Call
+          </button>
+          <button id="modal-btn-ai-sms" onclick="" class="py-2.5 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition shadow">
+            <i class="fa-solid fa-paper-plane"></i> Send Telnyx SMS
+          </button>
+        </div>
+        <a id="modal-btn-wa" href="#" target="_blank" class="w-full py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-2 active:scale-95 transition">
+          <i class="fa-brands fa-whatsapp text-emerald-400"></i> Open WhatsApp Web
         </a>
       </div>
     </div>
@@ -140,6 +165,29 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
   <script>
     let activeTab = 'hand_raisers';
     let cachedData = {{ hand_raisers: [], top_targets: [] }};
+    let currentModalLeadId = '';
+
+    function showToast(msg, isSuccess = true) {{
+      const toast = document.getElementById('toast');
+      const inner = document.getElementById('toast-inner');
+      const icon = document.getElementById('toast-icon');
+      const msgEl = document.getElementById('toast-msg');
+
+      msgEl.textContent = msg;
+      if (isSuccess) {{
+        inner.className = 'bg-slate-900 border border-emerald-500/80 rounded-2xl p-3.5 shadow-2xl flex items-center gap-3';
+        icon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+      }} else {{
+        inner.className = 'bg-slate-900 border border-rose-500/80 rounded-2xl p-3.5 shadow-2xl flex items-center gap-3';
+        icon.className = 'fa-solid fa-circle-exclamation text-rose-400 text-lg';
+      }}
+      toast.classList.remove('-translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+      setTimeout(() => {{
+        toast.classList.add('-translate-y-20', 'opacity-0');
+        toast.classList.remove('translate-y-0', 'opacity-100');
+      }}, 3500);
+    }}
 
     async function fetchData() {{
       const icon = document.getElementById('refresh-icon');
@@ -178,6 +226,36 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
       renderCurrentTab();
     }}
 
+    async function triggerSdrCall(leadId, clinicName) {{
+      showToast(`Initiating AI SDR call to ${{clinicName}}...`);
+      try {{
+        const res = await fetch(`/api/sdr/launch-call/${{leadId}}`, {{ method: 'POST' }});
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {{
+          showToast(`AI SDR call placed via Telnyx! (${{data.target_phone}})`);
+        }} else {{
+          showToast(data.detail || data.error || 'Failed to dispatch AI call', false);
+        }}
+      }} catch (e) {{
+        showToast('Call dispatch error: ' + e.message, false);
+      }}
+    }}
+
+    async function triggerSdrSms(leadId, clinicName) {{
+      showToast(`Dispatching Telnyx SMS teardown to ${{clinicName}}...`);
+      try {{
+        const res = await fetch(`/api/sdr/dispatch-sms/${{leadId}}`, {{ method: 'POST' }});
+        const data = await res.json();
+        if (res.ok && data.success) {{
+          showToast(`Teardown link sent to ${{data.to}} via Telnyx!`);
+        }} else {{
+          showToast(data.detail || data.error || 'Failed to send SMS', false);
+        }}
+      }} catch (e) {{
+        showToast('SMS dispatch error: ' + e.message, false);
+      }}
+    }}
+
     function renderCurrentTab() {{
       const container = document.getElementById('cards-container');
       const list = activeTab === 'hand_raisers' ? cachedData.hand_raisers : cachedData.top_targets;
@@ -193,7 +271,7 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
               <p class="text-xs text-slate-400 leading-relaxed">
                 When a doctor opens their custom audit link or tests their simulator, they will instantly light up here with a 1-tap call button!
               </p>
-              <button onclick="simulateTestClick()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shadow-lg">
+              <button onclick="simulateTestClick()" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-black shadow-lg active:scale-95 transition">
                 <i class="fa-solid fa-play mr-1"></i> Simulate Test Doctor Intercept
               </button>
             </div>
@@ -217,6 +295,7 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
         const isLive = item.is_live_now || false;
         const timeLabel = item.time_label || (isHR ? 'Hand-Raiser' : 'Prime Target');
         const script = item.speed_to_lead_hook || item.call_playbook?.step2_doctor_opener_20s?.hook_script || '';
+        const gatekeeper = item.gatekeeper_opener || item.call_playbook?.step1_gatekeeper_bypass?.rebuttal || '';
         const waUrl = item.whatsapp_url || item.call_playbook?.whatsapp_one_click_url || '#';
         const pitchUrl = item.pitch_portal_url || `/pitch/${{item.lead_id}}`;
 
@@ -237,19 +316,31 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
               </div>
               <div class="text-right flex-shrink-0">
                 <span class="text-[10px] text-slate-500 block uppercase font-bold">Leaked</span>
-                <span class="text-xs font-mono font-black text-rose-400">-\$${{Number(leaked).toLocaleString()}}/mo</span>
+                <span class="text-xs font-mono font-black text-rose-400">-${{Number(leaked).toLocaleString()}}/mo</span>
               </div>
             </div>
 
-            <!-- 1-Tap Action Row -->
+            <!-- 1-Tap Action Row: Human Direct Call -->
             <div class="grid grid-cols-2 gap-2 pt-1">
               <a href="tel:+${{cleanPhone}}" class="py-2.5 px-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-500/20 active:scale-95 transition">
                 <i class="fa-solid fa-phone text-xs"></i>
                 <span>Call Doctor</span>
               </a>
-              <button onclick="openScriptModal('${{encodeURIComponent(clinic)}}', '${{encodeURIComponent(script)}}', '+${{cleanPhone}}', '${{encodeURIComponent(waUrl)}}')" class="py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
+              <button onclick="openScriptModal('${{encodeURIComponent(clinic)}}', '${{encodeURIComponent(script)}}', '+${{cleanPhone}}', '${{encodeURIComponent(waUrl)}}', '${{encodeURIComponent(gatekeeper)}}', '${{item.lead_id}}')" class="py-2.5 px-3 rounded-xl bg-slate-800 border border-slate-700 text-slate-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition">
                 <i class="fa-solid fa-file-lines text-emerald-400"></i>
                 <span>20s Script</span>
+              </button>
+            </div>
+
+            <!-- AI SDR 1-Click Action Row -->
+            <div class="grid grid-cols-2 gap-2 pt-0.5">
+              <button onclick="triggerSdrCall('${{item.lead_id}}', '${{clinic.replace(/'/g, "\\\\'")}}')" class="py-2 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-indigo-500/40 text-indigo-300 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition">
+                <i class="fa-solid fa-robot text-indigo-400"></i>
+                <span>AI SDR Call</span>
+              </button>
+              <button onclick="triggerSdrSms('${{item.lead_id}}', '${{clinic.replace(/'/g, "\\\\'")}}')" class="py-2 px-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-teal-500/40 text-teal-300 font-bold text-[11px] flex items-center justify-center gap-1.5 active:scale-95 transition">
+                <i class="fa-solid fa-paper-plane text-teal-400"></i>
+                <span>Send SMS Link</span>
               </button>
             </div>
 
@@ -258,7 +349,7 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
                 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i> View Teardown
               </a>
               <a href="${{waUrl}}" target="_blank" class="text-slate-300 hover:text-white flex items-center gap-1">
-                <i class="fa-brands fa-whatsapp text-emerald-400 text-xs"></i> Drop SMS
+                <i class="fa-brands fa-whatsapp text-emerald-400 text-xs"></i> WhatsApp
               </a>
             </div>
           </div>
@@ -268,11 +359,21 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
       container.innerHTML = html;
     }}
 
-    function openScriptModal(encodedClinic, encodedScript, phone, encodedWa) {{
-      document.getElementById('modal-clinic-name').textContent = decodeURIComponent(encodedClinic);
+    function openScriptModal(encodedClinic, encodedScript, phone, encodedWa, encodedGatekeeper, leadId) {{
+      currentModalLeadId = leadId;
+      const clinic = decodeURIComponent(encodedClinic);
+      document.getElementById('modal-clinic-name').textContent = clinic;
       document.getElementById('modal-script-text').textContent = decodeURIComponent(encodedScript);
+      document.getElementById('modal-gatekeeper-text').textContent = decodeURIComponent(encodedGatekeeper) || 'No gatekeeper rebuttal needed.';
       document.getElementById('modal-btn-call').href = 'tel:' + phone;
       document.getElementById('modal-btn-wa').href = decodeURIComponent(encodedWa);
+
+      const aiCallBtn = document.getElementById('modal-btn-ai-call');
+      aiCallBtn.onclick = () => triggerSdrCall(leadId, clinic);
+
+      const aiSmsBtn = document.getElementById('modal-btn-ai-sms');
+      aiSmsBtn.onclick = () => triggerSdrSms(leadId, clinic);
+
       document.getElementById('script-modal').classList.remove('hidden');
     }}
 
@@ -287,6 +388,7 @@ def render_mobile_dashboard_html(base_url: str = "") -> str:
         await fetch(`/api/hand-raisers/test-trigger/${{leadId}}`, {{ method: 'POST' }});
         switchTab('hand_raisers');
         fetchData();
+        showToast('Simulated live doctor click! Target moved to Hand-Raisers.');
       }} catch (e) {{
         console.error(e);
       }}

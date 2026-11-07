@@ -11608,10 +11608,16 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
 
             <!-- Action Controls -->
             <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/80">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <a href="tel:+${cleanPhone}" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs flex items-center gap-1.5 shadow-md shadow-emerald-500/20">
                   <i class="fa-solid fa-phone"></i> Call Doctor
                 </a>
+                <button onclick="triggerSdrCallFromModal('${lead.lead_id}', '${clinic.replace(/'/g, "\\'")}')" class="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-indigo-600/20 cursor-pointer">
+                  <i class="fa-solid fa-robot"></i> AI SDR Call
+                </button>
+                <button onclick="triggerSdrSmsFromModal('${lead.lead_id}', '${clinic.replace(/'/g, "\\'")}')" class="px-3.5 py-2 rounded-xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-md shadow-teal-600/20 cursor-pointer">
+                  <i class="fa-solid fa-paper-plane"></i> Telnyx SMS
+                </button>
                 <a href="${waUrl}" target="_blank" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-700 flex items-center gap-1.5">
                   <i class="fa-brands fa-whatsapp text-emerald-400"></i> Drop Text
                 </a>
@@ -11658,6 +11664,37 @@ Next step: Dr. Vance requested a live 15-minute screen share demo this Thursday 
     // Auto-poll hand-raisers radar every 10 seconds
     setInterval(pollHandRaisers, 10000);
     setTimeout(pollHandRaisers, 1500);
+  
+    async function triggerSdrCallFromModal(leadId, clinicName) {
+      if (typeof showToast === 'function') showToast(`Initiating AI SDR call to ${clinicName}...`);
+      try {
+        const res = await fetch(`/api/sdr/launch-call/${leadId}`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.status === 'success') {
+          if (typeof showToast === 'function') showToast(`AI SDR call placed via Telnyx! (${data.target_phone})`);
+        } else {
+          if (typeof showToast === 'function') showToast(data.detail || data.error || 'Failed to dispatch AI call');
+        }
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('Call dispatch error: ' + e.message);
+      }
+    }
+
+    async function triggerSdrSmsFromModal(leadId, clinicName) {
+      if (typeof showToast === 'function') showToast(`Dispatching Telnyx SMS teardown to ${clinicName}...`);
+      try {
+        const res = await fetch(`/api/sdr/dispatch-sms/${leadId}`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok && data.success) {
+          if (typeof showToast === 'function') showToast(`Teardown link sent to ${data.to} via Telnyx!`);
+        } else {
+          if (typeof showToast === 'function') showToast(data.detail || data.error || 'Failed to send SMS');
+        }
+      } catch (e) {
+        if (typeof showToast === 'function') showToast('SMS dispatch error: ' + e.message);
+      }
+    }
+
   </script>
 </body>
 

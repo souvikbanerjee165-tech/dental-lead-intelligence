@@ -4538,6 +4538,108 @@ async def get_high_intent_top_targets(request: Request, limit: int = 25):
     }
 
 
+
+
+# --- AI Voice Door-Opener & 30-Second SDR Endpoints ---
+from ai_door_opener import AIDoorOpenerEngine
+
+
+class SDRCallDispatchRequest(BaseModel):
+    phone_override: Optional[str] = None
+
+
+class SDRSMSDispatchRequest(BaseModel):
+    phone_override: Optional[str] = None
+    custom_text: Optional[str] = None
+
+
+class SDRBatchSMSRequest(BaseModel):
+    lead_ids: List[str]
+
+
+@app.get("/api/sdr/campaign-assets/{lead_id}")
+async def get_sdr_campaign_assets(lead_id: str, request: Request):
+    """
+    Returns the 30-second conversational opening, gatekeeper rebuttal, and SMS payload.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        lead = {"id": lead_id, "name": "Dental Practice", "address": "Austin, TX"}
+    base_url = str(request.base_url).rstrip("/")
+    return AIDoorOpenerEngine.generate_sdr_campaign_assets(dict(lead), base_app_url=base_url)
+
+
+@app.post("/api/sdr/dispatch-sms/{lead_id}")
+async def dispatch_sdr_sms(lead_id: str, request: Request, req: Optional[SDRSMSDispatchRequest] = None):
+    """
+    Triggers an instant Telnyx SMS containing the personalized teardown link to the clinic.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    base_url = str(request.base_url).rstrip("/")
+    assets = AIDoorOpenerEngine.generate_sdr_campaign_assets(dict(lead), base_app_url=base_url)
+
+    target_phone = (req.phone_override if req and req.phone_override else None) or assets["target_phone"]
+    text_to_send = (req.custom_text if req and req.custom_text else None) or assets["sms_text"]
+
+    if not target_phone:
+        raise HTTPException(status_code=400, detail="No target phone number available for this lead.")
+
+    result = await AIDoorOpenerEngine.dispatch_telnyx_sms(
+        to_phone=target_phone,
+        text=text_to_send,
+        lead_id=lead_id,
+        db=db
+    )
+    return result
+
+
+@app.post("/api/sdr/launch-call/{lead_id}")
+async def launch_sdr_call(lead_id: str, request: Request, req: Optional[SDRCallDispatchRequest] = None):
+    """
+    Initiates an outbound Telnyx call using the 30-second door-opener script.
+    """
+    lead = db.get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+
+    base_url = str(request.base_url).rstrip("/")
+    phone = req.phone_override if req and req.phone_override else None
+
+    result = AIDoorOpenerEngine.launch_telnyx_door_opener_call(
+        lead_dict=dict(lead),
+        to_phone=phone,
+        base_app_url=base_url,
+        db=db
+    )
+    return result
+
+
+@app.post("/api/sdr/batch-dispatch-sms")
+async def batch_dispatch_sdr_sms(req: SDRBatchSMSRequest, request: Request):
+    """
+    Dispatches personalized SMS teardown links to multiple leads in batch.
+    """
+    base_url = str(request.base_url).rstrip("/")
+    results = []
+    for lid in req.lead_ids:
+        lead = db.get_lead(lid)
+        if not lead:
+            continue
+        assets = AIDoorOpenerEngine.generate_sdr_campaign_assets(dict(lead), base_app_url=base_url)
+        if assets["target_phone"]:
+            res = await AIDoorOpenerEngine.dispatch_telnyx_sms(
+                to_phone=assets["target_phone"],
+                text=assets["sms_text"],
+                lead_id=lid,
+                db=db
+            )
+            results.append({"lead_id": lid, "phone": assets["target_phone"], "result": res})
+    return {"total": len(results), "dispatches": results}
+
+
 if __name__ == "__main__":
     import webbrowser
     import uvicorn
