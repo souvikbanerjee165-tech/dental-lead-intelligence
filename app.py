@@ -1897,14 +1897,18 @@ async def telnyx_webhook_handler(request: Request):
                 matched_session["status"] = "CONNECTED"
 
             initial_mode = client_state.get("initial_mode") or (matched_session.get("current_mode") if matched_session else "AI_FIRST")
+            amd_mode = os.getenv("TELNYX_AMD_MODE", "detect_beep")
             if initial_mode not in ("HUMAN_FIRST", "HUMAN_CONTROL"):
-                if not matched_session or not matched_session.get("answered_hook_spoken"):
-                    hook_text = "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
-                    if matched_session:
-                        hook_text = matched_session.get("script", {}).get("gatekeeper_hook") or hook_text
-                        matched_session["answered_hook_spoken"] = True
-                    send_telnyx_speak(call_control_id, hook_text)
-                    notes = f"Telnyx call answered ({client_state.get('name')}). AI intro spoken with neural voice."
+                if amd_mode == "disabled":
+                    if not matched_session or not matched_session.get("answered_hook_spoken"):
+                        hook_text = "Hi, good morning! I was reviewing your practice intake and wondered who oversees weekend appointments?"
+                        if matched_session:
+                            hook_text = matched_session.get("script", {}).get("gatekeeper_hook") or hook_text
+                            matched_session["answered_hook_spoken"] = True
+                        send_telnyx_speak(call_control_id, hook_text)
+                        notes = f"Telnyx call answered ({client_state.get('name')}). AI intro spoken with neural voice."
+                else:
+                    notes = f"Telnyx call answered ({client_state.get('name')}). Awaiting Answering Machine Detection (AMD)..."
             else:
                 logger.info(f"Telnyx call {call_control_id} answered in HUMAN_FIRST mode. AI keeping line open for human rep.")
                 notes = f"Telnyx call answered ({client_state.get('name')}). Human-first mode active (AI silent)."
@@ -2008,6 +2012,37 @@ async def telnyx_webhook_handler(request: Request):
                     asyncio.create_task(_async_synth_browser_audio(session_id, transcript, ai_reply))
                 else:
                     logger.info(f"Session in {current_mode} mode. Prospect speech recorded for rep. AI waiting for rep.")
+
+        elif event_type in ("call.machine.detection.ended", "call.machine.greeting.ended"):
+            amd_result = str(payload.get("result", "")).lower()
+            logger.info(f"Telnyx AMD Event: {event_type}, Result: {amd_result} (Call: {call_control_id})")
+            from ai_door_opener import AIDoorOpenerEngine
+
+            base_app_url = str(request.base_url).rstrip("/")
+            if any(m in amd_result for m in ("machine", "beep", "answering", "voicemail")) or event_type == "call.machine.greeting.ended":
+                res = await AIDoorOpenerEngine.handle_answering_machine_detected(
+                    call_control_id=call_control_id,
+                    client_state=client_state,
+                    base_app_url=base_app_url,
+                    db=db
+                )
+                return {"status": "machine_handled", "details": res}
+            elif any(h in amd_result for h in ("human", "person")):
+                res = await AIDoorOpenerEngine.handle_human_answered(
+                    call_control_id=call_control_id,
+                    client_state=client_state,
+                    base_app_url=base_app_url,
+                    db=db
+                )
+                return {"status": "human_handled", "details": res}
+
+        elif event_type == "call.speak.ended":
+            # If call was in VOICEMAIL_DROP mode, immediately hang up to save carrier minutes
+            if matched_session and matched_session.get("status") == "VOICEMAIL_DROP":
+                from voice_dialer import hangup_telnyx_call
+                logger.info(f"Voicemail sting finished for {call_control_id}. Hanging up call to save carrier minutes.")
+                hangup_telnyx_call(call_control_id)
+                return {"status": "voicemail_hung_up"}
 
         elif event_type == "call.hangup":
             duration = payload.get("call_duration_seconds") or payload.get("duration") or 0

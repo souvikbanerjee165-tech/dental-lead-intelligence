@@ -987,7 +987,10 @@ class VoiceDialerEngine:
             "name": lead.get("name"),
             "doctor_name": lead.get("doctor_name"),
             "phone": target_phone,
-            "initial_mode": initial_mode
+            "initial_mode": initial_mode,
+            "address": lead.get("address") or "",
+            "missed_rev_min": lead.get("missed_rev_min") or 3500,
+            "missed_rev_max": lead.get("missed_rev_max") or 9600
         }).encode()).decode()
 
         # Resolve Caller ID: prefer saved setting, then query owned Telnyx numbers
@@ -1011,6 +1014,21 @@ class VoiceDialerEngine:
             "client_state": client_state,
             "timeout_secs": 60
         }
+
+        # Enable Telnyx Native Answering Machine Detection (AMD)
+        amd_mode = os.getenv("TELNYX_AMD_MODE", "detect_beep")
+        if amd_mode != "disabled":
+            payload["answering_machine_detection"] = amd_mode
+            payload["answering_machine_detection_config"] = {
+                "total_analysis_time_millis": 5000,
+                "after_greeting_silence_millis": 1200,
+                "between_words_silence_millis": 800,
+                "greeting_duration_millis": 3500,
+                "initial_silence_millis": 3500,
+                "maximum_number_of_words": 5,
+                "maximum_word_length_millis": 3500,
+                "silence_threshold": 256
+            }
 
         # Pass public webhook_url (Telnyx rejects localhost/127.0.0.1)
         public_url = None

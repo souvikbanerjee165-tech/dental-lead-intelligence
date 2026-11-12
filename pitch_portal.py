@@ -5,6 +5,7 @@ for dental practice owners, complete with revenue leakage calculations, embedded
 competitor poaching alerts, and single-patient break-even guarantee ($1,200 setup + $497/mo).
 """
 
+import os
 import json
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -73,6 +74,15 @@ class PitchPortalEngine:
         month1_hygiene_cash = hygiene_data["month1_cash_injection"]
         hygiene_roi = hygiene_data["month1_roi_multiplier"]
 
+        # Cal.com 1-Click Interactive Booking Resolution
+        cal_com_env = os.getenv("CAL_COM_URL", "https://cal.com/dental-growth/15min")
+        default_slug = os.getenv("CAL_COM_SLUG", "dental-growth/15min")
+        active_cal_url = calendar_link if (calendar_link and "calendly.com" not in calendar_link) else cal_com_env
+        if "cal.com/" in str(active_cal_url):
+            cal_slug = str(active_cal_url).split("cal.com/")[-1].strip("/")
+        else:
+            cal_slug = default_slug
+
         # XSS Sanitization Shield
         clinic_name = sanitize_for_html(clinic_name)
         doc_display = sanitize_for_html(doc_display)
@@ -83,6 +93,7 @@ class PitchPortalEngine:
         test_time = sanitize_for_html(test_time)
         rep_phone = sanitize_for_html(rep_phone)
         rep_email = sanitize_for_html(rep_email)
+        cal_slug = sanitize_for_html(cal_slug)
 
         return f"""<!DOCTYPE html>
 <html lang="en">
@@ -92,6 +103,12 @@ class PitchPortalEngine:
   <title>Confidential Revenue & Patient Recovery Audit • {clinic_name}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Cal.com 1-Click Interactive Embed Code -->
+  <script type="text/javascript">
+  (function (C, A, L) {{ let p = function (a, ar) {{ a.q.push(ar); }}; let d = C.document; C.Cal = C.Cal || function () {{ let cal = C.Cal; let ar = arguments; if (!cal.loaded) {{ cal.ns = {{}}; cal.q = cal.q || []; d.head.appendChild(d.createElement("script")).src = A; cal.loaded = true; }} if (ar[0] === L) {{ const api = function () {{ p(api, arguments); }}; const namespace = ar[1]; api.q = api.q || []; if(typeof namespace === "string"){{cal.ns[namespace] = cal.ns[namespace] || api;p(cal.ns[namespace], ar);p(cal, ["initNamespace", namespace]);}} else p(cal, ar); return;}} p(cal, ar); }}; }})(window, "https://app.cal.com/embed/embed.js", "init");
+  Cal("init", "15min", {{origin:"https://cal.com"}});
+  Cal.ns["15min"]("ui", {{"theme":"dark","styles":{{"branding":{{"brandColor":"#10b981"}}}},"hideEventTypeDetails":false,"layout":"month_view"}});
+  </script>
   <style>
     body {{ background-color: #0b1117; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }}
     .wa-bg {{ background-color: #0b141a; background-image: radial-gradient(#1f2c34 1px, transparent 1px); background-size: 20px 20px; }}
@@ -120,9 +137,10 @@ class PitchPortalEngine:
         <a href="/video/{lead_id}" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
           <i class="fa-solid fa-circle-play text-rose-400"></i> Watch 60s Video
         </a>
-        <a href="#book-walkthrough" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition">
-          Claim Practice Territory
-        </a>
+        <button data-cal-link="{cal_slug}" data-cal-namespace="15min" data-cal-config='{{"name":"{doc_display}","notes":"Practice: {clinic_name}"}}' class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition cursor-pointer flex items-center gap-1.5">
+          <i class="fa-solid fa-calendar-check"></i>
+          <span>Schedule 15-Min Walkthrough</span>
+        </button>
       </div>
     </div>
   </header>
@@ -365,10 +383,14 @@ class PitchPortalEngine:
             <i class="fa-solid fa-lock"></i>
             <span>Lock 3-Mile Territory ($0 Upfront Pilot)</span>
           </button>
-          <a href="{calendar_link}" target="_blank" class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition flex items-center justify-center gap-2">
-            <i class="fa-solid fa-calendar-check"></i>
-            <span>Or Schedule 10-Min Demo (Thursday 11 AM)</span>
-          </a>
+          <button data-cal-link="{cal_slug}" data-cal-namespace="15min" data-cal-config='{{"name":"{doc_display}","notes":"Practice: {clinic_name} - Urgent After-Hours Audit Review"}}' class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-emerald-500/40 transition flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:border-emerald-400">
+            <i class="fa-solid fa-calendar-check text-emerald-400"></i>
+            <span>Schedule 15-Min Onboarding Setup</span>
+          </button>
+        </div>
+        <div class="text-[11px] text-slate-500">
+          <span>Prefer direct calendar page? </span>
+          <a href="https://cal.com/{cal_slug}" target="_blank" class="text-emerald-400 hover:underline font-bold">Open Direct Link on Cal.com <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a>
         </div>
         <div class="text-xs text-slate-400 pt-1 flex items-center justify-center gap-4 flex-wrap">
           <a href="/agreement/{lead_id}" target="_blank" class="text-emerald-400 hover:underline font-bold flex items-center gap-1.5">

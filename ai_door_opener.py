@@ -84,6 +84,14 @@ class AIDoorOpenerEngine:
             f"we prepared for {clinic_name} (${monthly_leaked:,}/mo estimated leakage): {pitch_url}"
         )
 
+        # 4. 15-Second High-Status Voicemail Sting (Drop & SMS)
+        voicemail_sting = (
+            f"Hi {doc_display}, this is Alex with patient routing. "
+            f"I noticed weekend emergency patient calls for {clinic_name} are hitting voicemail. "
+            f"I'm texting a 30-second audit link to this office line right now so you can review the after-hours leakage. "
+            f"Have a great day."
+        )
+
         return {
             "lead_id": lead_id,
             "clinic_name": clinic_name,
@@ -94,7 +102,8 @@ class AIDoorOpenerEngine:
             "door_opener_script": door_opener_script,
             "gatekeeper_rebuttal": gatekeeper_rebuttal,
             "pitch_url": pitch_url,
-            "sms_text": sms_text
+            "sms_text": sms_text,
+            "voicemail_sting": voicemail_sting
         }
 
     @classmethod
@@ -225,4 +234,136 @@ class AIDoorOpenerEngine:
             "target_phone": target_phone,
             "call_result": result,
             "assets": assets
+        }
+
+    @classmethod
+    async def handle_answering_machine_detected(
+        cls,
+        call_control_id: str,
+        client_state: Dict[str, Any],
+        base_app_url: str = os.getenv("BASE_APP_URL", "https://dental.34.71.56.145.sslip.io"),
+        db: Optional[DatabaseManager] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes immediate Voicemail Drop + SMS Teardown protocol when Telnyx AMD detects machine/beep:
+        1. Speaks the 15-second Voicemail Sting.
+        2. Immediately texts the teardown link to the practice phone.
+        3. Marks session as VOICEMAIL_DROP for rapid hangup after speech to save carrier minutes.
+        4. Logs to timeline & database.
+        """
+        from voice_dialer import VoiceDialerEngine
+        from live_dialer_engine import LiveDialerEngine
+
+        lead_id = client_state.get("lead_id")
+        target_phone = client_state.get("phone") or ""
+        assets = cls.generate_sdr_campaign_assets(client_state, base_app_url=base_app_url)
+        voicemail_text = assets["voicemail_sting"]
+        sms_text = assets["sms_text"]
+
+        logger.info(f"AMD Machine Detected for call {call_control_id}. Dropping Voicemail Sting: '{voicemail_text[:60]}...'")
+
+        # 1. Speak Voicemail Sting
+        VoiceDialerEngine.send_telnyx_speak(call_control_id, voicemail_text)
+
+        # 2. Dispatch SMS Teardown link to practice phone
+        sms_result = {}
+        if target_phone:
+            sms_result = await cls.dispatch_telnyx_sms(
+                to_phone=target_phone,
+                text=sms_text,
+                lead_id=lead_id,
+                db=db
+            )
+
+        # Mark active session as VOICEMAIL_DROP
+        for s in list(LiveDialerEngine._active_sessions.values()):
+            if s.get("carrier_call_id") == call_control_id or s.get("call_id") == call_control_id:
+                s["status"] = "VOICEMAIL_DROP"
+                s["current_mode"] = "VOICEMAIL_DROP"
+                break
+
+        # 3. Log event to OpportunityTimelineManager & DB
+        if lead_id:
+            db = db or DatabaseManager()
+            try:
+                OpportunityTimelineManager.log_event(
+                    db=db,
+                    lead_id=lead_id,
+                    event_type="VOICEMAIL_STING_DROPPED",
+                    title="Voicemail Sting & Teardown SMS Dropped",
+                    description=f"AMD detected answering machine on {target_phone}. Spoke 15s voicemail sting and dispatched SMS audit link.",
+                    actor="AI_SDR"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log voicemail drop timeline: {e}")
+
+            try:
+                with db._get_connection() as conn:
+                    conn.execute("UPDATE leads SET contact_status = 'VOICEMAIL_DROPPED', last_updated = CURRENT_TIMESTAMP WHERE id = ?", (lead_id,))
+                    conn.commit()
+            except Exception:
+                pass
+
+        return {
+            "status": "voicemail_dropped",
+            "call_control_id": call_control_id,
+            "lead_id": lead_id,
+            "sms_result": sms_result
+        }
+
+    @classmethod
+    async def handle_human_answered(
+        cls,
+        call_control_id: str,
+        client_state: Dict[str, Any],
+        base_app_url: str = os.getenv("BASE_APP_URL", "https://dental.34.71.56.145.sslip.io"),
+        db: Optional[DatabaseManager] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes live conversational door-opener when Telnyx AMD detects a live human:
+        1. Speaks the 30-second door-opener hook immediately to eliminate dead air.
+        2. Starts Telnyx live speech transcription.
+        3. Logs to timeline & DB.
+        """
+        from voice_dialer import VoiceDialerEngine
+        from live_dialer_engine import LiveDialerEngine
+
+        lead_id = client_state.get("lead_id")
+        target_phone = client_state.get("phone") or ""
+        assets = cls.generate_sdr_campaign_assets(client_state, base_app_url=base_app_url)
+        hook_text = assets["door_opener_script"]
+
+        logger.info(f"AMD Human Answered for call {call_control_id}. Speaking live door opener: '{hook_text[:60]}...'")
+
+        # 1. Start live transcription
+        VoiceDialerEngine.start_telnyx_transcription(call_control_id)
+
+        # 2. Speak live door-opener hook
+        VoiceDialerEngine.send_telnyx_speak(call_control_id, hook_text)
+
+        # Mark active session as CONNECTED
+        for s in list(LiveDialerEngine._active_sessions.values()):
+            if s.get("carrier_call_id") == call_control_id or s.get("call_id") == call_control_id:
+                s["status"] = "CONNECTED"
+                s["answered_hook_spoken"] = True
+                break
+
+        if lead_id:
+            db = db or DatabaseManager()
+            try:
+                OpportunityTimelineManager.log_event(
+                    db=db,
+                    lead_id=lead_id,
+                    event_type="HUMAN_ANSWERED_DOOR_OPENER",
+                    title="Live Human Answered AI Door-Opener",
+                    description=f"Human answered at {target_phone}. Spoke 30s conversational intake opener.",
+                    actor="AI_SDR"
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log human answer timeline: {e}")
+
+        return {
+            "status": "human_connected",
+            "call_control_id": call_control_id,
+            "lead_id": lead_id
         }

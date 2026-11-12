@@ -30,12 +30,21 @@ PROCEDURE_KEYWORDS = [
     "emergency dentistry", "emergency dentist", "root canal", "crowns", "bridges",
     "invisalign", "clear aligners", "teeth whitening", "veneers", "smile makeover",
     "dentures", "full mouth reconstruction", "pediatric dentistry", "sedation dentistry",
-    "periodontics", "oral surgery", "tooth extraction", "sinus lift", "cosmetic dentistry"
+    "periodontics", "oral surgery", "tooth extraction", "sinus lift", "cosmetic dentistry",
+    "bone grafting", "sleep apnea", "tmj treatment", "wisdom teeth"
+]
+
+AFTER_HOURS_PATTERNS = [
+    (r'(?:call\s+911|dial\s+911|nearest\s+emergency\s+room)', "CALL_911_POLICY", "Redirects emergencies strictly to 911/ER (Zero practice revenue capture)"),
+    (r'(?:leave\s+(?:a\s+)?(?:voice\s*mail|message)|return\s+your\s+call\s+(?:next|during)\s+(?:business\s+hours|monday))', "VOICEMAIL_NEXT_DAY", "Standard voicemail: weekend patient inquiries wait until Monday"),
+    (r'(?:emergency\s+(?:line|number|hotline|phone)|on-call\s+(?:dentist|doctor)|paging\s+service)', "ON_CALL_DOCTOR", "Has dedicated emergency on-call contact line"),
+    (r'(?:24/7\s+(?:live\s+)?(?:chat|triage|support|intake|booking)|always\s+open)', "24_7_TRIAGE", "24/7 automated patient routing active")
 ]
 
 BOOKING_WIDGET_SIGNATURES = [
     "nexhealth", "localmed", "zocdoc", "calendly", "acuityscheduling",
-    "solutionreach", "weave", "practice-minder", "simplifeye", "modento"
+    "solutionreach", "weave", "practice-minder", "simplifeye", "modento",
+    "dentrix ascend", "opendental"
 ]
 
 CHAT_WIDGET_SIGNATURES = [
@@ -51,11 +60,15 @@ class ClinicResearchProfile(BaseModel):
     city_state: str = ""
     doctors: List[str] = Field(default_factory=list)
     primary_doctor: str = "Practice Principal"
+    lead_dentist_credentials: str = ""
     services_found: List[str] = Field(default_factory=list)
     has_online_booking: bool = False
     detected_booking_tool: Optional[str] = None
     has_ai_chat: bool = False
     detected_chat_tool: Optional[str] = None
+    after_hours_policy: str = "Standard voicemail (unanswered on weekends)"
+    after_hours_leakage_status: str = "HIGH_LEAKAGE"
+    emergency_policy_snippet: str = ""
     has_ssl: bool = True
     is_mobile_responsive: bool = True
     page_load_seconds: float = 1.0
@@ -212,12 +225,16 @@ class ClinicResearcher:
         if profile.doctors:
             profile.primary_doctor = profile.doctors[0]
 
+        cred_match = re.search(r'\b(DDS|DMD|BDS|FAGD|FICOI|FAACD)\b', combined_text)
+        if cred_match:
+            profile.lead_dentist_credentials = cred_match.group(1).upper()
+
         # 4. Extract Services & Procedures
         found_services = []
         for kw in PROCEDURE_KEYWORDS:
             if kw in combined_text_lower:
                 found_services.append(kw.title())
-        profile.services_found = list(dict.fromkeys(found_services))[:8]
+        profile.services_found = list(dict.fromkeys(found_services))[:10]
 
         # 5. Intake & Tech Audit
         for tool in BOOKING_WIDGET_SIGNATURES:
@@ -241,6 +258,23 @@ class ClinicResearcher:
 
         viewport = soup_home.find("meta", attrs={"name": "viewport"})
         profile.is_mobile_responsive = bool(viewport)
+
+        # Extract After-Hours Emergency Policy
+        detected_policy = "Standard voicemail (unanswered on weekends)"
+        leakage_status = "HIGH_LEAKAGE"
+        policy_snippet = ""
+        for pattern, status_code, description in AFTER_HOURS_PATTERNS:
+            m = re.search(pattern, combined_text, re.IGNORECASE)
+            if m:
+                detected_policy = description
+                leakage_status = "MINIMAL_LEAKAGE" if status_code in ("ON_CALL_DOCTOR", "24_7_TRIAGE") else "SEVERE_LEAKAGE"
+                start_pos = max(0, m.start() - 60)
+                end_pos = min(len(combined_text), m.end() + 60)
+                policy_snippet = combined_text[start_pos:end_pos].strip()
+                break
+        profile.after_hours_policy = detected_policy
+        profile.after_hours_leakage_status = leakage_status
+        profile.emergency_policy_snippet = policy_snippet
 
         # 6. Calculate Empirical Digital Maturity Score
         score = 20
@@ -273,6 +307,239 @@ class ClinicResearcher:
         # Store representative snippets
         profile.raw_snippets = [combined_text[:1200]]
 
+        return profile
+
+    @classmethod
+    async def extract_deep_clinic_profile(
+        cls,
+        url: str,
+        practice_name_hint: Optional[str] = None,
+        use_headless: bool = True
+    ) -> ClinicResearchProfile:
+        """
+        Deep DOM extraction using Playwright Chromium headless browser.
+        Handles client-side JavaScript rendering (Wix, Squarespace, React) to deeply extract:
+        1. Verified practice owner / lead dentist with credentials (DDS, DMD)
+        2. High-value clinical procedures (implants, Invisalign, veneers, etc.)
+        3. Exact after-hours emergency policy and friction snippets
+        4. Modern booking & intake tools
+        Gracefully falls back to standard HTTP crawling if Playwright is unavailable or fails.
+        """
+        if not use_headless:
+            return await cls.research_website(url, practice_name_hint)
+
+        from security import validate_external_url
+        is_safe, reason = validate_external_url(url)
+        if not is_safe:
+            logger.warning(f"Blocked unsafe URL in extract_deep_clinic_profile: {reason}")
+            return await cls.research_website(url, practice_name_hint)
+
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError:
+            logger.info("Playwright not installed in environment, falling back to httpx crawler.")
+            return await cls.research_website(url, practice_name_hint)
+
+        if not url.startswith("http://") and not url.startswith("https://"):
+            url = "https://" + url
+
+        import time as py_time
+        import asyncio as py_asyncio
+        t0 = py_time.time()
+        crawled_urls = [url]
+        extracted_html_parts = []
+        extracted_text_parts = []
+
+        try:
+            async with async_playwright() as p:
+                browser = await p.chromium.launch(
+                    headless=True,
+                    args=["--no-sandbox", "--disable-gpu", "--disable-dev-shm-usage"]
+                )
+                context = await browser.new_context(
+                    user_agent=USER_AGENT,
+                    viewport={"width": 1280, "height": 800},
+                    ignore_https_errors=True
+                )
+                page = await context.new_page()
+
+                # 1. Navigate to Homepage
+                try:
+                    await page.goto(url, timeout=12000, wait_until="domcontentloaded")
+                    await py_asyncio.sleep(1.0)
+                    home_html = await page.content()
+                    home_text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+                    extracted_html_parts.append(home_html)
+                    extracted_text_parts.append(home_text)
+                except Exception as e:
+                    logger.warning(f"Headless homepage load failed for {url}: {e}")
+                    await browser.close()
+                    return await cls.research_website(url, practice_name_hint)
+
+                # 2. Discover Deep Subpages (Team / About / Emergency / Services)
+                subpage_candidates = []
+                try:
+                    links = await page.eval_on_selector_all(
+                        "a[href]",
+                        "elements => elements.map(e => ({ href: e.href, text: e.innerText || '' }))"
+                    )
+                    base_netloc = urlparse(url).netloc
+                    for l in links:
+                        h = l.get("href", "")
+                        t = l.get("text", "").lower()
+                        if urlparse(h).netloc == base_netloc:
+                            h_lower = h.lower()
+                            if any(k in h_lower or k in t for k in ["meet-the-team", "our-team", "meet-the-doctor", "about", "emergency", "dentist", "doctor"]):
+                                if h not in subpage_candidates and h != url:
+                                    subpage_candidates.append(h)
+                except Exception as e:
+                    logger.debug(f"Subpage discovery notice: {e}")
+
+                # Visit up to 2 high-priority subpages (e.g. team or emergency)
+                for sub_url in subpage_candidates[:2]:
+                    try:
+                        await page.goto(sub_url, timeout=8000, wait_until="domcontentloaded")
+                        await py_asyncio.sleep(0.5)
+                        s_html = await page.content()
+                        s_text = await page.evaluate("() => document.body ? document.body.innerText : ''")
+                        extracted_html_parts.append(s_html)
+                        extracted_text_parts.append(s_text)
+                        crawled_urls.append(sub_url)
+                    except Exception as e:
+                        logger.debug(f"Subpage navigation notice for {sub_url}: {e}")
+
+                await browser.close()
+        except Exception as e:
+            logger.warning(f"Headless Playwright execution error for {url}: {e}. Falling back to standard research.")
+            return await cls.research_website(url, practice_name_hint)
+
+        combined_html = " ".join(extracted_html_parts)
+        combined_text = " ".join(extracted_text_parts)
+        combined_text_lower = combined_text.lower()
+
+        profile = ClinicResearchProfile(
+            name=practice_name_hint or "Dental Practice",
+            website=url,
+            has_ssl=url.startswith("https://"),
+            page_load_seconds=round(py_time.time() - t0, 2),
+            subpages_crawled=crawled_urls
+        )
+
+        soup_first = BeautifulSoup(extracted_html_parts[0] if extracted_html_parts else "", "html.parser")
+        title_tag = soup_first.find("title")
+        if title_tag and title_tag.string:
+            clean_title = title_tag.string.split("|")[0].split("-")[0].strip()
+            if clean_title and len(clean_title) > 3 and (not practice_name_hint or practice_name_hint.lower() in ("dental practice", "clinic")):
+                profile.name = clean_title
+
+        # Extract Phone
+        tel_links = [a["href"].replace("tel:", "").strip() for a in soup_first.find_all("a", href=True) if a["href"].startswith("tel:")]
+        if tel_links:
+            profile.phone = tel_links[0]
+        else:
+            phone_matches = re.findall(r'\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b', combined_html)
+            valid_phones = [p for p in phone_matches if not p.startswith("000") and not p.startswith("555-01") and ("-" in p or "(" in p)]
+            if valid_phones:
+                profile.phone = valid_phones[0]
+
+        # Extract Doctors & Credentials
+        doctors_found = []
+        extracted_decision = DecisionMakerHunter.extract_from_html(combined_html)
+        if extracted_decision.get("doctors"):
+            doctors_found.extend(extracted_decision["doctors"])
+
+        doc_patterns = [
+            r'Dr\.\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2})',
+            r'\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,2}),?\s+(?:DDS|DMD|BDS)\b'
+        ]
+        for pat in doc_patterns:
+            for m in re.finditer(pat, combined_text):
+                d_name = m.group(1).strip()
+                if DecisionMakerHunter.is_valid_person_name(d_name):
+                    doctors_found.append(f"Dr. {d_name}")
+
+        title_suffixes = {"General", "President", "Ceo", "Dds", "Dmd", "Bds", "Fagd", "Dentist", "And", "Implant", "Associate", "Staff"}
+        cleaned_doctors = []
+        for d in doctors_found:
+            parts = d.split()
+            kept = []
+            for p in parts:
+                if p.capitalize() in title_suffixes and len(kept) >= 3:
+                    break
+                kept.append(p)
+            clean_d = " ".join(kept)
+            if len(clean_d.split()) >= 2 and clean_d not in cleaned_doctors:
+                cleaned_doctors.append(clean_d)
+
+        profile.doctors = cleaned_doctors[:4]
+        if profile.doctors:
+            profile.primary_doctor = profile.doctors[0]
+
+        cred_match = re.search(r'\b(DDS|DMD|BDS|FAGD|FICOI|FAACD)\b', combined_text)
+        if cred_match:
+            profile.lead_dentist_credentials = cred_match.group(1).upper()
+
+        # Extract Services & Procedures
+        found_services = []
+        for kw in PROCEDURE_KEYWORDS:
+            if kw in combined_text_lower:
+                found_services.append(kw.title())
+        profile.services_found = list(dict.fromkeys(found_services))[:10]
+
+        # Extract Booking & Intake Widgets
+        for tool in BOOKING_WIDGET_SIGNATURES:
+            if tool in combined_html.lower():
+                profile.has_online_booking = True
+                profile.detected_booking_tool = tool.capitalize()
+                break
+
+        for chat in CHAT_WIDGET_SIGNATURES:
+            if chat == "whatsapp":
+                if re.search(r'wa\.me/\d+|whatsapp-widget|joinchat|whatsapp-chat|id=["\']whatsapp-widget', combined_html, re.I):
+                    profile.has_ai_chat = True
+                    profile.detected_chat_tool = "WhatsApp Chat"
+                    break
+            else:
+                if f"/{chat}" in combined_html.lower() or f"{chat}.com" in combined_html.lower() or f"{chat}-widget" in combined_html.lower():
+                    profile.has_ai_chat = True
+                    profile.detected_chat_tool = chat.capitalize()
+                    break
+
+        # Extract After-Hours Emergency Policy
+        detected_policy = "Standard voicemail (unanswered on weekends)"
+        leakage_status = "HIGH_LEAKAGE"
+        policy_snippet = ""
+        for pattern, status_code, description in AFTER_HOURS_PATTERNS:
+            m = re.search(pattern, combined_text, re.IGNORECASE)
+            if m:
+                detected_policy = description
+                leakage_status = "MINIMAL_LEAKAGE" if status_code in ("ON_CALL_DOCTOR", "24_7_TRIAGE") else "SEVERE_LEAKAGE"
+                start_pos = max(0, m.start() - 60)
+                end_pos = min(len(combined_text), m.end() + 60)
+                policy_snippet = combined_text[start_pos:end_pos].strip()
+                break
+        profile.after_hours_policy = detected_policy
+        profile.after_hours_leakage_status = leakage_status
+        profile.emergency_policy_snippet = policy_snippet
+
+        # Calculate Maturity Score
+        score = 25
+        if profile.has_ssl: score += 10
+        if profile.is_mobile_responsive: score += 15
+        if profile.has_online_booking: score += 15
+        if profile.has_ai_chat: score += 20
+        if len(profile.services_found) >= 4: score += 10
+        profile.digital_maturity_score = min(score, 95)
+
+        # Revenue Leakage
+        if any(s.lower() in ("all-on-4", "all on 4") for s in profile.services_found):
+            profile.estimated_monthly_leakage = 7800
+        elif any(s.lower() in ("dental implants", "emergency dentistry") for s in profile.services_found):
+            profile.estimated_monthly_leakage = 5400
+        else:
+            profile.estimated_monthly_leakage = 3800
+
+        profile.raw_snippets = [combined_text[:1200]]
         return profile
 
     @classmethod

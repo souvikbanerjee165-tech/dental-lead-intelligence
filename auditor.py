@@ -289,6 +289,31 @@ class WebsiteAuditor:
                 has_emergency = bool(re.search(r"emergency|urgent\s+dental|same-day|pain\s+relief", html_content, re.IGNORECASE))
                 has_insurance = bool(re.search(r"insurance|financing|payment\s+options|carecredit|in-network", html_content, re.IGNORECASE))
 
+                # Deep Clinic Extraction: After-hours emergency policy & clinical procedures
+                try:
+                    from clinic_researcher import AFTER_HOURS_PATTERNS, PROCEDURE_KEYWORDS
+                    for pat, code, desc in AFTER_HOURS_PATTERNS:
+                        m = re.search(pat, html_content, re.IGNORECASE)
+                        if m:
+                            graph.add_evidence(EvidenceItem(
+                                evidence_type="after_hours_leakage",
+                                source=final_url,
+                                snippet=f"Detected After-Hours Policy: {desc}",
+                                confidence=0.92
+                            ))
+                            break
+
+                    found_procs = [p.title() for p in PROCEDURE_KEYWORDS if p in html_content.lower()]
+                    if found_procs:
+                        graph.add_evidence(EvidenceItem(
+                            evidence_type="clinical_procedures",
+                            source=final_url,
+                            snippet=f"Detected High-Value Procedures: {', '.join(found_procs[:5])}",
+                            confidence=0.95
+                        ))
+                except Exception:
+                    pass
+
                 # 5. Contacts & Socials
                 emails = self._extract_emails(html_content, soup)
                 phones = self._extract_phones(html_content, soup)
