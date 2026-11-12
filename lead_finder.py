@@ -1,3 +1,4 @@
+import os
 import asyncio
 import re
 import urllib.parse
@@ -37,7 +38,52 @@ class GoogleMapsLeadFinder:
         """
         results: List[RawLead] = []
 
-        # 1. Try Official Google Places API (New) if API key is active
+        # 1. Zero-Cost Free Maps Scraper (Playwright fast-DOM engine from viral gmaps-scraper)
+        # Prioritized by default so zero GCP API credits or Maps quotas are consumed
+        prefer_free = os.getenv("PREFER_FREE_MAPS_SCRAPER", "true").lower() in ("1", "true", "yes")
+        if prefer_free:
+            try:
+                from free_maps_scraper import FreeGoogleMapsScraperEngine
+                free_leads = await FreeGoogleMapsScraperEngine.search_clinics(
+                    query=query,
+                    limit=limit,
+                    headless=self.headless
+                )
+                if free_leads:
+                    for idx, lead in enumerate(free_leads, 1):
+                        is_dup = False
+                        if is_existing_fn:
+                            try:
+                                is_dup = is_existing_fn(lead.name, lead.website, lead.phone)
+                            except TypeError:
+                                try:
+                                    is_dup = is_existing_fn(lead.name, lead.website)
+                                except Exception:
+                                    is_dup = False
+                        if not is_dup:
+                            results.append(lead)
+                            if on_lead_found:
+                                try:
+                                    if asyncio.iscoroutinefunction(on_lead_found):
+                                        await on_lead_found(lead, idx, len(free_leads))
+                                    else:
+                                        on_lead_found(lead, idx, len(free_leads))
+                                except Exception:
+                                    pass
+                        elif on_lead_skipped:
+                            try:
+                                if asyncio.iscoroutinefunction(on_lead_skipped):
+                                    await on_lead_skipped(lead.name, "Already in database")
+                                else:
+                                    on_lead_skipped(lead.name, "Already in database")
+                            except Exception:
+                                pass
+                    if results:
+                        return results
+            except Exception:
+                pass
+
+        # 2. Try Official Google Places API (New) if free scraper didn't return or was disabled
         try:
             from google_places_client import GooglePlacesClient
             places_client = GooglePlacesClient()

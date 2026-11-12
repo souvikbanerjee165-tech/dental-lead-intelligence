@@ -4640,6 +4640,51 @@ async def batch_dispatch_sdr_sms(req: SDRBatchSMSRequest, request: Request):
     return {"total": len(results), "dispatches": results}
 
 
+# --- Zero-Cost High-Yield Google Maps Scraper Endpoint ---
+from free_maps_scraper import FreeGoogleMapsScraperEngine
+
+
+class FreeDiscoverRequest(BaseModel):
+    query: str
+    limit: int = 15
+
+
+@app.post("/api/leads/discover-free")
+async def discover_leads_free(req: FreeDiscoverRequest):
+    """
+    Scrapes Google Maps dental clinics at $0 cost (without Google Places API billing).
+    Directly extracts clinic name, phone, address, website, rating, and review count,
+    saving qualified practices into storage.db.
+    """
+    if not req.query.strip():
+        raise HTTPException(status_code=400, detail="Search query is required")
+
+    limit = max(1, min(req.limit, 50))
+    leads = await FreeGoogleMapsScraperEngine.search_clinics(
+        query=req.query,
+        limit=limit,
+        db=db
+    )
+
+    return {
+        "status": "success",
+        "query": req.query,
+        "total_discovered": len(leads),
+        "leads": [
+            {
+                "name": l.name,
+                "phone": l.phone,
+                "website": l.website,
+                "address": l.address,
+                "rating": l.rating,
+                "review_count": l.review_count,
+                "category": l.category
+            }
+            for l in leads
+        ]
+    }
+
+
 if __name__ == "__main__":
     import webbrowser
     import uvicorn

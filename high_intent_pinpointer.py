@@ -261,6 +261,15 @@ class HighIntentPinpointer:
                     "Remember, 1 single crown, root canal, or emergency patient is worth $1,200+. Capturing just ONE caller who would have hung up on voicemail "
                     "pays for the entire $1,200 installation, and 1 patient every 2 months covers the $497/mo retainer. What's the best mobile number to text your live demo link?”"
                 )
+            },
+            {
+                "objection": "“I need to talk to my partner / office manager first.”",
+                "rebuttal": (
+                    f"“Completely understand, {doc_salutation}—practice decisions like this should involve your key team members! "
+                    f"We prepared a 1-page executive teardown and interactive prototype specifically for practice partners and office managers. "
+                    f"What's your office manager's name and mobile number? I'll text it over so both of you can review the missed-call leakage together, "
+                    f"and we can do a quick 10-minute walkthrough this Thursday.”"
+                )
             }
         ]
 
