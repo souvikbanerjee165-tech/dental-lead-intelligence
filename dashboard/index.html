@@ -263,6 +263,14 @@
           <span id="badge-todays-calls" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">HOT</span>
         </button>
 
+        <button onclick="switchTab('switchboard')" id="tab-btn-switchboard" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-slate-300 hover:bg-slate-800/70 hover:text-white border border-transparent">
+          <div class="flex items-center space-x-3">
+            <i class="fa-solid fa-server text-base w-5 text-center text-teal-400"></i>
+            <span>4-Line Switchboard</span>
+          </div>
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/30">4 CH</span>
+        </button>
+
         <button onclick="openInteractiveVoiceStudio()" id="tab-btn-voice-studio" class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all text-purple-300 hover:bg-purple-950/40 hover:text-white border border-purple-500/30 bg-purple-950/20 shadow-sm cursor-pointer">
           <div class="flex items-center space-x-3">
             <i class="fa-solid fa-headset text-base w-5 text-center text-purple-400 animate-pulse"></i>
@@ -1184,6 +1192,164 @@
         <!-- Hot Leads Cards Grid -->
         <div id="grid-todays-calls" class="grid grid-cols-1 md:grid-cols-2 gap-5">
           <!-- Populated dynamically via loadTodaysCallsData() -->
+        </div>
+      </section>
+
+      <!-- TAB: 4-CHANNEL MULTI-LINE SWITCHBOARD (BLUEPRINT V1.0.0) -->
+      <section id="view-switchboard" class="hidden space-y-6 max-w-6xl mx-auto">
+        <!-- Control & Metrics Header -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-900 to-teal-950/40 border border-teal-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+          <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-teal-400 animate-ping"></span>
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-teal-500/20 text-teal-300 border border-teal-500/30 uppercase tracking-wide">Blueprint V1.0.0 Telephony Engine</span>
+                <span class="text-slate-400 text-xs">• 4 Concurrent Voice Lines</span>
+              </div>
+              <h2 class="text-2xl font-extrabold text-white mt-1">Multi-Line Switchboard & AI Receptionist</h2>
+              <p class="text-xs text-slate-400 max-w-2xl mt-1">Sub-400ms turn SLA, 180ms vocal barge-in interruption, and zero-repetition warm transfers with live context briefing cards whispered to human staff.</p>
+            </div>
+
+            <!-- Operational SLA Pills -->
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-center">
+                <div class="text-[9px] uppercase font-bold text-slate-400">Turn SLA</div>
+                <div class="text-xs font-black text-emerald-400 font-mono">&lt; 400ms</div>
+              </div>
+              <div class="bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-center">
+                <div class="text-[9px] uppercase font-bold text-slate-400">Concurrency</div>
+                <div class="text-xs font-black text-teal-400 font-mono">4 Channels</div>
+              </div>
+              <div class="bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-center">
+                <div class="text-[9px] uppercase font-bold text-slate-400">Warm Transfer</div>
+                <div class="text-xs font-black text-amber-400 font-mono">Zero-Repeat</div>
+              </div>
+              <div class="bg-slate-950/80 px-3 py-2 rounded-xl border border-slate-800 text-center">
+                <div class="text-[9px] uppercase font-bold text-slate-400">Barge-In VAD</div>
+                <div class="text-xs font-black text-cyan-400 font-mono">180ms Cutoff</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="flex flex-wrap items-center gap-3 pt-5 border-t border-slate-800/80 mt-5">
+            <button onclick="simulateSwitchboardCall('EMERGENCY_URGENT')" class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-phone-arrow-down-left"></i>
+              <span>+ Simulate Inbound Call (Emergency)</span>
+            </button>
+            <button onclick="simulateSwitchboardCall('NEW_CUSTOMER_INTAKE')" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-teal-300 border border-teal-500/30 font-bold text-xs transition cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-user-plus"></i>
+              <span>Simulate New Patient</span>
+            </button>
+            <button onclick="simulateSwitchboardBargeIn()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/30 font-bold text-xs transition cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-waveform-lines"></i>
+              <span>Trigger Barge-In (180ms)</span>
+            </button>
+            <button onclick="triggerSwitchboardTransfer()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 font-bold text-xs transition cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-arrow-right-arrow-left"></i>
+              <span>Warm Transfer</span>
+            </button>
+            <button onclick="toggleSwitchboardHold()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 font-bold text-xs transition cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-pause"></i>
+              <span>Hold / Mute</span>
+            </button>
+            <button onclick="completeSwitchboardCall()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/30 font-bold text-xs transition cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-phone-slash"></i>
+              <span>Complete / Hangup</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 4-Channel Line Status Grid -->
+        <div id="switchboard-channels-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <!-- Populated dynamically via renderSwitchboardLines() -->
+        </div>
+
+        <!-- Selected Line Inspection Workspace -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <!-- Left 2 Cols: Live Audio, VAD Meter, and Attributed Transcript -->
+          <div class="lg:col-span-2 bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+              <div class="flex items-center gap-3">
+                <span id="sb-active-line-title" class="text-sm font-black text-white uppercase tracking-wider">Line 1 Workspace</span>
+                <span id="sb-active-status-badge" class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400">Idle</span>
+              </div>
+              <!-- VAD & Barge-In Indicator -->
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5 text-[11px] text-slate-400">
+                  <span class="text-[10px] font-bold text-slate-500 uppercase">VAD State:</span>
+                  <span id="sb-vad-state-pill" class="px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 font-mono">QUIET</span>
+                </div>
+                <!-- Volume Level Meter Bar -->
+                <div class="w-20 bg-slate-800 h-2 rounded-full overflow-hidden">
+                  <div id="sb-vad-volume-bar" class="bg-gradient-to-r from-teal-400 to-emerald-400 h-full w-0 transition-all duration-75"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Attributed Transcript Feed -->
+            <div id="sb-transcript-feed" class="h-80 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-slate-700">
+              <div class="h-full flex flex-col items-center justify-center text-center text-xs text-slate-500 space-y-2">
+                <i class="fa-solid fa-headset text-3xl text-slate-700"></i>
+                <p>Line is currently completed or idle. Click <strong>+ Simulate Inbound Call</strong> above to test sub-400ms live conversational turns.</p>
+              </div>
+            </div>
+
+            <!-- Line Action Directive Strip -->
+            <div id="sb-action-directive-strip" class="p-3 rounded-xl bg-slate-950 border border-slate-800/80 text-xs flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <i class="fa-solid fa-shield-halved text-teal-400"></i>
+                <span class="text-slate-400 text-[11px]">Automated Clinical Action Directive:</span>
+                <span id="sb-directive-text" class="text-slate-200 font-semibold">Awaiting inbound caller triage...</span>
+              </div>
+              <span id="sb-priority-badge" class="px-2 py-0.5 rounded text-[9px] font-black bg-slate-800 text-slate-400 uppercase">ROUTINE</span>
+            </div>
+          </div>
+
+          <!-- Right 1 Col: Zero-Repetition Warm Transfer Handoff Card -->
+          <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-5 space-y-4 flex flex-col justify-between">
+            <div class="space-y-4">
+              <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-clipboard-user text-amber-400"></i>
+                  <span class="text-xs font-black text-white uppercase tracking-wider">Zero-Repetition Handoff Card</span>
+                </div>
+                <span class="text-[10px] text-amber-400 font-mono">Whispered to Staff</span>
+              </div>
+
+              <!-- Briefing Card Content Container -->
+              <div id="sb-briefing-card-content" class="space-y-3">
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div class="text-[9px] font-bold uppercase text-slate-500">1. Caller Summary</div>
+                  <div id="sb-briefing-caller" class="text-xs font-semibold text-white">Amanda Cole (+1 555-332-9011, Member ID MET-987654321)</div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div class="text-[9px] font-bold uppercase text-slate-500">2. Identified Need</div>
+                  <div id="sb-briefing-need" class="text-xs font-semibold text-amber-300">Inquiring out-of-pocket coinsurance for tooth #19 porcelain crown ($1,250 fee)</div>
+                </div>
+
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
+                  <div class="text-[9px] font-bold uppercase text-slate-500">3. Suggested Resolution</div>
+                  <div id="sb-briefing-resolution" class="text-xs font-semibold text-emerald-300">MetLife covers 50% after $50 deductible. True estimated copay is $650.</div>
+                </div>
+
+                <div class="p-2.5 rounded-xl bg-amber-950/20 border border-amber-500/30 text-[11px] text-amber-200 flex items-center justify-between">
+                  <span>Transfer Target:</span>
+                  <span id="sb-briefing-target" class="font-bold text-white">Front Desk Coordinator (Sarah)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- TeXML Carrier Integration Notice -->
+            <div class="pt-3 border-t border-slate-800/80 text-[10px] text-slate-500 space-y-1">
+              <div class="flex items-center justify-between font-mono">
+                <span>Carrier PSTN Protocol:</span>
+                <span class="text-teal-400">Telnyx TeXML &lt;Dial&gt;</span>
+              </div>
+              <p>74% of patient complaints stem from repeating symptoms. This card eliminates repetition on transfer.</p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -4756,7 +4922,7 @@
     // Switch Tabs
     function switchTab(tab) {
       currentTab = tab;
-      ['finder', 'todays-calls', 'briefing', 'territories', 'learning', 'swarm', 'queue', 'kanban', 'leads', 'proposals', 'client-health', 'recordings', 'settings'].forEach(t => {
+      ['finder', 'todays-calls', 'switchboard', 'briefing', 'territories', 'learning', 'swarm', 'queue', 'kanban', 'leads', 'proposals', 'client-health', 'recordings', 'settings'].forEach(t => {
         const view = document.getElementById(`view-${t}`);
         const btn = document.getElementById(`tab-btn-${t}`);
         if (view && btn) {
@@ -4779,6 +4945,9 @@
       if (tab === 'todays-calls') {
         loadTodaysCallsData();
         checkDueRemindersBadge();
+      }
+      if (tab === 'switchboard') {
+        loadSwitchboardData();
       }
       if (tab === 'briefing') loadBriefingData();
       if (tab === 'territories') loadTerritoriesData();
@@ -5850,6 +6019,285 @@
         btn.disabled = false;
         btn.innerHTML = `<i class="fa-solid fa-wand-magic-sparkles"></i><span>Generate Interactive Proposal</span>`;
         alert("Failed to generate proposal: " + err.message);
+      }
+    }
+
+    // =========================================================================
+    // Multi-Line Switchboard Engine (Blueprint V1.0.0) Frontend Runtime
+    // =========================================================================
+    let currentSbLineId = 'line-1';
+    let sbPollingInterval = null;
+    let sbLinesData = [];
+
+    async function loadSwitchboardData() {
+      try {
+        const res = await fetch('/api/v1/voice/triage/lines');
+        if (!res.ok) return;
+        const data = await res.json();
+        sbLinesData = data.lines || [];
+        renderSwitchboardLines();
+        renderActiveSwitchboardLine();
+
+        if (!sbPollingInterval) {
+          sbPollingInterval = setInterval(() => {
+            if (currentTab === 'switchboard') {
+              loadSwitchboardData();
+            } else {
+              clearInterval(sbPollingInterval);
+              sbPollingInterval = null;
+            }
+          }, 1500);
+        }
+      } catch (err) {
+        console.error('Failed to load switchboard lines:', err);
+      }
+    }
+
+    function renderSwitchboardLines() {
+      const grid = document.getElementById('switchboard-channels-grid');
+      if (!grid) return;
+
+      grid.innerHTML = sbLinesData.map(l => {
+        const isSelected = l.id === currentSbLineId;
+        const borderClass = isSelected ? 'border-teal-400 bg-slate-800/90 shadow-lg shadow-teal-500/10' : 'border-slate-800 bg-slate-950/70 hover:border-slate-700';
+        
+        let statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">Idle</span>';
+        if (l.status === 'active_ai') {
+          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 animate-pulse">Active AI Call</span>';
+        } else if (l.status === 'warm_transfer_pending') {
+          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-bounce">Transfer Pending</span>';
+        } else if (l.status === 'ringing') {
+          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 animate-ping">Ringing</span>';
+        } else if (l.status === 'on_hold') {
+          statusBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/40">On Hold</span>';
+        }
+
+        const m = Math.floor((l.duration_seconds || 0) / 60);
+        const s = (l.duration_seconds || 0) % 60;
+        const timerStr = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+
+        return `
+          <div onclick="selectSwitchboardLine('${l.id}')" class="p-4 rounded-xl border transition-all cursor-pointer ${borderClass}">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black text-white uppercase">${l.id}</span>
+              <span class="font-mono text-xs font-bold text-teal-400">${timerStr}</span>
+            </div>
+            <div class="pt-2 pb-1">${statusBadge}</div>
+            <div class="text-xs font-bold text-slate-200 truncate pt-1">${l.caller_name || 'Line Available'}</div>
+            <div class="text-[10px] text-slate-400 truncate">${l.caller_phone || 'PSTN Softphone'}</div>
+            ${l.triage_category ? `<div class="mt-2 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-teal-300 truncate">${l.triage_category.replace(/_/g, ' ')}</div>` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectSwitchboardLine(lineId) {
+      currentSbLineId = lineId;
+      renderSwitchboardLines();
+      renderActiveSwitchboardLine();
+    }
+
+    function renderActiveSwitchboardLine() {
+      const activeLine = sbLinesData.find(l => l.id === currentSbLineId) || sbLinesData[0];
+      if (!activeLine) return;
+
+      const titleEl = document.getElementById('sb-active-line-title');
+      if (titleEl) titleEl.innerText = `${activeLine.id.toUpperCase()} Workspace • ${activeLine.caller_name || 'Available'}`;
+
+      const statusBadge = document.getElementById('sb-active-status-badge');
+      if (statusBadge) {
+        statusBadge.innerText = activeLine.status.toUpperCase().replace(/_/g, ' ');
+        statusBadge.className = activeLine.status === 'active_ai'
+          ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+          : activeLine.status === 'warm_transfer_pending'
+          ? 'px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40'
+          : 'px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700';
+      }
+
+      // Action directive strip
+      const dirText = document.getElementById('sb-directive-text');
+      if (dirText) dirText.innerText = activeLine.action_directive || 'Awaiting inbound caller triage...';
+
+      const prioBadge = document.getElementById('sb-priority-badge');
+      if (prioBadge) {
+        prioBadge.innerText = activeLine.triage_priority || 'ROUTINE';
+        prioBadge.className = activeLine.triage_priority === 'CRITICAL URGENT'
+          ? 'px-2 py-0.5 rounded text-[9px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40 uppercase'
+          : activeLine.triage_priority === 'HIGH PRODUCTION'
+          ? 'px-2 py-0.5 rounded text-[9px] font-black bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase'
+          : 'px-2 py-0.5 rounded text-[9px] font-black bg-slate-800 text-slate-400 uppercase';
+      }
+
+      // Transcript Feed
+      const feed = document.getElementById('sb-transcript-feed');
+      if (feed) {
+        if (activeLine.transcript && activeLine.transcript.length > 0) {
+          feed.innerHTML = activeLine.transcript.map(t => {
+            const isAi = t.speaker === 'ai_agent';
+            const isHuman = t.speaker === 'human_receptionist';
+            const alignClass = isAi ? 'bg-slate-800 text-slate-200 mr-auto border border-slate-700/60' :
+                               isHuman ? 'bg-amber-950/40 text-amber-200 ml-auto border border-amber-500/40' :
+                               'bg-teal-950/40 text-teal-200 ml-auto border border-teal-500/40';
+            const speakerLabel = isAi ? 'Emily (AI Receptionist)' : isHuman ? 'Sarah (Front Desk)' : 'Caller';
+
+            return `
+              <div class="p-3 rounded-xl text-xs max-w-[85%] ${alignClass} space-y-1">
+                <div class="flex items-center justify-between text-[10px] opacity-75">
+                  <span class="font-bold uppercase tracking-wider">${speakerLabel}</span>
+                  <span class="font-mono">${(t.timestampIso || '').slice(11, 19)}</span>
+                </div>
+                <p class="leading-relaxed">${t.text}</p>
+              </div>
+            `;
+          }).join('');
+          feed.scrollTop = feed.scrollHeight;
+        } else {
+          feed.innerHTML = `
+            <div class="h-full flex flex-col items-center justify-center text-center text-xs text-slate-500 space-y-2">
+              <i class="fa-solid fa-headset text-3xl text-slate-700"></i>
+              <p>Line is currently idle. Click <strong>+ Simulate Inbound Call</strong> to start live audio & turn attribution.</p>
+            </div>
+          `;
+        }
+      }
+
+      // Context Briefing Card
+      const card = activeLine.context_briefing_card;
+      const callerEl = document.getElementById('sb-briefing-caller');
+      const needEl = document.getElementById('sb-briefing-need');
+      const resEl = document.getElementById('sb-briefing-resolution');
+      const targetEl = document.getElementById('sb-briefing-target');
+
+      if (card) {
+        if (callerEl) callerEl.innerText = card.callerSummary;
+        if (needEl) needEl.innerText = card.identifiedNeed;
+        if (resEl) resEl.innerText = card.suggestedResolution;
+        if (targetEl) targetEl.innerText = card.transferredTo;
+      } else {
+        if (callerEl) callerEl.innerText = `${activeLine.caller_name || 'Caller'} (${activeLine.caller_phone || 'None'}, Member ID ${activeLine.member_id || 'MET-987654321'})`;
+        if (needEl) needEl.innerText = 'Call in progress with AI Emily. Briefing card generates automatically upon warm transfer.';
+        if (resEl) resEl.innerText = 'AI actively managing conversation turn under 400ms SLA.';
+        if (targetEl) targetEl.innerText = 'Front Desk Coordinator (Sarah)';
+      }
+    }
+
+    async function simulateSwitchboardCall(category) {
+      let msg = "Hi, I have severe throbbing pain in my molar and cannot chew.";
+      let name = "Amanda Cole";
+      if (category === 'NEW_CUSTOMER_INTAKE') {
+        msg = "Hi, I am a new patient just moved to Austin and want to schedule a comprehensive first exam.";
+        name = "David Miller";
+      }
+
+      try {
+        const res = await fetch('/api/v1/voice/triage/simulate-call', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            caller_name: name,
+            caller_phone: "+1 512-555-0199",
+            message: msg,
+            line_override: currentSbLineId
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadSwitchboardData();
+        } else {
+          alert(data.error || "Failed to simulate call");
+        }
+      } catch (e) {
+        alert("Network error simulating call: " + e.message);
+      }
+    }
+
+    async function simulateSwitchboardBargeIn() {
+      const vadPill = document.getElementById('sb-vad-state-pill');
+      const vadBar = document.getElementById('sb-vad-volume-bar');
+
+      if (vadPill && vadBar) {
+        vadPill.innerText = "STARTING";
+        vadPill.className = "px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 font-mono animate-pulse";
+        vadBar.style.width = "40%";
+
+        setTimeout(() => {
+          vadPill.innerText = "SPEAKING (BARGE-IN)";
+          vadPill.className = "px-2 py-0.5 rounded text-[9px] font-bold bg-rose-500/30 text-rose-300 border border-rose-500/50 font-mono animate-bounce";
+          vadBar.style.width = "90%";
+        }, 180);
+
+        setTimeout(async () => {
+          await fetch('/api/v1/voice/triage/turn', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              line_id: currentSbLineId,
+              speaker: 'customer',
+              text: "Wait, sorry, I meant Thursday afternoon, not Wednesday!"
+            })
+          });
+
+          await fetch('/api/v1/voice/triage/turn', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              line_id: currentSbLineId,
+              speaker: 'ai_agent',
+              text: "Understood! Switching to Thursday afternoon at 2:00 PM for you."
+            })
+          });
+
+          vadPill.innerText = "QUIET";
+          vadPill.className = "px-2 py-0.5 rounded text-[9px] font-bold bg-slate-800 text-slate-400 font-mono";
+          vadBar.style.width = "5%";
+          loadSwitchboardData();
+        }, 650);
+      }
+    }
+
+    async function triggerSwitchboardTransfer() {
+      try {
+        const res = await fetch('/api/v1/voice/triage/transfer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ line_id: currentSbLineId })
+        });
+        const data = await res.json();
+        if (data.success) {
+          loadSwitchboardData();
+        } else {
+          alert(data.error || "Cannot transfer line");
+        }
+      } catch (e) {
+        alert("Error initiating warm transfer: " + e.message);
+      }
+    }
+
+    async function toggleSwitchboardHold() {
+      const activeLine = sbLinesData.find(l => l.id === currentSbLineId);
+      const isHold = activeLine?.status === 'on_hold';
+      try {
+        await fetch('/api/v1/voice/triage/hold', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ line_id: currentSbLineId, on_hold: !isHold })
+        });
+        loadSwitchboardData();
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function completeSwitchboardCall() {
+      try {
+        await fetch('/api/v1/voice/triage/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ line_id: currentSbLineId, reason: "Operator ended call" })
+        });
+        loadSwitchboardData();
+      } catch (e) {
+        console.error(e);
       }
     }
 

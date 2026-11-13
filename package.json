@@ -1,0 +1,40 @@
+{
+  "name": "lead-gen-web-scrapper",
+  "version": "1.0.0",
+  "description": "[![Python](https://img.shields.io/badge/Python-3.14-blue.svg)](https://python.org) [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688.svg)](https://fastapi.tiangolo.com) [![Telephony](https://img.shields.io/badge/Telnyx-TeXML%20%7C%20WebRTC-green.svg)](https://telnyx.com) [![Voice](https://img.shields.io/badge/Edge--TTS%20%7C%20Kokoro-ONNX-orange.svg)](https://github.com/rany2/edge-tts) [![Qualification](https://img.shields.io/badge/BANT%20%7C%20MEDDIC-Enterprise%20Scored-purple.svg)](docs/ARCHITECTURE.md) [![Tests](https://img.shields.io/badge/Tests-Passed%20(100%25)-brightgreen.svg)](tests/)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/souvikbanerjee165-tech/dental-lead-intelligence.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/souvikbanerjee165-tech/dental-lead-intelligence/issues"
+  },
+  "homepage": "https://github.com/souvikbanerjee165-tech/dental-lead-intelligence#readme",
+  "dependencies": {
+    "@google/genai": "^3.3.0",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.10",
+    "express": "^5.3.0",
+    "ws": "^8.23.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "@types/ws": "^8.18.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

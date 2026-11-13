@@ -48,6 +48,7 @@ models/
 # Operating system / IDE
 .DS_Store
 Thumbs.db
+node_modules/
 .idea/
 .vscode/
 

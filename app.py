@@ -2276,6 +2276,216 @@ async def get_tunnel_status_endpoint():
 
 # --- Two-Way Calendar Sync & Demo Booking Endpoints ---
 
+# ==============================================================================
+# Blueprint V1.0.0: Voice Telephony & Multi-Line Switchboard Engine Endpoints
+# ==============================================================================
+
+@app.get("/lines")
+@app.get("/api/v1/voice/triage/lines")
+async def get_switchboard_lines_endpoint():
+    """Returns snapshot of all 4 concurrent channels with active call timers."""
+    from multiline_switchboard import switchboard_engine
+    lines = switchboard_engine.get_all_lines()
+    return {"success": True, "count": len(lines), "lines": lines}
+
+@app.get("/api/v1/voice/triage/lines/{line_id}")
+async def get_switchboard_line_endpoint(line_id: str):
+    """Returns detailed state for a specific switchboard channel."""
+    from multiline_switchboard import switchboard_engine
+    line = switchboard_engine.get_line(line_id)
+    if not line:
+        raise HTTPException(status_code=404, detail=f"Line {line_id} not found")
+    return {"success": True, "channel": line}
+
+@app.post("/classify")
+@app.post("/api/v1/voice/triage/classify")
+async def classify_switchboard_intent_endpoint(payload: Dict[str, Any] = Body(...)):
+    """Classifies speech into one of 6 clinical categories per Blueprint V1.0.0."""
+    from multiline_switchboard import switchboard_engine
+    text = payload.get("text", "")
+    if not text:
+        raise HTTPException(status_code=400, detail="Missing 'text' field")
+    return {"success": True, **switchboard_engine.classify_call_intent(text)}
+
+@app.post("/simulate-call")
+@app.post("/api/v1/voice/triage/simulate-call")
+async def simulate_switchboard_call_endpoint(payload: Dict[str, Any] = Body(...)):
+    """Seeds an inbound call across the 4 concurrency switchboard channels."""
+    from multiline_switchboard import switchboard_engine
+    caller_name = payload.get("caller_name", "Amanda Cole")
+    caller_phone = payload.get("caller_phone", "+1 555-332-9011")
+    message = payload.get("message") or payload.get("text") or "Hi, I have severe throbbing pain in my molar and cannot chew."
+    line_override = payload.get("line_override")
+    member_id = payload.get("member_id", "MET-987654321")
+
+    res = switchboard_engine.simulate_inbound_call(
+        caller_name=caller_name,
+        caller_phone=caller_phone,
+        initial_message=message,
+        line_override=line_override,
+        member_id=member_id
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=429, detail=res)
+    return res
+
+@app.post("/transfer")
+@app.post("/api/v1/voice/triage/transfer")
+async def transfer_switchboard_call_endpoint(payload: Dict[str, Any] = Body(...)):
+    """Triggers Section 5 Zero-Repetition Warm Transfer protocol."""
+    from multiline_switchboard import switchboard_engine
+    line_id = payload.get("line_id")
+    if not line_id:
+        raise HTTPException(status_code=400, detail="Missing 'line_id'")
+    transferred_to = payload.get("transferred_to", "Front Desk Coordinator (Sarah)")
+    op_phone = payload.get("operator_phone")
+    res = switchboard_engine.initiate_warm_transfer(
+        line_id=line_id,
+        transferred_to=transferred_to,
+        operator_phone=op_phone
+    )
+    if not res.get("success"):
+        raise HTTPException(status_code=400, detail=res)
+    return res
+
+@app.post("/complete")
+@app.post("/api/v1/voice/triage/complete")
+async def complete_switchboard_call_endpoint(payload: Dict[str, Any] = Body(...)):
+    """Completes and archives active switchboard call."""
+    from multiline_switchboard import switchboard_engine
+    line_id = payload.get("line_id")
+    if not line_id:
+        raise HTTPException(status_code=400, detail="Missing 'line_id'")
+    reason = payload.get("reason", "Normal clearing")
+    return switchboard_engine.complete_call(line_id=line_id, reason=reason)
+
+@app.post("/api/v1/voice/triage/hold")
+async def hold_switchboard_call_endpoint(payload: Dict[str, Any] = Body(...)):
+    """Mutes/holds audio channel during staff lookup."""
+    from multiline_switchboard import switchboard_engine
+    line_id = payload.get("line_id")
+    if not line_id:
+        raise HTTPException(status_code=400, detail="Missing 'line_id'")
+    on_hold = payload.get("on_hold", True)
+    return switchboard_engine.set_line_hold(line_id=line_id, on_hold=on_hold)
+
+@app.post("/api/v1/voice/triage/turn")
+async def add_switchboard_turn_endpoint(payload: Dict[str, Any] = Body(...)):
+    """Records an attributed conversational turn with ISO timestamp."""
+    from multiline_switchboard import switchboard_engine
+    line_id = payload.get("line_id")
+    speaker = payload.get("speaker", "customer")
+    text = payload.get("text", "")
+    audio_url = payload.get("audio_url")
+    if not line_id or not text:
+        raise HTTPException(status_code=400, detail="Missing line_id or text")
+    return switchboard_engine.process_line_turn(line_id=line_id, speaker=speaker, text=text, audio_url=audio_url)
+
+@app.post("/telnyx/inbound")
+@app.post("/api/v1/voice/telnyx/inbound")
+async def telnyx_texml_inbound_endpoint():
+    """TeXML carrier entry point with Polly.Joanna-Neural voice and Speech-to-Text Gather."""
+    xml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="speech" action="/api/v1/voice/telnyx/respond" method="POST" timeout="5" speechTimeout="auto">
+    <Say voice="Polly.Joanna-Neural" language="en-US">
+      Thank you for calling Apex Dental Studio. This is Emily, your AI patient coordinator. How can I help you today?
+    </Say>
+  </Gather>
+  <Say voice="Polly.Joanna-Neural" language="en-US">
+    I did not hear a response. Please hold or call back during our normal practice hours. Goodbye.
+  </Say>
+  <Hangup/>
+</Response>"""
+    return Response(content=xml, media_type="application/xml")
+
+@app.post("/telnyx/respond")
+@app.post("/api/v1/voice/telnyx/respond")
+async def telnyx_texml_respond_endpoint(request: Request):
+    """TeXML speech triage handler with automatic Zero-Repetition Warm Transfer <Dial>."""
+    from multiline_switchboard import switchboard_engine
+    form = {}
+    try:
+        raw_body = (await request.body()).decode("utf-8", errors="ignore")
+        form = dict(urllib.parse.parse_qsl(raw_body, keep_blank_values=True))
+    except Exception:
+        pass
+
+    speech = form.get("SpeechResult") or form.get("speech_result") or ""
+    op_phone = os.getenv("FRONT_DESK_TRANSFER_PHONE", "+15559876543")
+
+    if not speech:
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna-Neural" language="en-US">
+    Connecting you directly to our front desk coordinator right now. Please hold.
+  </Say>
+  <Dial timeout="25">{op_phone}</Dial>
+</Response>"""
+        return Response(content=xml, media_type="application/xml")
+
+    triage = switchboard_engine.classify_call_intent(speech)
+    if triage["priority"] in ("CRITICAL URGENT", "HIGH PRODUCTION"):
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Say voice="Polly.Joanna-Neural" language="en-US">
+    Connecting you directly to our front desk coordinator right now. Please hold.
+  </Say>
+  <Dial timeout="25">{op_phone}</Dial>
+</Response>"""
+    else:
+        directive = triage["automated_action_directive"]
+        xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+  <Gather input="speech" action="/api/v1/voice/telnyx/respond" method="POST" timeout="4" speechTimeout="auto">
+    <Say voice="Polly.Joanna-Neural" language="en-US">
+      I understand. {directive} Is there anything else I can check for you?
+    </Say>
+  </Gather>
+</Response>"""
+    return Response(content=xml, media_type="application/xml")
+
+@app.websocket("/api/v1/voice/stream/{line_id}")
+async def websocket_switchboard_stream_endpoint(websocket: WebSocket, line_id: str):
+    """24kHz Bidirectional Audio WebSocket Stream with real-time VAD & 180ms Vocal Barge-In."""
+    await websocket.accept()
+    from multiline_switchboard import switchboard_engine
+    import struct, math
+
+    ch = switchboard_engine.channels.get(line_id)
+    if not ch:
+        await websocket.close(code=1008)
+        return
+
+    tc = switchboard_engine.turn_controllers.get(line_id)
+    try:
+        while True:
+            message = await websocket.receive()
+            if "bytes" in message and message["bytes"]:
+                raw_bytes = message["bytes"]
+                num_samples = len(raw_bytes) // 2
+                if num_samples > 0:
+                    samples = struct.unpack(f"<{num_samples}h", raw_bytes[:num_samples * 2])
+                    sum_sq = sum((s / 32768.0) ** 2 for s in samples)
+                    rms_vol = math.sqrt(sum_sq / num_samples)
+                    if tc:
+                        vad = tc.process_audio_frame(rms_vol)
+                        if vad["barge_in"]:
+                            await websocket.send_json({"event": "barge_in", "line_id": line_id, "vad": vad})
+                        elif vad["turn_complete"]:
+                            await websocket.send_json({"event": "turn_complete", "line_id": line_id, "vad": vad})
+            elif "text" in message and message["text"]:
+                data = json.loads(message["text"])
+                if data.get("event") == "start_ai_speech":
+                    tc.set_ai_speaking(True)
+                elif data.get("event") == "stop_ai_speech":
+                    tc.set_ai_speaking(False)
+    except WebSocketDisconnect:
+        if tc:
+            tc.reset()
+    except Exception:
+        pass
+
 @app.get("/api/calendar/slots")
 async def get_calendar_slots_endpoint(days: int = 5):
     """Returns available 15-minute demo slots for dental practice owners."""
