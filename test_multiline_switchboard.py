@@ -10,7 +10,7 @@ from turn_controller import TurnController
 total_assertions = 0
 passed_assertions = 0
 
-def assert_test(cond: bool, desc: string = ""):
+def assert_test(cond: bool, desc: str = ""):
     global total_assertions, passed_assertions
     total_assertions += 1
     if cond:
