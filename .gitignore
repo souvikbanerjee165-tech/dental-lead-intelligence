@@ -55,3 +55,6 @@ node_modules/
 .vercel
 cloudflared.exe
 
+# Knowledge graph outputs
+graphify-out/
+
