@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import os
 import re
+import html
 import json
 import time
 import base64
@@ -43,7 +44,7 @@ from settings_manager import SettingsManager
 from security import (
     SecurityHeadersMiddleware, RateLimitMiddleware, AuthEnforcementMiddleware, PayloadSizeLimitMiddleware,
     validate_startup_security, validate_external_url, verify_twilio_signature,
-    verify_telnyx_webhook, human_jitter_delay, compress_image_if_possible
+    verify_telnyx_webhook, verify_calcom_signature, human_jitter_delay, compress_image_if_possible
 )
 from auth_manager import auth_manager, verify_auth_dependency
 from structured_logger import audit_logger, SecretMaskingLogFilter
@@ -1881,6 +1882,15 @@ async def telnyx_webhook_handler(request: Request):
 
         logger.info(f"Telnyx webhook received: {event_type} (Call ID: {call_control_id}, Lead: {lead_id}, Hangup: {hangup_cause})")
 
+        # Silent Mystery Shopper AMD verification probes never speak sales audio to clinics
+        if client_state.get("probe_type") == "mystery_shopper":
+            return MysteryShopperAuditor.handle_probe_webhook_event(
+                event_type=event_type,
+                payload=payload,
+                client_state=client_state,
+                db=db
+            )
+
         from voice_dialer import start_telnyx_transcription, send_telnyx_speak
         from live_dialer_engine import LiveDialerEngine
 
@@ -1974,6 +1984,33 @@ async def telnyx_webhook_handler(request: Request):
                     db=db
                 )
 
+                # Instant TCPA / DNC opt-out keyword detection & automatic blacklisting
+                try:
+                    from carrier_reputation_manager import CarrierReputationManager
+                    rep_mgr = CarrierReputationManager(db=db)
+                    if rep_mgr.check_for_opt_out(transcript):
+                        opt_phone = client_state.get("phone") or matched_session.get("phone") or ""
+                        opt_clinic = client_state.get("name") or matched_session.get("contact_name") or ""
+                        opt_res = rep_mgr.process_opt_out(
+                            destination_phone=opt_phone,
+                            clinic_name=opt_clinic,
+                            reason=f"VOICE_OPT_OUT: {transcript[:80]}"
+                        )
+                        if lead_id:
+                            OpportunityTimelineManager.log_event(
+                                db=db,
+                                lead_id=lead_id,
+                                event_type="DNC_OPT_OUT",
+                                title="🛑 Prospect Requested Do-Not-Call Removal",
+                                description=f"Caller said '{transcript}'. Blacklisted {opt_phone} immediately.",
+                                actor="COMPLIANCE_SHIELD"
+                            )
+                        matched_session["status"] = "OPT_OUT_HANGUP"
+                        send_telnyx_speak(call_control_id, opt_res["polite_exit_statement"])
+                        return {"status": "dnc_opt_out_processed", "details": opt_res}
+                except Exception as dnc_ex:
+                    logger.warning(f"DNC keyword check notice: {dnc_ex}")
+
                 # Formulate real-time tactical AI response
                 current_mode = matched_session.get("current_mode", "AI_CONTROL")
                 if current_mode in ("AI_CONTROL", "AI_FIRST"):
@@ -2037,10 +2074,10 @@ async def telnyx_webhook_handler(request: Request):
                 return {"status": "human_handled", "details": res}
 
         elif event_type == "call.speak.ended":
-            # If call was in VOICEMAIL_DROP mode, immediately hang up to save carrier minutes
-            if matched_session and matched_session.get("status") == "VOICEMAIL_DROP":
+            # Hang up immediately after finishing a Voicemail Drop or polite DNC Opt-Out exit statement
+            if matched_session and matched_session.get("status") in ("VOICEMAIL_DROP", "OPT_OUT_HANGUP"):
                 from voice_dialer import hangup_telnyx_call
-                logger.info(f"Voicemail sting finished for {call_control_id}. Hanging up call to save carrier minutes.")
+                logger.info(f"Post-speech disconnect ({matched_session.get('status')}) for {call_control_id}. Hanging up cleanly.")
                 hangup_telnyx_call(call_control_id)
                 return {"status": "voicemail_hung_up"}
 
@@ -2381,10 +2418,48 @@ async def add_switchboard_turn_endpoint(payload: Dict[str, Any] = Body(...)):
         raise HTTPException(status_code=400, detail="Missing line_id or text")
     return switchboard_engine.process_line_turn(line_id=line_id, speaker=speaker, text=text, audio_url=audio_url)
 
+async def _verify_and_parse_texml(request: Request) -> Dict[str, str]:
+    """Verifies Telnyx webhook headers/signature and parses URL-encoded or JSON TeXML body."""
+    raw_body = await request.body()
+    ok_sig, reason = verify_telnyx_webhook(request.headers, raw_body)
+    if not ok_sig:
+        logger.warning(f"Rejected Telnyx TeXML request: {reason}")
+        raise HTTPException(status_code=403, detail=reason)
+
+    body_text = raw_body.decode("utf-8", errors="ignore").strip()
+    if not body_text:
+        return {}
+    if body_text.startswith("{"):
+        try:
+            parsed = json.loads(body_text)
+            if isinstance(parsed, dict):
+                return {str(k): "" if v is None else str(v) for k, v in parsed.items()}
+        except Exception:
+            return {}
+    return dict(urllib.parse.parse_qsl(body_text, keep_blank_values=True))
+
+
 @app.post("/telnyx/inbound")
 @app.post("/api/v1/voice/telnyx/inbound")
-async def telnyx_texml_inbound_endpoint():
-    """TeXML carrier entry point with Polly.Joanna-Neural voice and Speech-to-Text Gather."""
+async def telnyx_texml_inbound_endpoint(request: Request):
+    """TeXML carrier entry point with webhook verification and 4-line switchboard sync."""
+    from multiline_switchboard import switchboard_engine
+
+    form = await _verify_and_parse_texml(request)
+    call_id = (
+        form.get("CallControlId")
+        or form.get("call_control_id")
+        or form.get("CallSid")
+        or f"texml_{int(time.time())}"
+    )
+    caller_phone = form.get("From") or form.get("from") or "Unknown Caller"
+    caller_name = form.get("CallerName") or form.get("caller_name") or "Inbound Patient"
+    switchboard_engine.register_or_get_pstn_line(
+        call_id=call_id,
+        caller_phone=caller_phone,
+        caller_name=caller_name
+    )
+
     xml = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather input="speech" action="/api/v1/voice/telnyx/respond" method="POST" timeout="5" speechTimeout="auto">
@@ -2402,44 +2477,66 @@ async def telnyx_texml_inbound_endpoint():
 @app.post("/telnyx/respond")
 @app.post("/api/v1/voice/telnyx/respond")
 async def telnyx_texml_respond_endpoint(request: Request):
-    """TeXML speech triage handler with automatic Zero-Repetition Warm Transfer <Dial>."""
+    """TeXML speech triage handler with webhook auth, live switchboard tracking, and warm transfer."""
     from multiline_switchboard import switchboard_engine
-    form = {}
-    try:
-        raw_body = (await request.body()).decode("utf-8", errors="ignore")
-        form = dict(urllib.parse.parse_qsl(raw_body, keep_blank_values=True))
-    except Exception:
-        pass
 
-    speech = form.get("SpeechResult") or form.get("speech_result") or ""
+    form = await _verify_and_parse_texml(request)
+    call_id = (
+        form.get("CallControlId")
+        or form.get("call_control_id")
+        or form.get("CallSid")
+        or f"texml_{int(time.time())}"
+    )
+    caller_phone = form.get("From") or form.get("from") or "Unknown Caller"
+    caller_name = form.get("CallerName") or form.get("caller_name") or "Inbound Patient"
+    speech = (form.get("SpeechResult") or form.get("speech_result") or "").strip()
     op_phone = os.getenv("FRONT_DESK_TRANSFER_PHONE", "+15559876543")
 
+    line_reg = switchboard_engine.register_or_get_pstn_line(
+        call_id=call_id,
+        caller_phone=caller_phone,
+        caller_name=caller_name
+    )
+    line_id = line_reg.get("line_id")
+    if line_id and speech:
+        switchboard_engine.process_line_turn(line_id, "customer", speech)
+
     if not speech:
+        handoff_msg = "Connecting you directly to our front desk coordinator right now. Please hold."
+        if line_id:
+            switchboard_engine.process_line_turn(line_id, "ai_agent", handoff_msg)
+            switchboard_engine.initiate_warm_transfer(line_id, operator_phone=op_phone)
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna-Neural" language="en-US">
-    Connecting you directly to our front desk coordinator right now. Please hold.
+    {handoff_msg}
   </Say>
-  <Dial timeout="25">{op_phone}</Dial>
+  <Dial timeout="25">{html.escape(op_phone)}</Dial>
 </Response>"""
         return Response(content=xml, media_type="application/xml")
 
     triage = switchboard_engine.classify_call_intent(speech)
     if triage["priority"] in ("CRITICAL URGENT", "HIGH PRODUCTION"):
+        spoken_reply = switchboard_engine.get_patient_spoken_reply(triage)
+        if line_id:
+            switchboard_engine.process_line_turn(line_id, "ai_agent", spoken_reply)
+            switchboard_engine.initiate_warm_transfer(line_id, operator_phone=op_phone)
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Say voice="Polly.Joanna-Neural" language="en-US">
-    Connecting you directly to our front desk coordinator right now. Please hold.
+    {html.escape(spoken_reply)} Connecting you directly to our front desk coordinator right now. Please hold.
   </Say>
-  <Dial timeout="25">{op_phone}</Dial>
+  <Dial timeout="25">{html.escape(op_phone)}</Dial>
 </Response>"""
     else:
-        directive = triage["automated_action_directive"]
+        spoken_reply = switchboard_engine.get_patient_spoken_reply(triage)
+        if line_id:
+            switchboard_engine.process_line_turn(line_id, "ai_agent", spoken_reply)
         xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
   <Gather input="speech" action="/api/v1/voice/telnyx/respond" method="POST" timeout="4" speechTimeout="auto">
     <Say voice="Polly.Joanna-Neural" language="en-US">
-      I understand. {directive} Is there anything else I can check for you?
+      {html.escape(spoken_reply)} Is there anything else I can check for you?
     </Say>
   </Gather>
 </Response>"""
@@ -2522,6 +2619,162 @@ async def get_calendar_bookings_endpoint():
     return {
         "status": "success",
         "bookings": CalendarSyncEngine.get_upcoming_bookings(db=db)
+    }
+
+
+def _extract_calcom_lead_context(payload: Dict[str, Any]) -> Dict[str, Optional[str]]:
+    """Extracts lead identifiers, attendee contact details, and notes from a Cal.com webhook payload."""
+    metadata = payload.get("metadata") if isinstance(payload.get("metadata"), dict) else {}
+    responses = payload.get("responses") if isinstance(payload.get("responses"), dict) else {}
+    attendees = payload.get("attendees") if isinstance(payload.get("attendees"), list) else []
+    first_att = attendees[0] if attendees and isinstance(attendees[0], dict) else {}
+
+    notes_blob = " ".join(
+        str(v) for v in (
+            responses.get("notes"),
+            payload.get("description"),
+            payload.get("additionalNotes"),
+            metadata.get("notes")
+        ) if v
+    )
+    lead_id = metadata.get("lead_id")
+    if not lead_id and notes_blob:
+        m = re.search(r"\[LeadID:([A-Za-z0-9_.:-]+)\]", notes_blob)
+        if m:
+            lead_id = m.group(1)
+
+    email = responses.get("email") or first_att.get("email")
+    name = responses.get("name") or first_att.get("name")
+    phone = responses.get("attendeePhoneNumber") or responses.get("phone") or first_att.get("phoneNumber")
+
+    clinic_hint = metadata.get("clinic_name")
+    if not clinic_hint and notes_blob:
+        cm = re.search(r"Practice:\s*([^\[\-\n]+)", notes_blob)
+        if cm:
+            clinic_hint = cm.group(1).strip()
+
+    return {
+        "lead_id": str(lead_id).strip() if lead_id else None,
+        "email": str(email).strip() if email else None,
+        "phone": str(phone).strip() if phone else None,
+        "clinic_name": str(clinic_hint or name).strip() if (clinic_hint or name) else None,
+        "attendee_name": str(name).strip() if name else None,
+    }
+
+
+@app.post("/api/webhooks/calcom")
+async def calcom_booking_webhook(request: Request, background_tasks: BackgroundTasks):
+    """
+    Receives Cal.com booking lifecycle webhooks (BOOKING_CREATED, BOOKING_RESCHEDULED,
+    BOOKING_CANCELLED, BOOKING_REJECTED), updates CRM stage/cadence state cleanly,
+    logs timeline events, and alerts the assigned sales rep.
+    """
+    raw_body = await request.body()
+    cal_secret = os.getenv("CAL_COM_WEBHOOK_SECRET", "").strip()
+    if cal_secret:
+        sig = request.headers.get("X-Cal-Signature-256") or request.headers.get("x-cal-signature-256")
+        if not verify_calcom_signature(raw_body, sig, cal_secret):
+            logger.warning("Rejected Cal.com webhook: invalid X-Cal-Signature-256")
+            raise HTTPException(status_code=403, detail="Invalid Cal.com webhook signature")
+
+    try:
+        body = json.loads(raw_body.decode("utf-8") if raw_body else "{}")
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON payload")
+
+    trigger_event = str(body.get("triggerEvent") or body.get("event") or "").upper().strip()
+    payload = body.get("payload") if isinstance(body.get("payload"), dict) else body
+    ctx = _extract_calcom_lead_context(payload)
+    lead = db.find_lead_for_booking(
+        lead_id=ctx["lead_id"],
+        email=ctx["email"],
+        phone=ctx["phone"],
+        clinic_name=ctx["clinic_name"]
+    )
+    matched_lead_id = lead.get("id") if lead else None
+    start_time = payload.get("startTime") or payload.get("start_time") or ""
+    booking_uid = payload.get("uid") or payload.get("bookingId") or ""
+
+    if not matched_lead_id:
+        logger.info(f"Cal.com webhook '{trigger_event}' ({booking_uid}) unmatched to local lead.")
+        return {
+            "status": "received_unmatched",
+            "trigger_event": trigger_event,
+            "booking_uid": booking_uid,
+            "matched_lead_id": None
+        }
+
+    clinic_label = lead.get("name") or ctx["clinic_name"] or "Dental Practice"
+    if trigger_event == "BOOKING_CREATED":
+        db.update_lead_stage(
+            matched_lead_id,
+            CRMStage.MEETING.value,
+            notes=f"Cal.com demo booked ({start_time or 'scheduled'}) [UID: {booking_uid}]"
+        )
+        with db._get_connection() as conn:
+            conn.execute(
+                "UPDATE leads SET contact_status = 'BOOKED', cadence_status = 'PAUSED_BOOKED', win_probability_pct = MAX(95, COALESCE(win_probability_pct, 80)), last_updated = ? WHERE id = ?",
+                (datetime.now().isoformat(), matched_lead_id)
+            )
+            conn.commit()
+        OpportunityTimelineManager.log_event(
+            db=db,
+            lead_id=matched_lead_id,
+            event_type="CALCOM_BOOKING_CREATED",
+            title=f"📅 Cal.com Onboarding Confirmed ({start_time or 'Scheduled'})",
+            description=f"{ctx['attendee_name'] or clinic_label} ({ctx['email'] or 'no email'}) booked 15-min setup via Cal.com.",
+            actor="CAL_COM",
+            metadata={"booking_uid": booking_uid, "start_time": start_time, "email": ctx["email"]}
+        )
+        alert_msg = f"📅 BOOKING CONFIRMED: {clinic_label} scheduled a Cal.com walkthrough ({start_time})!"
+        background_tasks.add_task(
+            LiveInterceptRadar.dispatch_rep_alert,
+            lead_id=matched_lead_id,
+            event_type="CALCOM_BOOKING_CREATED",
+            summary_text=alert_msg,
+            db=db
+        )
+    elif trigger_event == "BOOKING_RESCHEDULED":
+        OpportunityTimelineManager.log_event(
+            db=db,
+            lead_id=matched_lead_id,
+            event_type="CALCOM_BOOKING_RESCHEDULED",
+            title=f"🔁 Cal.com Meeting Rescheduled ({start_time or 'Updated'})",
+            description=f"Booking {booking_uid} moved to {start_time}.",
+            actor="CAL_COM",
+            metadata={"booking_uid": booking_uid, "start_time": start_time}
+        )
+    elif trigger_event in ("BOOKING_CANCELLED", "BOOKING_REJECTED"):
+        with db._get_connection() as conn:
+            conn.execute(
+                "UPDATE leads SET cadence_status = 'ACTIVE', last_updated = ? WHERE id = ?",
+                (datetime.now().isoformat(), matched_lead_id)
+            )
+            conn.commit()
+        OpportunityTimelineManager.log_event(
+            db=db,
+            lead_id=matched_lead_id,
+            event_type="CALCOM_BOOKING_CANCELLED",
+            title="⚠️ Cal.com Booking Cancelled — Follow-Up Cadence Resumed",
+            description=f"Booking {booking_uid} ended ({trigger_event}); automated cadence reactivated.",
+            actor="CAL_COM",
+            metadata={"booking_uid": booking_uid, "trigger_event": trigger_event}
+        )
+        alert_msg = f"⚠️ CAL.COM CANCELLED: {clinic_label} cancelled {start_time} — follow up to rebook!"
+        background_tasks.add_task(
+            LiveInterceptRadar.dispatch_rep_alert,
+            lead_id=matched_lead_id,
+            event_type="CALCOM_BOOKING_CANCELLED",
+            summary_text=alert_msg,
+            db=db
+        )
+
+    return {
+        "status": "processed",
+        "trigger_event": trigger_event,
+        "booking_uid": booking_uid,
+        "matched_lead_id": matched_lead_id,
+        "clinic_name": clinic_label
     }
 
 # --- Two-Way Interactive WhatsApp Test Sandbox Endpoints ---
@@ -4050,9 +4303,10 @@ class CadenceAdvanceRequest(BaseModel):
     notes: Optional[str] = None
 
 class MysteryAuditRequest(BaseModel):
-    ring_count: int = 5
-    reached_voicemail: bool = True
+    ring_count: Optional[int] = None
+    reached_voicemail: Optional[bool] = None
     test_timestamp: Optional[str] = None
+    live_probe: bool = False
 
 
 @app.get("/demo/{lead_id}", response_class=HTMLResponse)
@@ -4181,35 +4435,46 @@ async def sniff_ehr_and_npi_for_lead(lead_id: str):
 
 
 @app.get("/api/leads/{lead_id}/mystery-audit")
+@app.get("/api/leads/{lead_id}/mystery-shop")
 async def get_mystery_shopper_audit(lead_id: str):
     """
-    Retrieves or generates an empirical Mystery Shopper after-hours phone friction audit proof card.
+    Retrieves stored verified probe / audit proof card, or generates an unverified
+    market benchmark estimate (never fabricating a verified probe call).
     """
     lead = db.get_lead(lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    
+
     existing_proof = lead.get("mystery_audit_json")
-    if existing_proof:
+    if existing_proof and isinstance(existing_proof, dict):
         return existing_proof
 
-    # Generate fresh proof card
-    proof = MysteryShopperAuditor.generate_audit_proof(lead)
-    db.update_lead_mystery_audit(lead_id, proof)
+    # Generate honest unverified benchmark estimate until a live Telnyx probe runs
+    proof = MysteryShopperAuditor.generate_audit_proof(lead, verified=False)
     return proof
 
 
 @app.post("/api/leads/{lead_id}/mystery-audit")
-async def run_mystery_shopper_audit(lead_id: str, req: Optional[MysteryAuditRequest] = None):
+@app.post("/api/leads/{lead_id}/mystery-shop")
+async def run_mystery_shopper_audit(lead_id: str, request: Request, req: Optional[MysteryAuditRequest] = None):
     """
-    Executes or updates empirical Mystery Shopper friction test parameters for a clinic.
+    Triggers a real silent Telnyx AMD after-hours probe (when live_probe=True)
+    or records manual observation / benchmark estimate for a clinic.
     """
     lead = db.get_lead(lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    
-    ring_count = req.ring_count if req else 5
-    reached_voicemail = req.reached_voicemail if req else True
+
+    if req and req.live_probe:
+        base_url = str(request.base_url).rstrip("/")
+        return MysteryShopperAuditor.launch_verification_probe(
+            lead_dict=lead,
+            db=db,
+            server_base_url=base_url
+        )
+
+    ring_count = req.ring_count if req else None
+    reached_voicemail = req.reached_voicemail if req else None
     test_timestamp = req.test_timestamp if req else None
 
     proof = MysteryShopperAuditor.generate_audit_proof(
@@ -4302,15 +4567,22 @@ async def render_executive_pitch_portal(lead_id: str, request: Request):
 
 
 @app.post("/api/pitch/{lead_id}/viewed")
-async def record_pitch_portal_view(lead_id: str, request: Request):
+async def record_pitch_portal_view(lead_id: str, request: Request, background_tasks: BackgroundTasks):
     """
-    Records high-intent prospect viewing of their confidential pitch teardown portal
-    and registers real-time speed-to-lead Live Intercept Radar.
+    Records high-intent prospect viewing of their confidential pitch teardown portal,
+    updates Live Intercept Radar, and dispatches an instant cooldown-guarded rep alert.
     """
     client_ip = request.client.host if request.client else "127.0.0.1"
     user_agent = request.headers.get("user-agent")
     LiveInterceptRadar.record_view(lead_id=lead_id, client_ip=client_ip, user_agent=user_agent, db=db)
-    return SMSDispatcherEngine.record_pitch_view(lead_id=lead_id, db=db)
+    view_res = SMSDispatcherEngine.record_pitch_view(lead_id=lead_id, db=db)
+    background_tasks.add_task(
+        LiveInterceptRadar.dispatch_rep_alert,
+        lead_id=lead_id,
+        event_type="PITCH_VIEWED",
+        db=db
+    )
+    return view_res
 
 
 @app.get("/api/leads/{lead_id}/voicemail-sting")

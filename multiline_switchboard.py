@@ -75,6 +75,33 @@ TRIAGE_CATEGORIES = {
     }
 }
 
+PATIENT_SPOKEN_REPLIES = {
+    "EMERGENCY_URGENT": (
+        "I am so sorry you are in discomfort. Let me connect you right away with our emergency coordinator "
+        "so we can get you seen as soon as possible."
+    ),
+    "NEW_CUSTOMER_INTAKE": (
+        "We would love to welcome you as a new patient. Let me connect you with our scheduling coordinator "
+        "to reserve a convenient onboarding visit for you."
+    ),
+    "EXISTING_CUSTOMER_RESCHEDULE": (
+        "Of course, we can help move your appointment to a time that works better for your schedule. "
+        "Would you prefer morning or afternoon availability later this week?"
+    ),
+    "BILLING_PAYMENT_INQUIRY": (
+        "I would be happy to help clarify your dental benefits and estimated out-of-pocket costs. "
+        "May I take your insurance provider name so our coordinator can verify coverage?"
+    ),
+    "POST_SERVICE_FOLLOWUP": (
+        "Thank you for calling back after your procedure. Are you experiencing active bleeding or swelling right now "
+        "so I can flag our on-call clinical team immediately?"
+    ),
+    "HOURS_LOCATION_INFO": (
+        "Our practice sees patients Monday through Friday with extended urgent coverage, and we can also text you "
+        "directions and a direct self-scheduling link."
+    ),
+}
+
 
 def get_current_iso_time() -> str:
     """Returns exact ISO-8601 UTC timestamp."""
@@ -127,6 +154,7 @@ class MultiLineSwitchboard:
         self.turn_controllers: Dict[str, TurnController] = {
             f"line-{i}": TurnController() for i in range(1, 5)
         }
+        self._call_id_to_line: Dict[str, str] = {}
 
     # -------------------------------------------------------------
     # Line & Concurrency Management
@@ -201,6 +229,80 @@ class MultiLineSwitchboard:
             "automated_action_directive": meta["action_directive"],
             "action_directive": meta["action_directive"]  # Alias
         }
+
+    @classmethod
+    def get_patient_spoken_reply(cls, triage_or_category: Any) -> str:
+        """Maps a triage result dict or category key into natural, empathetic patient speech."""
+        cat = (
+            triage_or_category.get("intent_category") or triage_or_category.get("category")
+            if isinstance(triage_or_category, dict)
+            else str(triage_or_category or "HOURS_LOCATION_INFO")
+        )
+        return PATIENT_SPOKEN_REPLIES.get(cat, PATIENT_SPOKEN_REPLIES["HOURS_LOCATION_INFO"])
+
+    def get_line_for_call(self, call_control_id: Optional[str]) -> Optional[str]:
+        """Looks up which switchboard line tracks a live Telnyx call_control_id / CallSid."""
+        if not call_control_id:
+            return None
+        mapped = self._call_id_to_line.get(call_control_id)
+        if mapped and mapped in self.channels and self.channels[mapped].status != "completed":
+            return mapped
+        for lid, ch in self.channels.items():
+            if ch.call_control_id == call_control_id and ch.status != "completed":
+                self._call_id_to_line[call_control_id] = lid
+                return lid
+        return None
+
+    def register_or_get_pstn_line(
+        self,
+        call_id: str,
+        caller_phone: str = "Unknown Caller",
+        caller_name: str = "Inbound Caller",
+        initial_speech: str = ""
+    ) -> Dict[str, Any]:
+        """Assigns an inbound PSTN/TeXML call to a switchboard channel (or returns existing active line)."""
+        existing = self.get_line_for_call(call_id)
+        if existing:
+            channel = self.channels[existing]
+            if caller_phone and caller_phone != "Unknown Caller":
+                channel.caller_phone = caller_phone
+            if caller_name and caller_name != "Inbound Caller":
+                channel.caller_name = caller_name
+            return {"success": True, "line_id": existing, "channel": channel.dict(), "is_new": False}
+
+        line_id = self.find_available_line()
+        if not line_id:
+            # Recycle oldest completed line or report capacity
+            return {"success": False, "error": "SWITCHBOARD_AT_CAPACITY", "line_id": None}
+
+        now_ms = int(time.time() * 1000)
+        triage = self.classify_call_intent(initial_speech or "hours")
+        ch = self.channels[line_id]
+        ch.status = "active_ai"
+        ch.caller_name = caller_name or "Inbound Caller"
+        ch.caller_phone = caller_phone or "Unknown Caller"
+        ch.member_id = None
+        ch.started_at_ms = now_ms
+        ch.duration_seconds = 0
+        ch.triage_category = triage["intent_category"] if initial_speech else None
+        ch.triage_priority = triage["priority"] if initial_speech else None
+        ch.action_directive = triage["automated_action_directive"] if initial_speech else None
+        ch.context_briefing_card = None
+        ch.call_control_id = call_id
+        ch.transcript = [
+            {
+                "speaker": "ai_agent",
+                "text": "Thank you for calling Apex Dental Studio. This is Emily, your AI patient coordinator. How can I help you today?",
+                "timestampIso": get_current_iso_time()
+            }
+        ]
+        self.turn_controllers[line_id].reset()
+        self._call_id_to_line[call_id] = line_id
+
+        if initial_speech:
+            self.process_line_turn(line_id, "customer", initial_speech)
+
+        return {"success": True, "line_id": line_id, "channel": ch.dict(), "is_new": True}
 
     # -------------------------------------------------------------
     # Inbound Call Lifecycle (Simulated & Carrier PSTN)
@@ -434,3 +536,4 @@ class MultiLineSwitchboard:
 
 # Singleton Switchboard Engine Instance
 switchboard_engine = MultiLineSwitchboard()
+

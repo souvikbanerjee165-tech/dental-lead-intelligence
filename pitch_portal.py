@@ -63,8 +63,20 @@ class PitchPortalEngine:
         if not mystery_data or not isinstance(mystery_data, dict):
             mystery_data = MysteryShopperAuditor.generate_audit_proof(lead_dict)
 
-        ring_count = mystery_data.get("ring_count", 5)
+        ring_count = mystery_data.get("ring_count")
         test_time = mystery_data.get("test_timestamp", "Recent After-Hours Audit")
+        is_verified_probe = bool(mystery_data.get("verified"))
+        mystery_badge_text = "🔴 Verified Voicemail Bounce" if is_verified_probe else "📊 Market Benchmark Estimate"
+        if is_verified_probe and ring_count:
+            mystery_body_text = (
+                f"During a verified after-hours Telnyx AMD test call to your clinic line, "
+                f"the line rang <strong>{ring_count} times</strong> before routing to office voicemail with no 24/7 online triage."
+            )
+        else:
+            mystery_body_text = (
+                "Based on our audit of your public site (no 24/7 AI chat or online booking widget detected), "
+                "after-hours urgent dental callers typically hit clinic voicemail after standard office hours."
+            )
 
         # Hygiene Reactivation Data
         from hygiene_recall_calculator import HygieneRecallCalculator
@@ -137,7 +149,7 @@ class PitchPortalEngine:
         <a href="/video/{lead_id}" class="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 text-xs font-bold transition">
           <i class="fa-solid fa-circle-play text-rose-400"></i> Watch 60s Video
         </a>
-        <button data-cal-link="{cal_slug}" data-cal-namespace="15min" data-cal-config='{{"name":"{doc_display}","notes":"Practice: {clinic_name}"}}' class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition cursor-pointer flex items-center gap-1.5">
+        <button data-cal-link="{cal_slug}" data-cal-namespace="15min" data-cal-config='{{"name":"{doc_display}","notes":"Practice: {clinic_name} [LeadID:{lead_id}]"}}' class="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs shadow-lg shadow-emerald-500/20 transition cursor-pointer flex items-center gap-1.5">
           <i class="fa-solid fa-calendar-check"></i>
           <span>Schedule 15-Min Walkthrough</span>
         </button>
@@ -196,14 +208,13 @@ class PitchPortalEngine:
           </div>
         </div>
         <span class="px-3 py-1 rounded-full text-xs font-black bg-rose-500/20 text-rose-300 border border-rose-500/40">
-          🔴 Confirmed Voicemail Bounce
+          {mystery_badge_text}
         </span>
       </div>
 
       <div class="bg-slate-950/90 p-4 rounded-xl border border-slate-800 space-y-2 text-xs">
         <p class="text-slate-300 leading-relaxed font-sans">
-          During after-hours mystery testing, a simulated urgent inquiry was placed to your clinic phone. 
-          The line rang <strong>{ring_count} times</strong> before dropping into a generic office voicemail with no 24/7 online triage.
+          {mystery_body_text}
         </p>
         <div class="p-3 rounded-lg bg-rose-950/40 border border-rose-500/20 text-rose-200 text-xs italic">
           "American Dental Association data proves 67% of acute toothache callers hang up on voicemail. When a patient is in pain on Sunday evening, they will not wait until Monday 8:00 AM—they book the first practice that replies on their phone."
@@ -383,7 +394,7 @@ class PitchPortalEngine:
             <i class="fa-solid fa-lock"></i>
             <span>Lock 3-Mile Territory ($0 Upfront Pilot)</span>
           </button>
-          <button data-cal-link="{cal_slug}" data-cal-namespace="15min" data-cal-config='{{"name":"{doc_display}","notes":"Practice: {clinic_name} - Urgent After-Hours Audit Review"}}' class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-emerald-500/40 transition flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:border-emerald-400">
+          <button data-cal-link="{cal_slug}" data-cal-namespace="15min" data-cal-config='{{"name":"{doc_display}","notes":"Practice: {clinic_name} - Urgent After-Hours Audit Review [LeadID:{lead_id}]"}}' class="w-full sm:w-auto px-6 py-4 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-emerald-500/40 transition flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:border-emerald-400">
             <i class="fa-solid fa-calendar-check text-emerald-400"></i>
             <span>Schedule 15-Min Onboarding Setup</span>
           </button>

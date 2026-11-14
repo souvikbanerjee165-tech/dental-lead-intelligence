@@ -64,9 +64,39 @@ class CarrierReputationManager:
 
     def __init__(self, db: Optional[DatabaseManager] = None):
         self.db = db or DatabaseManager()
-        # Pool of configured outbound numbers from env (comma-separated), or default Telnyx/Twilio number
-        pool_str = os.getenv("CALLER_ID_POOL", os.getenv("TELNYX_CALLER_PHONE", "+12145550199"))
-        self.caller_pool = [p.strip() for p in pool_str.split(",") if p.strip()]
+        self.caller_pool = self._resolve_caller_pool()
+
+    @staticmethod
+    def _resolve_caller_pool() -> List[str]:
+        """Builds deduplicated outbound caller ID pool from env vars and runtime SettingsManager."""
+        candidates: List[str] = []
+        pool_env = os.getenv("CALLER_ID_POOL", "")
+        if pool_env:
+            candidates.extend(p.strip() for p in pool_env.split(",") if p.strip())
+
+        for env_key in ("TELNYX_FROM_PHONE", "TELNYX_CALLER_PHONE", "TWILIO_FROM_PHONE"):
+            val = os.getenv(env_key, "").strip()
+            if val:
+                candidates.append(val)
+
+        try:
+            from settings_manager import SettingsManager
+            cfg = SettingsManager.get()
+            for cfg_key in ("telnyx_from_phone", "twilio_from_phone"):
+                val = str(cfg.get(cfg_key) or "").strip()
+                if val:
+                    candidates.append(val)
+        except Exception:
+            pass
+
+        # Deduplicate while preserving order; fallback only when no real number is configured
+        seen = set()
+        pool: List[str] = []
+        for num in candidates:
+            if num not in seen:
+                seen.add(num)
+                pool.append(num)
+        return pool or ["+12145550199"]
 
     @classmethod
     def extract_area_code(cls, phone: str) -> Optional[str]:
@@ -78,23 +108,58 @@ class CarrierReputationManager:
             return digits[0:3]
         return None
 
-    def match_local_caller_id(self, destination_phone: str) -> str:
+    def match_local_caller_id(self, destination_phone: str, fallback_caller_id: Optional[str] = None) -> str:
         """
         Selects the best outbound caller ID from the pool to match target clinic's area code.
-        Boosts answer rate by up to 400% via local presence.
+        Boosts answer rate via local presence while respecting a configured carrier fallback.
         """
+        pool = self.caller_pool or self._resolve_caller_pool()
         dest_area = self.extract_area_code(destination_phone)
-        if not dest_area or not self.caller_pool:
-            return self.caller_pool[0] if self.caller_pool else "+12145550199"
+        if dest_area and pool:
+            for num in pool:
+                num_area = self.extract_area_code(num)
+                if num_area and num_area == dest_area:
+                    return num
 
-        # Check for exact area code match in pool
-        for num in self.caller_pool:
-            num_area = self.extract_area_code(num)
-            if num_area and num_area == dest_area:
-                return num
+        if fallback_caller_id and fallback_caller_id.strip():
+            return fallback_caller_id.strip()
+        return pool[0] if pool else "+12145550199"
 
-        # Fallback to first available number in pool
-        return self.caller_pool[0]
+    def verify_outbound_action(
+        self,
+        destination_phone: str,
+        caller_phone: Optional[str] = None,
+        channel: str = "VOICE",
+        bypass_velocity: bool = False
+    ) -> Tuple[bool, str, str]:
+        """
+        Central compliance guard for both Voice and SMS outbound dispatches:
+        1. Phone number format check (>=10 digits)
+        2. Hard DNC Blacklist check
+        3. Local-presence area code matching
+        4. Hourly velocity throttle per outbound caller number (for VOICE unless bypassed)
+        Returns: (allowed, reason_message, selected_caller_id)
+        """
+        clean_dest = re.sub(r"\D", "", destination_phone or "")
+        if len(clean_dest) < 10:
+            return False, "INVALID_PHONE_NUMBER", ""
+
+        # 1. DNC Check (applies strictly to all channels)
+        if self.db.is_dnc_phone(destination_phone):
+            return False, "DNC_BLACKLISTED: Number requested no further contact.", ""
+
+        # 2. Match Local Presence Caller ID (prefer exact area-code match in pool over generic fallback)
+        outbound_caller = self.match_local_caller_id(destination_phone, fallback_caller_id=caller_phone)
+
+        # 3. Call Velocity Check
+        if not bypass_velocity and channel.upper() == "VOICE":
+            hourly_count = self.db.get_hourly_call_count(outbound_caller)
+            if hourly_count >= self.MAX_CALLS_PER_HOUR_PER_NUMBER:
+                msg = f"VELOCITY_THROTTLED: Caller {outbound_caller} has made {hourly_count} calls this hour (max {self.MAX_CALLS_PER_HOUR_PER_NUMBER}). Pausing to protect carrier reputation."
+                logger.warning(msg)
+                return False, msg, outbound_caller
+
+        return True, "DIAL_APPROVED", outbound_caller
 
     def check_dial_permission(
         self,
@@ -103,31 +168,13 @@ class CarrierReputationManager:
     ) -> Tuple[bool, str, str]:
         """
         Evaluates whether a phone call can be legally and safely placed.
-        Checks:
-        1. DNC Blacklist (100% hard block)
-        2. Area Code matching
-        3. Velocity limit (<18 calls/hr on caller number)
-        Returns: (allowed, reason_message, selected_caller_id)
         """
-        clean_dest = re.sub(r"\D", "", destination_phone)
-        if len(clean_dest) < 10:
-            return False, "INVALID_PHONE_NUMBER", ""
-
-        # 1. DNC Check
-        if self.db.is_dnc_phone(destination_phone):
-            return False, "DNC_BLACKLISTED: Number requested no further contact.", ""
-
-        # 2. Match Caller ID
-        outbound_caller = caller_phone or self.match_local_caller_id(destination_phone)
-
-        # 3. Call Velocity Check
-        hourly_count = self.db.get_hourly_call_count(outbound_caller)
-        if hourly_count >= self.MAX_CALLS_PER_HOUR_PER_NUMBER:
-            msg = f"VELOCITY_THROTTLED: Caller {outbound_caller} has made {hourly_count} calls this hour (max {self.MAX_CALLS_PER_HOUR_PER_NUMBER}). Pausing to protect carrier reputation."
-            logger.warning(msg)
-            return False, msg, outbound_caller
-
-        return True, "DIAL_APPROVED", outbound_caller
+        return self.verify_outbound_action(
+            destination_phone=destination_phone,
+            caller_phone=caller_phone,
+            channel="VOICE",
+            bypass_velocity=False
+        )
 
     def check_for_opt_out(self, transcript_text: str) -> bool:
         """Checks if prospect utterance contains DNC opt-out keywords."""

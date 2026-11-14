@@ -6,10 +6,13 @@ Maintains active viewer states and provides instant 1-click speed-to-lead callba
 with tailored conversational intercept hooks.
 """
 
+import os
 import time
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+
+import httpx
 
 from database import DatabaseManager
 from timeline import OpportunityTimelineManager
@@ -22,6 +25,8 @@ class LiveInterceptRadar:
 
     # In-memory registry of active prospect view events: {lead_id: event_data}
     _active_viewers: Dict[str, Dict[str, Any]] = {}
+    # Deduplication / cooldown timestamps keyed by "{lead_id}:{event_type}"
+    _alert_cooldowns: Dict[str, float] = {}
 
     @classmethod
     def record_view(
@@ -155,3 +160,110 @@ class LiveInterceptRadar:
             cls._active_viewers.pop(lead_id, None)
             return True
         return False
+
+    @classmethod
+    async def dispatch_rep_alert(
+        cls,
+        lead_id: str,
+        event_type: str = "PITCH_VIEWED",
+        summary_text: Optional[str] = None,
+        db: Optional[DatabaseManager] = None,
+        force: bool = False
+    ) -> Dict[str, Any]:
+        """
+        Dispatches an instant Speed-to-Lead alert to the assigned sales rep via Telnyx SMS
+        (REP_ALERT_PHONE) and/or webhook (REP_ALERT_WEBHOOK_URL), with per-lead cooldown
+        deduplication so rapid browser refreshes do not spam.
+        """
+        cooldown_sec = int(os.getenv("REP_ALERT_COOLDOWN_SECONDS", "900"))
+        dedupe_key = f"{lead_id}:{event_type}"
+        now_ts = time.time()
+
+        if not force:
+            last_sent = cls._alert_cooldowns.get(dedupe_key, 0.0)
+            if (now_ts - last_sent) < cooldown_sec:
+                return {"sent": False, "reason": "COOLDOWN_ACTIVE", "cooldown_seconds": cooldown_sec}
+
+        db = db or DatabaseManager()
+        lead = db.get_lead(lead_id) or {}
+        clinic_name = lead.get("name") or "Dental Practice"
+        phone = lead.get("phone") or "N/A"
+        base_url = os.getenv("BASE_APP_URL", "https://dental.34.71.56.145.sslip.io").rstrip("/")
+        pitch_url = f"{base_url}/pitch/{lead_id}"
+
+        message = summary_text or (
+            f"🔥 SPEED-TO-LEAD: {clinic_name} just opened {pitch_url} — call {phone} now!"
+        )
+
+        # Resolve destinations from env or settings
+        rep_phone = os.getenv("REP_ALERT_PHONE", "").strip()
+        webhook_url = os.getenv("REP_ALERT_WEBHOOK_URL", "").strip()
+        try:
+            from settings_manager import SettingsManager
+            cfg = SettingsManager.get()
+            rep_phone = rep_phone or str(cfg.get("rep_alert_phone") or "").strip()
+            webhook_url = webhook_url or str(cfg.get("rep_alert_webhook_url") or "").strip()
+        except Exception:
+            pass
+
+        if not rep_phone and not webhook_url:
+            return {"sent": False, "reason": "NO_ALERT_DESTINATION_CONFIGURED"}
+
+        # Reserve cooldown window immediately to suppress concurrent refresh storms
+        cls._alert_cooldowns[dedupe_key] = now_ts
+        results: Dict[str, Any] = {"sent": False, "channels": {}}
+
+        if rep_phone:
+            try:
+                from ai_door_opener import AIDoorOpenerEngine
+                sms_res = await AIDoorOpenerEngine.dispatch_telnyx_sms(
+                    to_phone=rep_phone,
+                    text=message,
+                    lead_id=lead_id,
+                    db=db,
+                    bypass_compliance=True,
+                    is_internal_alert=True
+                )
+                results["channels"]["sms"] = sms_res
+                if sms_res.get("success"):
+                    results["sent"] = True
+            except Exception as e:
+                logger.warning(f"Speed-to-lead SMS alert failed: {e}")
+                results["channels"]["sms"] = {"success": False, "error": str(e)}
+
+        if webhook_url:
+            try:
+                payload = {
+                    "event": event_type,
+                    "lead_id": lead_id,
+                    "clinic_name": clinic_name,
+                    "phone": phone,
+                    "pitch_url": pitch_url,
+                    "text": message,
+                    "timestamp": datetime.now().isoformat()
+                }
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    resp = await client.post(webhook_url, json=payload)
+                    ok = resp.status_code in (200, 201, 202, 204)
+                    results["channels"]["webhook"] = {"success": ok, "status_code": resp.status_code}
+                    if ok:
+                        results["sent"] = True
+            except Exception as e:
+                logger.warning(f"Speed-to-lead webhook alert failed: {e}")
+                results["channels"]["webhook"] = {"success": False, "error": str(e)}
+
+        if results["sent"]:
+            try:
+                OpportunityTimelineManager.log_event(
+                    db=db,
+                    lead_id=lead_id,
+                    event_type="REP_ALERT_DISPATCHED",
+                    title=f"⚡ Instant Speed-to-Lead Rep Alert Sent ({event_type})",
+                    description=message,
+                    actor="SYSTEM",
+                    metadata=results["channels"]
+                )
+            except Exception:
+                pass
+
+        return results

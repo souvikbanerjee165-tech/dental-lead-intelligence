@@ -112,10 +112,13 @@ class AIDoorOpenerEngine:
         to_phone: str,
         text: str,
         lead_id: Optional[str] = None,
-        db: Optional[DatabaseManager] = None
+        db: Optional[DatabaseManager] = None,
+        bypass_compliance: bool = False,
+        is_internal_alert: bool = False
     ) -> Dict[str, Any]:
         """
-        Sends an official SMS through Telnyx REST API.
+        Sends an official SMS through Telnyx REST API, enforcing DNC compliance and
+        area-code matching via CarrierReputationManager for prospect outreach.
         """
         cfg = cls.get_telnyx_config()
         api_key = cfg["api_key"]
@@ -125,10 +128,34 @@ class AIDoorOpenerEngine:
             return {"success": False, "error": "TELNYX_API_KEY is not configured."}
 
         # Normalize to E.164
-        digits = re.sub(r"\D", "", to_phone)
+        digits = re.sub(r"\D", "", to_phone or "")
         if len(digits) == 10:
             digits = "1" + digits
-        formatted_to = f"+{digits}"
+        formatted_to = f"+{digits}" if digits else ""
+
+        if not bypass_compliance:
+            from carrier_reputation_manager import CarrierReputationManager
+            rep_mgr = CarrierReputationManager(db=db)
+            allowed, reason, matched_caller = rep_mgr.verify_outbound_action(
+                destination_phone=formatted_to,
+                caller_phone=from_phone,
+                channel="SMS",
+                bypass_velocity=True
+            )
+            if not allowed:
+                logger.warning(f"Telnyx SMS blocked by CarrierReputationManager for {formatted_to}: {reason}")
+                return {
+                    "success": False,
+                    "blocked": True,
+                    "error": reason,
+                    "reason": reason,
+                    "to": formatted_to
+                }
+            if matched_caller and matched_caller != "+12145550199":
+                from_phone = matched_caller
+
+        if not from_phone:
+            return {"success": False, "error": "TELNYX_FROM_PHONE is not configured."}
 
         headers = {
             "Authorization": f"Bearer {api_key}",
@@ -147,8 +174,8 @@ class AIDoorOpenerEngine:
                     data = resp.json().get("data", {})
                     msg_id = data.get("id")
 
-                    # Log to database timeline
-                    if lead_id:
+                    # Log to database timeline (skip prospect status mutation for internal rep alerts)
+                    if lead_id and not is_internal_alert:
                         db = db or DatabaseManager()
                         OpportunityTimelineManager.log_event(
                             db=db,
@@ -207,6 +234,17 @@ class AIDoorOpenerEngine:
             server_base_url=base_app_url,
             initial_mode="AI_FIRST"
         )
+
+        if result.get("status") == "blocked" or result.get("blocked"):
+            return {
+                "status": "blocked",
+                "blocked": True,
+                "error": result.get("reason") or result.get("error"),
+                "lead_id": lead_id,
+                "target_phone": target_phone,
+                "call_result": result,
+                "assets": assets
+            }
         
         if lead_id and db:
             try:
@@ -229,7 +267,7 @@ class AIDoorOpenerEngine:
                 pass
                 
         return {
-            "status": "success" if result.get("status") in ("dispatched", "simulated", "success") else "error",
+            "status": "success" if result.get("status") in ("dispatched", "simulated", "success", "initiated") else "error",
             "lead_id": lead_id,
             "target_phone": target_phone,
             "call_result": result,

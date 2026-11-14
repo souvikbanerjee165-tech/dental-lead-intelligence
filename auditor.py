@@ -1,5 +1,7 @@
+import os
 import re
 import time
+import asyncio
 import urllib.parse
 import hashlib
 from pathlib import Path
@@ -351,6 +353,72 @@ class WebsiteAuditor:
                 has_faq = self._detect_faq(html_content, soup)
                 viewport_meta = soup.find("meta", attrs={"name": "viewport"})
                 is_mobile_responsive = viewport_meta is not None
+
+                # Deep Headless DOM Fallback: Trigger Playwright only when static HTML is sparse,
+                # JS-rendered (Wix/Squarespace/React/Next), or missed doctor & conversion tooling
+                visible_text = soup.get_text(" ", strip=True)
+                headless_enabled = os.getenv("ENABLE_HEADLESS_AUDIT_FALLBACK", "true").lower() in ("1", "true", "yes")
+                html_lower = html_content.lower()
+                is_js_shell = len(visible_text) < 700 or any(
+                    tok in html_lower
+                    for tok in ("id=\"__next\"", "id=\"root\"", "id=\"app\"", "wix.com", "squarespace.com", "webflow")
+                )
+                needs_deep_fallback = headless_enabled and (
+                    is_js_shell or not primary_doctor or (not has_booking and not has_chatbot)
+                )
+                if needs_deep_fallback:
+                    try:
+                        from clinic_researcher import ClinicResearcher
+                        deep_profile = await asyncio.wait_for(
+                            ClinicResearcher.extract_deep_clinic_profile(final_url, use_headless=True),
+                            timeout=22.0
+                        )
+                        if deep_profile:
+                            if deep_profile.primary_doctor and not primary_doctor:
+                                primary_doctor = deep_profile.primary_doctor
+                                graph.add_evidence(EvidenceItem(
+                                    evidence_type="headless_dom_extraction",
+                                    source=final_url,
+                                    snippet=f"Headless browser extracted lead dentist: {primary_doctor}",
+                                    confidence=0.90
+                                ))
+                            for d in (deep_profile.doctors or []):
+                                if d not in staff_roster:
+                                    staff_roster.append(d)
+                            if deep_profile.has_online_booking and not has_booking:
+                                has_booking = True
+                                booking_tool = deep_profile.detected_booking_tool
+                                if booking_tool and booking_tool not in tech_detail.booking_tools:
+                                    tech_detail.booking_tools.append(booking_tool)
+                                graph.add_evidence(EvidenceItem(
+                                    evidence_type="headless_dom_extraction",
+                                    source=final_url,
+                                    snippet=f"Headless browser detected JS booking widget: {booking_tool or 'Online Booking'}",
+                                    confidence=0.90
+                                ))
+                            if deep_profile.has_ai_chat and not has_chatbot:
+                                has_chatbot = True
+                                chatbot_name = deep_profile.detected_chat_tool
+                                if chatbot_name and chatbot_name not in tech_detail.chatbots:
+                                    tech_detail.chatbots.append(chatbot_name)
+                                graph.add_evidence(EvidenceItem(
+                                    evidence_type="headless_dom_extraction",
+                                    source=final_url,
+                                    snippet=f"Headless browser detected JS live chat: {chatbot_name or 'Chat Widget'}",
+                                    confidence=0.90
+                                ))
+                            if deep_profile.phone and deep_profile.phone not in phones:
+                                phones.append(deep_profile.phone)
+                                clickable_phone = True
+                            if deep_profile.after_hours_policy and not any(e.evidence_type == "after_hours_leakage" for e in graph.evidence):
+                                graph.add_evidence(EvidenceItem(
+                                    evidence_type="after_hours_leakage",
+                                    source=final_url,
+                                    snippet=f"Headless after-hours policy check: {deep_profile.after_hours_policy}",
+                                    confidence=0.88
+                                ))
+                    except Exception:
+                        pass
 
                 return WebsiteAuditResult(
                     reachable=True,

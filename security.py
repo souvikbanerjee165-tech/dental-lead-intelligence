@@ -347,6 +347,9 @@ PUBLIC_API_EXACT = {
     "/api/auth/status",
     "/api/voice/webhook/telnyx",
     "/api/voice/webhook/twilio",
+    "/api/v1/voice/telnyx/inbound",
+    "/api/v1/voice/telnyx/respond",
+    "/api/webhooks/calcom",
     "/api/scheduler/cron-tick",
 }
 
@@ -423,9 +426,12 @@ def verify_twilio_signature(url: str, form_params: Dict[str, Any], signature: st
 
 def verify_telnyx_webhook(request_headers: Any, raw_body: bytes, max_tolerance_sec: int = 300) -> Tuple[bool, str]:
     """
-    Validates Telnyx webhook headers (telnyx-timestamp replay guard and optional signature verification).
+    Validates Telnyx webhook headers (telnyx-timestamp replay guard and Ed25519 signature verification).
+    Enforces strict presence + Ed25519 verification when STRICT_WEBHOOK_VERIFY=true, and verifies
+    cryptographically whenever TELNYX_PUBLIC_KEY and telnyx-signature-ed25519 are provided.
     """
     strict_webhooks = os.getenv("STRICT_WEBHOOK_VERIFY", "false").lower() in ("1", "true", "yes")
+    public_key_b64 = os.getenv("TELNYX_PUBLIC_KEY", "").strip()
     timestamp_hdr = request_headers.get("telnyx-timestamp")
     signature_hdr = request_headers.get("telnyx-signature-ed25519")
 
@@ -442,7 +448,34 @@ def verify_telnyx_webhook(request_headers: Any, raw_body: bytes, max_tolerance_s
     if strict_webhooks and not signature_hdr:
         return False, "Missing telnyx-signature-ed25519 header"
 
+    if public_key_b64 and signature_hdr:
+        if not timestamp_hdr:
+            return False, "Missing telnyx-timestamp header for Ed25519 signature verification"
+        try:
+            from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+            pub_bytes = base64.b64decode(public_key_b64)
+            sig_bytes = base64.b64decode(signature_hdr.strip())
+            signed_payload = f"{timestamp_hdr}|".encode("utf-8") + (raw_body or b"")
+            Ed25519PublicKey.from_public_bytes(pub_bytes).verify(sig_bytes, signed_payload)
+        except Exception as e:
+            return False, f"Invalid Telnyx Ed25519 webhook signature: {e}"
+    elif strict_webhooks and not public_key_b64:
+        return False, "TELNYX_PUBLIC_KEY must be set when STRICT_WEBHOOK_VERIFY is enabled"
+
     return True, "OK"
+
+
+def verify_calcom_signature(raw_body: bytes, signature: Optional[str], secret: str) -> bool:
+    """
+    Validates Cal.com webhook X-Cal-Signature-256 HMAC-SHA256 signature.
+    """
+    if not signature or not secret:
+        return False
+    sig_clean = signature.strip()
+    if sig_clean.lower().startswith("sha256="):
+        sig_clean = sig_clean.split("=", 1)[1].strip()
+    computed = hmac.new(secret.encode("utf-8"), raw_body or b"", hashlib.sha256).hexdigest()
+    return hmac.compare_digest(computed.lower(), sig_clean.lower())
 
 
 # ==============================================================================

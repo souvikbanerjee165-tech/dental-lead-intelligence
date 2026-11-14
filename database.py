@@ -1561,6 +1561,54 @@ class DatabaseManager:
                     return self._format_lead_row(row)
             return None
 
+    def find_lead_for_booking(
+        self,
+        lead_id: Optional[str] = None,
+        email: Optional[str] = None,
+        phone: Optional[str] = None,
+        clinic_name: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Matches a lead deterministically from Cal.com or external booking webhook metadata."""
+        if lead_id:
+            lead = self.get_lead(lead_id)
+            if lead:
+                return lead
+
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if email and email.strip():
+                clean_email = email.strip().lower()
+                cursor.execute(
+                    "SELECT * FROM leads WHERE LOWER(COALESCE(direct_emails, '')) LIKE ? LIMIT 1",
+                    (f"%{clean_email}%",)
+                )
+                row = cursor.fetchone()
+                if row:
+                    return self._format_lead_row(row)
+
+            if phone:
+                digits = re.sub(r"\D", "", phone)
+                if len(digits) >= 7:
+                    last_10 = digits[-10:] if len(digits) >= 10 else digits
+                    cursor.execute(
+                        "SELECT * FROM leads WHERE clean_digits(phone) LIKE ? LIMIT 1",
+                        (f"%{last_10}%",)
+                    )
+                    row = cursor.fetchone()
+                    if row:
+                        return self._format_lead_row(row)
+
+            if clinic_name and clinic_name.strip():
+                clean_name = clinic_name.strip().lower()
+                cursor.execute(
+                    "SELECT * FROM leads WHERE LOWER(name) = ? OR LOWER(name) LIKE ? LIMIT 1",
+                    (clean_name, f"%{clean_name}%")
+                )
+                row = cursor.fetchone()
+                if row:
+                    return self._format_lead_row(row)
+        return None
+
     def is_lead_existing(self, name: str, website: Optional[str] = None, phone: Optional[str] = None) -> bool:
         """Check if a lead already exists in the database by ID, website domain, phone number, or exact name."""
         lead_id = self._make_lead_id(name, website)

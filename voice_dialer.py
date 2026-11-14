@@ -695,16 +695,46 @@ class VoiceDialerEngine:
         carrier_override: Optional[str] = None,
         db: Any = None,
         server_base_url: Optional[str] = None,
-        initial_mode: str = "AI_FIRST"
+        initial_mode: str = "AI_FIRST",
+        bypass_throttle: bool = False,
+        extra_client_state: Optional[Dict[str, Any]] = None,
+        register_live_session: bool = True
     ) -> Dict[str, Any]:
         """
         Dispatches an autonomous AI call to a confirmed dental lead.
-        Supports selection between Telnyx, Twilio, or sandbox simulation.
+        Enforces CarrierReputationManager (DNC blacklist, local area-code matching, hourly rate throttle).
         """
         target_phone = clean_phone_e164(to_phone or lead.get("phone"))
         carrier_status = cls.get_carrier_status()
         script = DentalCallerPersona.build_call_script(lead)
         selected_carrier = (carrier_override or carrier_status.get("active_carrier") or "TELNYX").upper()
+
+        matched_caller_id: Optional[str] = None
+        try:
+            from carrier_reputation_manager import CarrierReputationManager
+            rep_mgr = CarrierReputationManager(db=db)
+            preferred_from = get_twilio_from_phone() if selected_carrier == "TWILIO" else get_telnyx_from_phone()
+            allowed, reason, matched_caller_id = rep_mgr.verify_outbound_action(
+                destination_phone=target_phone,
+                caller_phone=preferred_from or None,
+                channel="VOICE",
+                bypass_velocity=bypass_throttle
+            )
+            if not allowed:
+                logger.warning(f"Outbound call to {target_phone} blocked by CarrierReputationManager: {reason}")
+                return {
+                    "status": "blocked",
+                    "mode": "COMPLIANCE_BLOCKED",
+                    "blocked": True,
+                    "reason": reason,
+                    "error": reason,
+                    "target_phone": target_phone,
+                    "caller_id": matched_caller_id,
+                    "clinic_name": lead.get("name"),
+                    "message": f"Call blocked by Carrier Reputation Shield: {reason}"
+                }
+        except Exception as e:
+            logger.debug(f"Carrier reputation check skipped cleanly: {e}")
 
         if selected_carrier == "TWILIO" and carrier_status.get("has_twilio"):
             return cls._dispatch_twilio_call(
@@ -712,7 +742,8 @@ class VoiceDialerEngine:
                 target_phone=target_phone,
                 script=script,
                 server_base_url=server_base_url,
-                db=db
+                db=db,
+                caller_id_override=matched_caller_id
             )
         elif selected_carrier == "TELNYX" and carrier_status.get("has_telnyx"):
             return cls._dispatch_telnyx_call(
@@ -721,7 +752,10 @@ class VoiceDialerEngine:
                 script=script,
                 server_base_url=server_base_url,
                 db=db,
-                initial_mode=initial_mode
+                initial_mode=initial_mode,
+                caller_id_override=matched_caller_id,
+                extra_client_state=extra_client_state,
+                register_live_session=register_live_session
             )
         elif selected_carrier == "TWILIO" and not carrier_status.get("has_twilio"):
             err_reason = "Twilio credentials incomplete. Configure Account SID, Auth Token / API Secret, and From Phone in settings."
@@ -744,7 +778,8 @@ class VoiceDialerEngine:
         target_phone: str,
         script: Dict[str, Any],
         server_base_url: Optional[str],
-        db: Any
+        db: Any,
+        caller_id_override: Optional[str] = None
     ) -> Dict[str, Any]:
         """Initiates real PSTN call via Twilio Voice API with TwiML."""
         clinic_name = lead.get("name") or "Dental Practice"
@@ -760,7 +795,11 @@ class VoiceDialerEngine:
             logger.warning(f"Twilio dispatch error: {err_reason}")
             return cls._dispatch_sandbox_call(lead=lead, target_phone=target_phone, script=script, db=db, error_reason=err_reason)
 
-        from_phone = get_twilio_from_phone()
+        from_phone = (
+            caller_id_override
+            if (caller_id_override and caller_id_override != "+12145550199")
+            else get_twilio_from_phone()
+        )
         if not from_phone:
             err_reason = "Twilio From Phone number not configured. Please add TWILIO_FROM_PHONE in settings."
             logger.warning(f"Twilio dispatch error: {err_reason}")
@@ -787,6 +826,17 @@ class VoiceDialerEngine:
 
             call = client.calls.create(**call_kwargs)
             call_sid = getattr(call, "sid", "twilio_live_call")
+
+            try:
+                from carrier_reputation_manager import CarrierReputationManager
+                CarrierReputationManager(db=db).log_call_attempt(
+                    caller_phone=from_phone,
+                    destination_phone=target_phone,
+                    lead_id=lead.get("id"),
+                    status="INITIATED"
+                )
+            except Exception:
+                pass
 
             if db:
                 db.log_call_outcome(
@@ -978,11 +1028,14 @@ class VoiceDialerEngine:
         script: Dict[str, Any],
         server_base_url: Optional[str],
         db: Any,
-        initial_mode: str = "AI_FIRST"
+        initial_mode: str = "AI_FIRST",
+        caller_id_override: Optional[str] = None,
+        extra_client_state: Optional[Dict[str, Any]] = None,
+        register_live_session: bool = True
     ) -> Dict[str, Any]:
         """Initiates real PSTN call via Telnyx Call Control v2 REST API."""
         url = "https://api.telnyx.com/v2/calls"
-        client_state = base64.b64encode(json.dumps({
+        state_payload: Dict[str, Any] = {
             "lead_id": lead.get("id"),
             "name": lead.get("name"),
             "doctor_name": lead.get("doctor_name"),
@@ -991,10 +1044,17 @@ class VoiceDialerEngine:
             "address": lead.get("address") or "",
             "missed_rev_min": lead.get("missed_rev_min") or 3500,
             "missed_rev_max": lead.get("missed_rev_max") or 9600
-        }).encode()).decode()
+        }
+        if extra_client_state:
+            state_payload.update(extra_client_state)
+        client_state = base64.b64encode(json.dumps(state_payload).encode()).decode()
 
-        # Resolve Caller ID: prefer saved setting, then query owned Telnyx numbers
-        caller_id = get_telnyx_from_phone()
+        # Resolve Caller ID: prefer local-presence pool match, saved setting, or owned Telnyx number
+        caller_id = (
+            caller_id_override
+            if (caller_id_override and caller_id_override != "+12145550199")
+            else get_telnyx_from_phone()
+        )
         api_key = get_telnyx_api_key()
         
         if not caller_id or caller_id == "+13343780005":
@@ -1007,9 +1067,10 @@ class VoiceDialerEngine:
             except Exception:
                 pass
 
+        actual_from = caller_id or "+13343780005"
         payload = {
             "to": target_phone,
-            "from": caller_id or "+13343780005",
+            "from": actual_from,
             "connection_id": get_telnyx_connection_id(),
             "client_state": client_state,
             "timeout_secs": 60
@@ -1062,32 +1123,44 @@ class VoiceDialerEngine:
                 data = json.loads(resp.read().decode("utf-8"))
                 call_control_id = data.get("data", {}).get("call_control_id", "telnyx_live_call")
 
-                # Log to DB
+                # Log to DB + Carrier Reputation Velocity Tracker
+                try:
+                    from carrier_reputation_manager import CarrierReputationManager
+                    CarrierReputationManager(db=db).log_call_attempt(
+                        caller_phone=actual_from,
+                        destination_phone=target_phone,
+                        lead_id=lead.get("id"),
+                        status="INITIATED"
+                    )
+                except Exception:
+                    pass
+
                 if db:
                     db.log_call_outcome(
                         lead_id=lead.get("id") or "manual_call",
                         outcome="CALL_INITIATED",
-                        rep_notes=f"Telnyx outbound call placed to {target_phone}. Call ID: {call_control_id}",
+                        rep_notes=f"Telnyx outbound call placed to {target_phone} via {actual_from}. Call ID: {call_control_id}",
                         duration_sec=0
                     )
 
                 # Pre-register session in LiveDialerEngine so webhooks, UI, and hangup endpoints track it immediately
                 session_id = f"call_telnyx_{int(time.time())}_{abs(hash(call_control_id)) % 10000}"
-                try:
-                    from live_dialer_engine import LiveDialerEngine
-                    live_sess = LiveDialerEngine.start_manual_session(
-                        phone=target_phone,
-                        lead_id=lead.get("id"),
-                        contact_name=lead.get("name"),
-                        mode=initial_mode,
-                        carrier_mode="TELNYX",
-                        carrier_call_id=call_control_id,
-                        dispatch_carrier=False,  # Already dispatched above!
-                        db=db
-                    )
-                    session_id = live_sess.get("session_id", session_id)
-                except Exception as ex:
-                    logger.warning(f"Could not pre-register live session for {call_control_id}: {ex}")
+                if register_live_session:
+                    try:
+                        from live_dialer_engine import LiveDialerEngine
+                        live_sess = LiveDialerEngine.start_manual_session(
+                            phone=target_phone,
+                            lead_id=lead.get("id"),
+                            contact_name=lead.get("name"),
+                            mode=initial_mode,
+                            carrier_mode="TELNYX",
+                            carrier_call_id=call_control_id,
+                            dispatch_carrier=False,  # Already dispatched above!
+                            db=db
+                        )
+                        session_id = live_sess.get("session_id", session_id)
+                    except Exception as ex:
+                        logger.warning(f"Could not pre-register live session for {call_control_id}: {ex}")
 
                 logger.info(f"Telnyx call {call_control_id} dispatched to {target_phone}. Registered session {session_id}. Awaiting call.answered webhook for introductory speech.")
 
